@@ -427,9 +427,14 @@
     </div>
     <div style="margin-bottom:10px">
       <div style="font-size:11px;font-weight:600;color:var(--text3);margin-bottom:5px;text-transform:uppercase;letter-spacing:0.5px">Vehicle Interested In</div>
-      <select id="al-vehicle" style="width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:8px 10px;border-radius:var(--radius);font-family:'Syne',sans-serif;font-size:13px;outline:none;appearance:none">
-        <option value="">Select a vehicle…</option>
-      </select>
+      <div style="position:relative">
+        <svg style="position:absolute;left:10px;top:50%;transform:translateY(-50%);opacity:0.4;pointer-events:none" width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+        <input type="text" id="al-vehicle-search" placeholder="Search year, make, model, color…" autocomplete="off"
+          style="width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:8px 10px 8px 32px;border-radius:var(--radius);font-family:'Syne',sans-serif;font-size:13px;outline:none"
+          oninput="renderAlResults(this.value)" onfocus="renderAlResults(this.value)">
+      </div>
+      <div id="al-vehicle-results" style="display:none;border:1px solid var(--border);border-top:none;border-radius:0 0 var(--radius) var(--radius);background:var(--bg2);max-height:200px;overflow-y:auto"></div>
+      <div id="al-vehicle-selected" style="display:none;margin-top:6px;font-size:12px;color:var(--green);font-weight:600"></div>
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
       <div>
@@ -1059,7 +1064,10 @@ function buildLeadSectionHtml(lead, car){
     <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:12px;gap:10px">
       <div>
         <div style="font-size:15px;font-weight:700;color:var(--text)">${lead.firstName||''} ${lead.lastName||''}</div>
-        <a href="tel:${lead.phone||''}" style="font-size:13px;color:var(--blue);font-family:'DM Mono',monospace">${lead.phone||''}</a>
+        <div style="display:flex;align-items:center;gap:8px;margin-top:2px">
+          <span style="font-size:13px;font-family:'DM Mono',monospace;color:var(--text2)">${lead.phone||''}</span>
+          ${lead.phone?`<button class="mini-copy-btn" onclick="copyText('${lead.phone}',this)">Copy</button>`:''}
+        </div>
       </div>
       <div style="display:flex;gap:6px;flex-wrap:wrap">
         <button class="mini-copy-btn" onclick="copyLeadSnippet()" title="Copy quick summary to paste in a text">📋 Copy for Text</button>
@@ -1642,9 +1650,10 @@ function renderLeads(){
     const vehicleCell = matchedCar
       ? `<div class="lead-vehicle-match">
            <span style="font-size:12px;color:var(--text2)">${lead.vehicle||getTitle(matchedCar)}</span>
-           <button class="icon-btn" title="Refresh this vehicle's web data" onclick="refreshLeadVehicle('${lead.vin}',this)" style="color:var(--blue);padding:2px 4px">
+           <button class="icon-btn" title="Refresh this vehicle's web data" onclick="event.stopPropagation();refreshLeadVehicle('${lead.vin}',this)" style="color:var(--blue);padding:2px 4px">
              <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M4 4v5h5"/><path d="M20 20v-5h-5"/><path d="M4 9a9 9 0 0115.47-3.47"/><path d="M20 15a9 9 0 01-15.47 3.47"/></svg>
            </button>
+           <div style="margin-top:4px">${statusBadge(matchedCar)}</div>
          </div>`
       : `<span style="font-size:12px;color:var(--text2)">${lead.vehicle||'—'}</span>`;
 
@@ -1652,7 +1661,10 @@ function renderLeads(){
       <td onclick="event.stopPropagation()"><input type="checkbox" ${isSelected?'checked':''} onchange="toggleLeadSelect(${lead.rowIndex},this)"></td>
       <td style="color:var(--text3);font-family:'DM Mono',monospace;font-size:11px;white-space:nowrap">${date}</td>
       <td class="td-main" style="white-space:nowrap">${lead.firstName||''} ${lead.lastName||''}</td>
-      <td><a href="tel:${lead.phone||''}" style="color:var(--blue);font-family:'DM Mono',monospace;font-size:12px">${lead.phone||'—'}</a></td>
+      <td onclick="event.stopPropagation()" style="white-space:nowrap">
+        <span style="font-family:'DM Mono',monospace;font-size:12px;color:var(--text2)">${lead.phone||'—'}</span>
+        ${lead.phone?`<button class="mini-copy-btn" style="margin-left:6px" onclick="copyText('${lead.phone}',this)">Copy</button>`:''}
+      </td>
       <td>${vehicleCell}</td>
       <td><span style="font-size:11px;background:var(--bg3);padding:2px 8px;border-radius:4px;color:var(--text3);white-space:nowrap">${lead.timeframe||'—'}</span></td>
       <td><select class="lead-status-sel ${cls}" onchange="updateLeadStatus(${lead.rowIndex},this)">${statusOpts}</select></td>
@@ -1783,31 +1795,60 @@ async function doDeleteLead(rowIndex){
 }
 
 // ── Add Lead Manually ─────────────────────────────────────────
+let alSelectedVin = '';
+let alSelectedVehicle = '';
+
 function openAddLeadModal(){
-  // Populate vehicle dropdown from inventory
-  const sel = document.getElementById('al-vehicle');
-  sel.innerHTML='<option value="">Select a vehicle…</option>';
-  inventory.filter(c=>(c.websiteStatus||'').toLowerCase().includes('live')&&!c.soldDate)
-    .sort((a,b)=>getTitle(a).localeCompare(getTitle(b)))
-    .forEach(c=>{
-      const o=document.createElement('option');
-      o.value=c.vin;
-      o.textContent=getTitle(c)+(c.stock?' — #'+c.stock:'');
-      sel.appendChild(o);
-    });
+  alSelectedVin=''; alSelectedVehicle='';
   ['al-firstname','al-lastname','al-phone','al-notes'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('al-vehicle-search').value='';
+  document.getElementById('al-vehicle-results').style.display='none';
+  document.getElementById('al-vehicle-selected').style.display='none';
   document.getElementById('al-timeframe').value='';
   document.getElementById('al-status').value='New';
   document.getElementById('al-error').style.display='none';
   document.getElementById('add-lead-modal').classList.add('open');
+  setTimeout(()=>document.getElementById('al-firstname').focus(),100);
 }
-function closeAddLeadModal(){ document.getElementById('add-lead-modal').classList.remove('open'); }
+function closeAddLeadModal(){
+  document.getElementById('add-lead-modal').classList.remove('open');
+  document.getElementById('al-vehicle-results').style.display='none';
+}
+
+function renderAlResults(q){
+  const results=document.getElementById('al-vehicle-results');
+  q=(q||'').toLowerCase().trim();
+  const cars=inventory.filter(c=>{
+    if((c.websiteStatus||'').toLowerCase().includes('sold')||c.soldDate) return false;
+    if(!q) return true;
+    return [c.year,c.make,c.model,c.trim,c.color,c.stock].join(' ').toLowerCase().includes(q);
+  }).slice(0,30);
+  if(!cars.length){
+    results.innerHTML='<div style="padding:12px 14px;font-size:12px;color:var(--text3)">No vehicles match</div>';
+    results.style.display='block'; return;
+  }
+  results.innerHTML=cars.map(c=>`
+    <div onclick="selectAlVehicle('${c.vin}')" style="padding:9px 14px;border-bottom:1px solid var(--border);cursor:pointer;transition:background 0.1s" onmouseover="this.style.background='var(--bg3)'" onmouseout="this.style.background=''">
+      <div style="font-size:13px;font-weight:600;color:var(--text)">${getTitle(c)}</div>
+      <div style="font-size:11px;color:var(--text3);font-family:'DM Mono',monospace;margin-top:1px">${c.vin}${c.stock?' · #'+c.stock:''}${c.websitePrice?' · '+fmtPrice(c.websitePrice):''}</div>
+    </div>`).join('');
+  results.style.display='block';
+}
+
+function selectAlVehicle(vin){
+  const car=inventory.find(c=>c.vin===vin); if(!car) return;
+  alSelectedVin=vin;
+  alSelectedVehicle=getTitle(car);
+  document.getElementById('al-vehicle-search').value=alSelectedVehicle;
+  document.getElementById('al-vehicle-results').style.display='none';
+  const sel=document.getElementById('al-vehicle-selected');
+  sel.textContent='✓ '+alSelectedVehicle; sel.style.display='block';
+}
 
 async function submitManualLead(){
   const firstName = document.getElementById('al-firstname').value.trim();
   const lastName  = document.getElementById('al-lastname').value.trim();
   const phone     = document.getElementById('al-phone').value.trim();
-  const vinVal    = document.getElementById('al-vehicle').value;
   const timeframe = document.getElementById('al-timeframe').value;
   const status    = document.getElementById('al-status').value;
   const notes     = document.getElementById('al-notes').value.trim();
@@ -1815,16 +1856,12 @@ async function submitManualLead(){
   if(!firstName||!lastName||!phone){ document.getElementById('al-error').style.display='block'; return; }
   document.getElementById('al-error').style.display='none';
 
-  const car = vinVal ? inventory.find(c=>c.vin===vinVal) : null;
-  const vehicleText = car ? getTitle(car) : '';
-
   try {
     await apiPost('submitLead',{
       firstName,lastName,phone,timeframe,
-      vehicle: vehicleText,
-      vin: vinVal||'',
-      status,
-      notes,
+      vehicle: alSelectedVehicle,
+      vin: alSelectedVin,
+      status,notes,
       source:'manual'
     });
     closeAddLeadModal();
