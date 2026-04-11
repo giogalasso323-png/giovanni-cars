@@ -1,0 +1,618 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Giovanni Galasso | Toyota Specialist — Dublin Toyota</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --red: #c8102e;
+  --red-dark: #a00d24;
+  --text: #111827;
+  --text2: #6b7280;
+  --text3: #9ca3af;
+  --bg: #ffffff;
+  --bg2: #f9fafb;
+  --bg3: #f3f4f6;
+  --border: #e5e7eb;
+  --radius: 10px;
+  --radius-lg: 14px;
+  --shadow: 0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04);
+  --shadow-md: 0 4px 16px rgba(0,0,0,0.10);
+  --shadow-lg: 0 10px 40px rgba(0,0,0,0.14);
+}
+body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--text); font-size: 15px; line-height: 1.5; }
+a { text-decoration: none; color: inherit; }
+
+/* NAV */
+nav {
+  position: sticky; top: 0; z-index: 100;
+  background: #fff; border-bottom: 1px solid var(--border);
+  padding: 0 24px; height: 64px;
+  display: flex; align-items: center; justify-content: space-between;
+}
+.nav-logo { display: flex; flex-direction: column; }
+.nav-logo-name { font-size: 17px; font-weight: 800; color: var(--text); letter-spacing: -0.3px; }
+.nav-logo-sub { font-size: 11px; color: var(--text3); font-weight: 500; letter-spacing: 0.3px; text-transform: uppercase; }
+.nav-cta { background: var(--red); color: #fff; border: none; border-radius: 8px; padding: 9px 18px; font-size: 14px; font-weight: 600; cursor: pointer; font-family: 'Inter', sans-serif; transition: background 0.15s; }
+.nav-cta:hover { background: var(--red-dark); }
+
+/* HERO */
+.hero { background: var(--bg2); border-bottom: 1px solid var(--border); padding: 56px 24px 48px; text-align: center; }
+.hero-tag { display: inline-block; background: rgba(200,16,46,0.08); color: var(--red); font-size: 12px; font-weight: 600; letter-spacing: 0.5px; text-transform: uppercase; padding: 5px 12px; border-radius: 20px; margin-bottom: 18px; }
+.hero h1 { font-size: clamp(28px, 5vw, 46px); font-weight: 800; letter-spacing: -0.8px; line-height: 1.15; margin-bottom: 16px; color: var(--text); }
+.hero h1 span { color: var(--red); }
+.hero p { font-size: 16px; color: var(--text2); max-width: 520px; margin: 0 auto 28px; line-height: 1.65; }
+.hero-search { display: flex; gap: 8px; max-width: 480px; margin: 0 auto; }
+.hero-search input { flex: 1; padding: 12px 16px; border: 1px solid var(--border); border-radius: var(--radius); font-size: 14px; font-family: 'Inter', sans-serif; outline: none; background: #fff; color: var(--text); }
+.hero-search input:focus { border-color: var(--red); }
+.hero-search input::placeholder { color: var(--text3); }
+.hero-search button { background: var(--red); color: #fff; border: none; border-radius: var(--radius); padding: 12px 20px; font-size: 14px; font-weight: 600; cursor: pointer; font-family: 'Inter', sans-serif; transition: background 0.15s; white-space: nowrap; }
+.hero-search button:hover { background: var(--red-dark); }
+
+/* INVENTORY */
+.inventory { max-width: 1200px; margin: 0 auto; padding: 32px 24px; }
+.inv-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; flex-wrap: wrap; gap: 12px; }
+.inv-title { font-size: 20px; font-weight: 700; }
+.inv-count { font-size: 13px; color: var(--text2); font-weight: 400; margin-left: 8px; }
+.filters { display: flex; gap: 8px; flex-wrap: wrap; }
+select.filter { background: var(--bg); border: 1px solid var(--border); color: var(--text); padding: 8px 32px 8px 12px; border-radius: 8px; font-size: 13px; font-family: 'Inter', sans-serif; outline: none; cursor: pointer; appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' fill='none'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%239ca3af' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 10px center; }
+select.filter:focus { border-color: var(--red); }
+
+/* GRID */
+.car-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 20px; }
+.car-card { background: #fff; border: 1px solid var(--border); border-radius: var(--radius-lg); overflow: hidden; cursor: pointer; transition: all 0.15s; box-shadow: var(--shadow); }
+.car-card:hover { border-color: #d1d5db; box-shadow: var(--shadow-md); transform: translateY(-2px); }
+.car-photo { width: 100%; aspect-ratio: 16/10; object-fit: cover; background: var(--bg3); display: block; }
+.car-photo-placeholder { width: 100%; aspect-ratio: 16/10; background: var(--bg3); display: flex; align-items: center; justify-content: center; color: var(--text3); font-size: 13px; }
+.car-body { padding: 16px; }
+.car-title { font-size: 15px; font-weight: 700; color: var(--text); margin-bottom: 4px; line-height: 1.3; }
+.car-sub { font-size: 12px; color: var(--text3); margin-bottom: 12px; }
+.car-price { font-size: 22px; font-weight: 800; color: var(--text); letter-spacing: -0.5px; margin-bottom: 10px; }
+.car-meta { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
+.car-meta-item { font-size: 12px; color: var(--text2); display: flex; align-items: center; gap: 4px; }
+.car-meta-item svg { opacity: 0.5; }
+.car-cta { width: 100%; background: var(--red); color: #fff; border: none; border-radius: 8px; padding: 10px; font-size: 14px; font-weight: 600; cursor: pointer; font-family: 'Inter', sans-serif; transition: background 0.15s; }
+.car-cta:hover { background: var(--red-dark); }
+
+/* BADGES */
+.badge { display: inline-flex; align-items: center; gap: 5px; padding: 3px 8px; border-radius: 5px; font-size: 11px; font-weight: 600; }
+.badge-certified { background: rgba(200,16,46,0.08); color: var(--red); }
+
+/* LOADING / EMPTY */
+.loading { text-align: center; padding: 80px 24px; color: var(--text2); }
+.loading-spinner { width: 36px; height: 36px; border: 3px solid var(--border); border-top-color: var(--red); border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto 16px; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.empty { text-align: center; padding: 80px 24px; color: var(--text2); }
+.empty-icon { font-size: 40px; margin-bottom: 12px; }
+.empty h3 { font-size: 18px; font-weight: 600; color: var(--text); margin-bottom: 8px; }
+
+/* MODAL */
+.overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.55); z-index: 200; display: none; align-items: flex-end; justify-content: center; padding: 0; }
+.overlay.open { display: flex; }
+@media (min-width: 640px) { .overlay { align-items: center; padding: 24px; } }
+.modal { background: #fff; border-radius: var(--radius-lg) var(--radius-lg) 0 0; width: 100%; max-height: 92vh; overflow-y: auto; box-shadow: var(--shadow-lg); animation: slideUp 0.25s ease; position: relative; }
+@media (min-width: 640px) { .modal { border-radius: var(--radius-lg); max-width: 860px; max-height: 88vh; animation: fadeScale 0.2s ease; } }
+@keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+@keyframes fadeScale { from { opacity: 0; transform: scale(0.96); } to { opacity: 1; transform: scale(1); } }
+.modal-close { position: absolute; top: 14px; right: 14px; width: 32px; height: 32px; border-radius: 50%; background: rgba(0,0,0,0.08); border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; z-index: 10; transition: background 0.15s; }
+.modal-close:hover { background: rgba(0,0,0,0.15); }
+
+/* PHOTO CAROUSEL */
+.carousel { position: relative; background: var(--bg3); aspect-ratio: 16/10; overflow: hidden; }
+.carousel img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.carousel-nav { position: absolute; top: 50%; transform: translateY(-50%); display: flex; justify-content: space-between; width: 100%; padding: 0 10px; pointer-events: none; }
+.carousel-btn { width: 34px; height: 34px; border-radius: 50%; background: rgba(255,255,255,0.92); border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; pointer-events: all; box-shadow: var(--shadow); transition: background 0.15s; }
+.carousel-btn:hover { background: #fff; }
+.carousel-dots { position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%); display: flex; gap: 5px; }
+.carousel-dot { width: 6px; height: 6px; border-radius: 50%; background: rgba(255,255,255,0.5); border: none; cursor: pointer; padding: 0; transition: background 0.15s; }
+.carousel-dot.active { background: #fff; }
+
+/* MODAL BODY */
+.modal-body { padding: 24px; }
+.modal-header { margin-bottom: 20px; }
+.modal-title { font-size: 22px; font-weight: 800; letter-spacing: -0.4px; margin-bottom: 4px; }
+.modal-price { font-size: 28px; font-weight: 800; color: var(--text); letter-spacing: -0.5px; margin-bottom: 6px; }
+.modal-sub { font-size: 13px; color: var(--text2); }
+.modal-grid { display: grid; grid-template-columns: 1fr; gap: 28px; }
+@media (min-width: 640px) { .modal-grid { grid-template-columns: 1fr 1fr; } }
+
+/* DETAILS */
+.details-section h3 { font-size: 13px; font-weight: 700; color: var(--text3); text-transform: uppercase; letter-spacing: 0.6px; margin-bottom: 12px; }
+.detail-row { display: flex; justify-content: space-between; padding: 9px 0; border-bottom: 1px solid var(--border); font-size: 14px; }
+.detail-row:last-child { border-bottom: none; }
+.detail-label { color: var(--text2); }
+.detail-val { font-weight: 600; color: var(--text); text-align: right; }
+.features-list { font-size: 13px; color: var(--text2); line-height: 1.8; white-space: pre-wrap; }
+.carfax-link { display: inline-flex; align-items: center; gap: 6px; color: var(--red); font-size: 13px; font-weight: 600; margin-top: 10px; }
+.carfax-link:hover { text-decoration: underline; }
+
+/* LEAD FORM */
+.lead-form-section { background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; }
+.lead-form-section h3 { font-size: 16px; font-weight: 700; margin-bottom: 4px; }
+.lead-form-section p { font-size: 13px; color: var(--text2); margin-bottom: 18px; line-height: 1.5; }
+.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.form-group { margin-bottom: 12px; }
+.form-label { font-size: 12px; font-weight: 600; color: var(--text2); display: block; margin-bottom: 5px; }
+.form-input { width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; font-size: 14px; font-family: 'Inter', sans-serif; outline: none; color: var(--text); background: #fff; transition: border-color 0.15s; }
+.form-input:focus { border-color: var(--red); }
+.form-input::placeholder { color: var(--text3); }
+select.form-input { appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' fill='none'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%239ca3af' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 12px center; padding-right: 32px; cursor: pointer; }
+.form-submit { width: 100%; background: var(--red); color: #fff; border: none; border-radius: 8px; padding: 12px; font-size: 15px; font-weight: 700; cursor: pointer; font-family: 'Inter', sans-serif; transition: background 0.15s; margin-top: 4px; }
+.form-submit:hover { background: var(--red-dark); }
+.form-submit:disabled { opacity: 0.6; cursor: not-allowed; }
+.form-error { font-size: 12px; color: var(--red); margin-top: 4px; display: none; }
+.form-success { text-align: center; padding: 20px 10px; display: none; }
+.form-success h4 { font-size: 17px; font-weight: 700; margin-bottom: 8px; }
+.form-success p { font-size: 14px; color: var(--text2); line-height: 1.6; }
+.success-check { font-size: 40px; margin-bottom: 12px; }
+
+/* FOOTER */
+footer { background: var(--text); color: rgba(255,255,255,0.7); padding: 36px 24px; margin-top: 60px; }
+.footer-inner { max-width: 1200px; margin: 0 auto; display: flex; flex-wrap: wrap; justify-content: space-between; gap: 20px; align-items: center; }
+.footer-name { font-size: 16px; font-weight: 700; color: #fff; margin-bottom: 4px; }
+.footer-sub { font-size: 13px; }
+.footer-disclaimer { font-size: 11px; color: rgba(255,255,255,0.35); margin-top: 20px; max-width: 1200px; margin-left: auto; margin-right: auto; }
+
+@media (max-width: 480px) {
+  .form-row { grid-template-columns: 1fr; }
+  .hero-search { flex-direction: column; }
+}
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <div class="nav-logo">
+    <span class="nav-logo-name">Giovanni Galasso</span>
+    <span class="nav-logo-sub">Toyota Specialist &middot; Dublin Toyota</span>
+  </div>
+  <button class="nav-cta" onclick="openContactModal()">Get in Touch</button>
+</nav>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="hero-tag">Dublin, CA</div>
+  <h1>Find Your Next<br><span>Toyota</span> With Giovanni</h1>
+  <p>Browse my current inventory and reach out directly. I'll help you find the right car at the right price — no runaround.</p>
+  <div class="hero-search">
+    <input type="text" id="heroSearch" placeholder="Search by model, year, color..." oninput="handleSearch(this.value)">
+    <button onclick="handleSearch(document.getElementById('heroSearch').value)">Search</button>
+  </div>
+</section>
+
+<!-- INVENTORY -->
+<section class="inventory">
+  <div class="inv-header">
+    <div>
+      <span class="inv-title">Available Now</span>
+      <span class="inv-count" id="carCount"></span>
+    </div>
+    <div class="filters">
+      <select class="filter" id="filterModel" onchange="applyFilters()">
+        <option value="">All Models</option>
+      </select>
+      <select class="filter" id="filterPrice" onchange="applyFilters()">
+        <option value="">Any Price</option>
+        <option value="0-20000">Under $20,000</option>
+        <option value="20000-30000">$20k – $30k</option>
+        <option value="30000-40000">$30k – $40k</option>
+        <option value="40000-99999">$40k+</option>
+      </select>
+      <select class="filter" id="filterYear" onchange="applyFilters()">
+        <option value="">Any Year</option>
+      </select>
+    </div>
+  </div>
+  <div id="carGrid">
+    <div class="loading">
+      <div class="loading-spinner"></div>
+      <div>Loading inventory...</div>
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <div class="footer-inner">
+    <div>
+      <div class="footer-name">Giovanni Galasso</div>
+      <div class="footer-sub">Toyota Sales Specialist &middot; Dublin Toyota</div>
+    </div>
+    <div style="font-size:13px;">Dublin, CA</div>
+  </div>
+  <div class="footer-disclaimer">
+    This is an independent site run by Giovanni Galasso, a salesperson at Dublin Toyota. Prices and availability are subject to change. All vehicles are subject to prior sale.
+  </div>
+</footer>
+
+<!-- MODAL -->
+<div class="overlay" id="overlay" onclick="handleOverlayClick(event)">
+  <div class="modal" id="modal">
+    <button class="modal-close" onclick="closeModal()">
+      <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M1 1l12 12M13 1L1 13" stroke="#374151" stroke-width="2" stroke-linecap="round"/></svg>
+    </button>
+    <div class="carousel" id="carousel">
+      <img id="carouselImg" src="" alt="" style="display:none">
+      <div id="carouselPlaceholder" style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:#9ca3af;font-size:14px;">Loading photos...</div>
+      <div class="carousel-nav">
+        <button class="carousel-btn" onclick="prevPhoto()">
+          <svg width="8" height="14" viewBox="0 0 8 14" fill="none"><path d="M7 1L1 7l6 6" stroke="#374151" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <button class="carousel-btn" onclick="nextPhoto()">
+          <svg width="8" height="14" viewBox="0 0 8 14" fill="none"><path d="M1 1l6 6-6 6" stroke="#374151" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+      </div>
+      <div class="carousel-dots" id="carouselDots"></div>
+    </div>
+    <div class="modal-body">
+      <div class="modal-header">
+        <div class="modal-title" id="modalTitle"></div>
+        <div class="modal-price" id="modalPrice"></div>
+        <div class="modal-sub" id="modalSub"></div>
+      </div>
+      <div class="modal-grid">
+        <div class="details-section">
+          <h3>Vehicle Details</h3>
+          <div id="detailRows"></div>
+          <div id="carfaxArea" style="margin-top:12px;"></div>
+          <div id="featuresArea" style="margin-top:16px;"></div>
+        </div>
+        <div>
+          <div class="lead-form-section">
+            <div class="form-success" id="formSuccess">
+              <div class="success-check">&#10003;</div>
+              <h4>Got it! I'll be in touch soon.</h4>
+              <p>Thanks for reaching out. Giovanni will contact you personally — usually within a few hours.</p>
+            </div>
+            <div id="formContent">
+              <h3>I'm Interested</h3>
+              <p>Fill out the form and Giovanni will reach out to you directly — no dealership runaround.</p>
+              <form id="leadForm" onsubmit="submitLead(event)">
+                <div class="form-row">
+                  <div class="form-group">
+                    <label class="form-label">First Name *</label>
+                    <input class="form-input" type="text" id="fFirstName" placeholder="Jane" required>
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">Last Name *</label>
+                    <input class="form-input" type="text" id="fLastName" placeholder="Smith" required>
+                  </div>
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Phone Number *</label>
+                  <input class="form-input" type="tel" id="fPhone" placeholder="(555) 000-0000" required>
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Interested In</label>
+                  <input class="form-input" type="text" id="fVehicle" readonly style="background:var(--bg3);color:var(--text2);">
+                </div>
+                <div class="form-group">
+                  <label class="form-label">When are you looking to buy? *</label>
+                  <select class="form-input" id="fTimeframe" required>
+                    <option value="">Select timeframe...</option>
+                    <option value="ASAP">As soon as possible</option>
+                    <option value="Within 2 weeks">Within 2 weeks</option>
+                    <option value="Within a month">Within a month</option>
+                    <option value="1-3 months">1–3 months</option>
+                    <option value="Just browsing">Just browsing</option>
+                  </select>
+                </div>
+                <div class="form-error" id="formError">Please fill in all required fields.</div>
+                <button class="form-submit" type="submit" id="formSubmit">Send to Giovanni</button>
+              </form>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const API_URL = 'https://script.google.com/macros/s/AKfycbwKodPA7tuxeblfpakHxSd0XFu5MkCguo7rIjBltynkiDEQZky3qCck6_C0sftzgF9Qhg/exec';
+const DEALER_ID = '13444';
+
+let allCars = [];
+let filteredCars = [];
+let currentCar = null;
+let photos = [];
+let photoIndex = 0;
+let searchQuery = '';
+
+// ── Load Inventory ────────────────────────────────────────────
+async function loadInventory() {
+  try {
+    const res = await fetch(API_URL + '?action=getAll');
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    allCars = (data.cars || []).filter(car =>
+      car.websiteStatus && car.websiteStatus.toLowerCase().includes('live') &&
+      !car.soldDate
+    );
+    populateFilters(allCars);
+    filteredCars = allCars;
+    renderGrid(filteredCars);
+  } catch (err) {
+    document.getElementById('carGrid').innerHTML = `
+      <div class="empty">
+        <div class="empty-icon">&#9888;</div>
+        <h3>Couldn't load inventory</h3>
+        <p>Please try refreshing the page.</p>
+      </div>`;
+  }
+}
+
+// ── Filters ───────────────────────────────────────────────────
+function populateFilters(cars) {
+  const models = [...new Set(cars.map(c => c.model).filter(Boolean))].sort();
+  const years  = [...new Set(cars.map(c => String(c.year)).filter(Boolean))].sort().reverse();
+  const modelSel = document.getElementById('filterModel');
+  const yearSel  = document.getElementById('filterYear');
+  models.forEach(m => { const o = document.createElement('option'); o.value = m; o.textContent = m; modelSel.appendChild(o); });
+  years.forEach(y  => { const o = document.createElement('option'); o.value = y; o.textContent = y; yearSel.appendChild(o); });
+}
+
+function applyFilters() {
+  const model = document.getElementById('filterModel').value;
+  const price = document.getElementById('filterPrice').value;
+  const year  = document.getElementById('filterYear').value;
+
+  filteredCars = allCars.filter(car => {
+    if (model && car.model !== model) return false;
+    if (year  && String(car.year) !== year) return false;
+    if (price) {
+      const [min, max] = price.split('-').map(Number);
+      const p = Number(car.websitePrice) || Number(car.price) || 0;
+      if (p < min || p > max) return false;
+    }
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase();
+      const haystack = [car.year, car.make, car.model, car.trim, car.color].join(' ').toLowerCase();
+      if (!haystack.includes(q)) return false;
+    }
+    return true;
+  });
+  renderGrid(filteredCars);
+}
+
+function handleSearch(val) {
+  searchQuery = val;
+  applyFilters();
+}
+
+// ── Render Grid ───────────────────────────────────────────────
+function fmt(n) { return Number(n) ? '$' + Number(n).toLocaleString() : '—'; }
+function fmtMiles(n) { return Number(n) ? Number(n).toLocaleString() + ' mi' : '—'; }
+
+function renderGrid(cars) {
+  const grid = document.getElementById('carGrid');
+  document.getElementById('carCount').textContent = `(${cars.length} vehicle${cars.length !== 1 ? 's' : ''})`;
+
+  if (!cars.length) {
+    grid.innerHTML = `<div class="empty"><div class="empty-icon">&#128663;</div><h3>No vehicles match</h3><p>Try adjusting your filters.</p></div>`;
+    return;
+  }
+
+  grid.innerHTML = '<div class="car-grid">' + cars.map(car => {
+    const price = Number(car.websitePrice) || Number(car.price) || 0;
+    const vin   = (car.vin || '').toLowerCase();
+    const photoUrl = vin ? `https://www.dublintoyota.com/inventoryphotos/${DEALER_ID}/${vin}/ip/1.jpg` : '';
+    const cert  = car.certification ? `<div style="margin-top:8px"><span class="badge badge-certified">&#10003; ${car.certification}</span></div>` : '';
+    return `
+      <div class="car-card" onclick='openCar(${JSON.stringify(car).replace(/'/g, "&#39;")})'>
+        ${photoUrl
+          ? `<img class="car-photo" src="${photoUrl}" alt="${car.year} ${car.make} ${car.model}" onerror="this.style.display='none';this.nextSibling.style.display='flex'">`
+          : ''}
+        <div class="car-photo-placeholder" style="${photoUrl ? 'display:none' : ''}">No photo available</div>
+        <div class="car-body">
+          <div class="car-title">${car.year || ''} ${car.make || ''} ${car.model || ''} ${car.trim || ''}</div>
+          <div class="car-sub">Stock #${car.stock || '—'} &middot; ${car.color || ''}</div>
+          <div class="car-price">${price ? fmt(price) : 'Call for Price'}</div>
+          <div class="car-meta">
+            ${car.mileage ? `<span class="car-meta-item"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>${fmtMiles(car.mileage)}</span>` : ''}
+            ${car.color ? `<span class="car-meta-item">${car.color}</span>` : ''}
+          </div>
+          ${cert}
+          <button class="car-cta" onclick="event.stopPropagation();openCar(${JSON.stringify(car).replace(/'/g, "&#39;")})">I'm Interested</button>
+        </div>
+      </div>`;
+  }).join('') + '</div>';
+}
+
+// ── Modal ─────────────────────────────────────────────────────
+function openCar(car) {
+  currentCar = car;
+  photos = [];
+  photoIndex = 0;
+
+  const price = Number(car.websitePrice) || Number(car.price) || 0;
+  document.getElementById('modalTitle').textContent = `${car.year || ''} ${car.make || ''} ${car.model || ''} ${car.trim || ''}`.trim();
+  document.getElementById('modalPrice').textContent = price ? fmt(price) : 'Call for Price';
+  document.getElementById('modalSub').textContent = [car.color, car.stock ? `Stock #${car.stock}` : '', car.vin].filter(Boolean).join(' · ');
+
+  // Details
+  const vehicleInfo = car.vehicleInfo || '';
+  const infoLines = vehicleInfo.split('\n').filter(l => l.includes(':'));
+  const detailMap = {};
+  infoLines.forEach(l => {
+    const [key, ...rest] = l.split(':');
+    if (key && rest.length) detailMap[key.trim()] = rest.join(':').trim();
+  });
+
+  const rows = [
+    ['Year', car.year],
+    ['Make', car.make],
+    ['Model', car.model],
+    ['Trim', car.trim],
+    ['Color', car.color],
+    ['Mileage', car.mileage ? fmtMiles(car.mileage) : null],
+    ['Body Style', detailMap['Body Style']],
+    ['Engine', detailMap['Engine']],
+    ['Transmission', detailMap['Transmission']],
+    ['Fuel Type', detailMap['Fuel Type']],
+    ['Interior', detailMap['Interior Color']],
+  ].filter(r => r[1]);
+
+  document.getElementById('detailRows').innerHTML = rows.map(([label, val]) => `
+    <div class="detail-row"><span class="detail-label">${label}</span><span class="detail-val">${val}</span></div>`).join('');
+
+  // CARFAX
+  const cfArea = document.getElementById('carfaxArea');
+  cfArea.innerHTML = car.carfaxUrl
+    ? `<a class="carfax-link" href="${car.carfaxUrl}" target="_blank" rel="noopener">&#128202; View CARFAX Report</a>` : '';
+  if (car.vehicleHistory) {
+    cfArea.innerHTML += `<div style="margin-top:10px;font-size:13px;color:#6b7280;line-height:1.8;">${car.vehicleHistory}</div>`;
+  }
+
+  // Features
+  const featArea = document.getElementById('featuresArea');
+  if (car.features) {
+    featArea.innerHTML = `<h3 style="font-size:13px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:0.6px;margin-bottom:10px;">Features</h3><div class="features-list">${car.features}</div>`;
+  } else {
+    featArea.innerHTML = '';
+  }
+
+  // Pre-fill form
+  document.getElementById('fVehicle').value = `${car.year || ''} ${car.make || ''} ${car.model || ''} ${car.trim || ''}`.trim();
+  document.getElementById('fFirstName').value = '';
+  document.getElementById('fLastName').value = '';
+  document.getElementById('fPhone').value = '';
+  document.getElementById('fTimeframe').value = '';
+  document.getElementById('formSuccess').style.display = 'none';
+  document.getElementById('formContent').style.display = 'block';
+  document.getElementById('formError').style.display = 'none';
+  document.getElementById('formSubmit').disabled = false;
+
+  // Photos
+  loadPhotos(car.vin);
+
+  document.getElementById('overlay').classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+
+function closeModal() {
+  document.getElementById('overlay').classList.remove('open');
+  document.body.style.overflow = '';
+  currentCar = null;
+}
+
+function handleOverlayClick(e) {
+  if (e.target === document.getElementById('overlay')) closeModal();
+}
+
+function openContactModal() {
+  if (allCars.length) {
+    openCar(allCars[0]);
+    document.getElementById('fVehicle').value = '';
+  }
+}
+
+// ── Photos ────────────────────────────────────────────────────
+async function loadPhotos(vin) {
+  if (!vin) { showNoPhoto(); return; }
+  const vinLower = vin.toLowerCase();
+  const img = document.getElementById('carouselImg');
+  const placeholder = document.getElementById('carouselPlaceholder');
+  img.style.display = 'none';
+  placeholder.style.display = 'flex';
+  placeholder.textContent = 'Loading photos...';
+
+  photos = [];
+  for (let i = 1; i <= 30; i++) {
+    const url = `https://www.dublintoyota.com/inventoryphotos/${DEALER_ID}/${vinLower}/ip/${i}.jpg`;
+    const ok = await checkImage(url);
+    if (!ok) break;
+    photos.push(url);
+  }
+
+  if (!photos.length) { showNoPhoto(); return; }
+  photoIndex = 0;
+  showPhoto(0);
+  renderDots();
+}
+
+function checkImage(url) {
+  return new Promise(res => {
+    const img = new Image();
+    img.onload  = () => res(true);
+    img.onerror = () => res(false);
+    img.src = url;
+  });
+}
+
+function showPhoto(i) {
+  const img = document.getElementById('carouselImg');
+  const placeholder = document.getElementById('carouselPlaceholder');
+  img.src = photos[i];
+  img.style.display = 'block';
+  placeholder.style.display = 'none';
+  document.querySelectorAll('.carousel-dot').forEach((d, idx) => d.classList.toggle('active', idx === i));
+}
+
+function showNoPhoto() {
+  document.getElementById('carouselImg').style.display = 'none';
+  document.getElementById('carouselPlaceholder').style.display = 'flex';
+  document.getElementById('carouselPlaceholder').textContent = 'No photos available';
+  document.getElementById('carouselDots').innerHTML = '';
+}
+
+function renderDots() {
+  const dots = document.getElementById('carouselDots');
+  dots.innerHTML = photos.slice(0, 10).map((_, i) =>
+    `<button class="carousel-dot ${i===0?'active':''}" onclick="goToPhoto(${i})"></button>`).join('');
+}
+
+function prevPhoto() { if (!photos.length) return; photoIndex = (photoIndex - 1 + photos.length) % photos.length; showPhoto(photoIndex); }
+function nextPhoto() { if (!photos.length) return; photoIndex = (photoIndex + 1) % photos.length; showPhoto(photoIndex); }
+function goToPhoto(i) { photoIndex = i; showPhoto(i); }
+
+// ── Lead Form ─────────────────────────────────────────────────
+async function submitLead(e) {
+  e.preventDefault();
+  const firstName = document.getElementById('fFirstName').value.trim();
+  const lastName  = document.getElementById('fLastName').value.trim();
+  const phone     = document.getElementById('fPhone').value.trim();
+  const timeframe = document.getElementById('fTimeframe').value;
+  const vehicle   = document.getElementById('fVehicle').value.trim();
+
+  if (!firstName || !lastName || !phone || !timeframe) {
+    document.getElementById('formError').style.display = 'block';
+    return;
+  }
+  document.getElementById('formError').style.display = 'none';
+
+  const btn = document.getElementById('formSubmit');
+  btn.disabled = true;
+  btn.textContent = 'Sending...';
+
+  const payload = {
+    action: 'submitLead',
+    firstName, lastName, phone, timeframe,
+    vehicle,
+    vin: currentCar ? (currentCar.vin || '') : '',
+    source: 'website'
+  };
+
+  try {
+    await fetch(API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+      mode: 'no-cors'
+    });
+  } catch (_) {}
+
+  document.getElementById('formContent').style.display = 'none';
+  document.getElementById('formSuccess').style.display = 'block';
+}
+
+// ── Init ──────────────────────────────────────────────────────
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+loadInventory();
+</script>
+</body>
+</html>
