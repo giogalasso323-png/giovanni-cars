@@ -250,9 +250,14 @@ footer { background: var(--text); color: rgba(255,255,255,0.7); padding: 36px 24
     </div>
     <div class="modal-body">
       <div class="modal-header">
-        <div class="modal-title" id="modalTitle"></div>
-        <div class="modal-price" id="modalPrice"></div>
-        <div class="modal-sub" id="modalSub"></div>
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px">
+          <div>
+            <div class="modal-title" id="modalTitle"></div>
+            <div class="modal-price" id="modalPrice"></div>
+            <div class="modal-sub" id="modalSub"></div>
+          </div>
+          <button id="copyLinkBtn" onclick="copyCarLink()" style="flex-shrink:0;background:var(--bg3);border:1px solid var(--border);color:var(--text2);padding:7px 12px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;font-family:'Inter',sans-serif;white-space:nowrap;margin-top:4px">🔗 Copy Link</button>
+        </div>
       </div>
       <div class="modal-grid">
         <div class="details-section">
@@ -426,6 +431,7 @@ function renderGrid(cars) {
 // ── Modal ─────────────────────────────────────────────────────
 function openCar(car) {
   currentCar = car;
+  history.replaceState(null, '', '#' + (car.vin || ''));
   photos = [];
   photoIndex = 0;
 
@@ -495,6 +501,7 @@ function closeModal() {
   document.getElementById('overlay').classList.remove('open');
   document.body.style.overflow = '';
   currentCar = null;
+  history.replaceState(null, '', window.location.pathname);
 }
 
 function handleOverlayClick(e) {
@@ -608,9 +615,31 @@ async function submitLead(e) {
   document.getElementById('formSuccess').style.display = 'block';
 }
 
+function copyCarLink(){
+  const url = window.location.href;
+  navigator.clipboard.writeText(url).then(()=>{
+    const btn = document.getElementById('copyLinkBtn');
+    btn.textContent = '✓ Copied!';
+    setTimeout(()=>{ btn.textContent = '🔗 Copy Link'; }, 2000);
+  });
+}
+
+function openCarByVin(vin){
+  if(!vin||!allCars.length) return;
+  const car=allCars.find(c=>(c.vin||'').toUpperCase()===vin.toUpperCase());
+  if(car) openCar(car);
+}
+
 // ── Init ──────────────────────────────────────────────────────
 document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
-loadInventory();
+window.addEventListener('hashchange', ()=>{
+  const vin = window.location.hash.replace('#','');
+  if(vin) openCarByVin(vin); else closeModal();
+});
+loadInventory().then(()=>{
+  const vin = window.location.hash.replace('#','');
+  if(vin) setTimeout(()=>openCarByVin(vin), 100);
+});
 </script>
 </body>
 </html>

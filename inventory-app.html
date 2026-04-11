@@ -390,6 +390,22 @@
 
 <div class="toast" id="toast"></div>
 
+<!-- VEHICLE SEARCH MODAL -->
+<div class="modal-overlay" id="vehicle-search-modal">
+  <div class="modal" style="width:560px;max-height:80vh;display:flex;flex-direction:column;padding-bottom:0">
+    <h2>Change Vehicle</h2>
+    <p>Search your inventory and select the car this lead is interested in.</p>
+    <div style="position:relative;margin-bottom:12px">
+      <svg style="position:absolute;left:10px;top:50%;transform:translateY(-50%);opacity:0.4;pointer-events:none" width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+      <input type="text" id="vs-search" placeholder="Search year, make, model, color, stock #…" style="width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:9px 12px 9px 34px;border-radius:var(--radius);font-family:'Syne',sans-serif;font-size:13px;outline:none" oninput="renderVehicleSearchResults(this.value)">
+    </div>
+    <div id="vs-results" style="overflow-y:auto;max-height:340px;border:1px solid var(--border);border-radius:var(--radius);margin-bottom:16px"></div>
+    <div class="modal-footer" style="padding-bottom:16px">
+      <button class="btn" onclick="closeVehicleSearch()">Cancel</button>
+    </div>
+  </div>
+</div>
+
 <!-- ADD LEAD MODAL -->
 <div class="modal-overlay" id="add-lead-modal">
   <div class="modal" style="width:500px">
@@ -472,6 +488,7 @@ let API_URL = '', inventory = [], filtered = [];
 let currentView = 'table', activeFilter = 'all', sortKey = 'date-desc';
 let selectedVins = new Set(), pendingCsvData = null, currentVin = null, lastOpenedVin = null;
 let pendingPhotos = [];
+let currentLeadRowIndex = null;
 
 // ── SETUP ──────────────────────────────────────────────────
 function init() {
@@ -978,6 +995,7 @@ function buildFBDesc(c){
 }
 
 function openDrawer(vin){
+  currentLeadRowIndex=null;
   currentVin=vin;
   lastOpenedVin=vin;
   const c=inventory.find(x=>x.vin===vin); if(!c) return;
@@ -985,11 +1003,89 @@ function openDrawer(vin){
   document.getElementById('drawer-vin').textContent=c.vin;
   renderDrawer(c);
   document.getElementById('drawer-overlay').classList.add('open');
-  // Highlight the row
   document.querySelectorAll('tbody tr').forEach(tr=>tr.classList.remove('row-active'));
   document.querySelectorAll('tbody tr').forEach(tr=>{
     if(tr.onclick&&tr.onclick.toString().includes(vin)) tr.classList.add('row-active');
   });
+}
+
+function openDrawerFromLead(rowIndex){
+  const lead=leadsData.find(l=>l.rowIndex===rowIndex); if(!lead) return;
+  currentLeadRowIndex=rowIndex;
+  const car=lead.vin?inventory.find(c=>c.vin===lead.vin):null;
+  if(car){
+    currentVin=car.vin;
+    lastOpenedVin=car.vin;
+    document.getElementById('drawer-title').textContent=getTitle(car);
+    document.getElementById('drawer-vin').textContent=car.vin;
+    renderDrawer(car);
+  } else {
+    currentVin=null;
+    document.getElementById('drawer-title').textContent=(lead.firstName||'')+' '+(lead.lastName||'');
+    document.getElementById('drawer-vin').textContent=lead.vehicle||'No vehicle selected';
+    renderDrawerLeadOnly(lead);
+  }
+  document.getElementById('drawer-overlay').classList.add('open');
+}
+
+function renderDrawerLeadOnly(lead){
+  const timeframeOpts=['ASAP','Within 2 weeks','Within a month','1-3 months','Just browsing']
+    .map(t=>`<option value="${t}"${t===lead.timeframe?' selected':''}>${t}</option>`).join('');
+  const statusOpts=LEAD_STATUSES.map(s=>`<option value="${s}"${s===(lead.status||'New')?' selected':''}>${s}</option>`).join('');
+  document.getElementById('drawer-body').innerHTML=`
+    ${buildLeadSectionHtml(lead,null)}
+    <div style="padding:40px;text-align:center;color:var(--text3)">
+      <div style="font-size:28px;margin-bottom:10px">🚗</div>
+      <div style="font-size:14px;font-weight:600;color:var(--text2);margin-bottom:6px">No vehicle linked</div>
+      <div style="font-size:13px;margin-bottom:16px">Click Change Vehicle to assign a car to this lead.</div>
+    </div>`;
+}
+
+function buildLeadSectionHtml(lead, car){
+  const timeframeOpts=['ASAP','Within 2 weeks','Within a month','1-3 months','Just browsing']
+    .map(t=>`<option value="${t}"${t===lead.timeframe?' selected':''}>${t}</option>`).join('');
+  const statusOpts=LEAD_STATUSES.map(s=>`<option value="${s}"${s===(lead.status||'New')?' selected':''}>${s}</option>`).join('');
+  let fuelType='';
+  if(car&&car.vehicleInfo){ const fm=car.vehicleInfo.match(/Fuel Type:\s*([^\n]+)/i); if(fm) fuelType=fm[1].trim(); }
+  const siteUrl='https://giogalasso323-png.github.io/giovanni-cars/#'+(car?car.vin:'');
+  const snippet=[
+    car?getTitle(car):(lead.vehicle||''),
+    car&&car.mileage?Number(car.mileage).toLocaleString()+' miles'+(fuelType?' | '+fuelType:''):'',
+    car?(car.websitePrice||car.price?fmtPrice(car.websitePrice||car.price):''):'',
+    car?siteUrl:''
+  ].filter(Boolean).join('\n');
+
+  return `<div style="background:rgba(74,158,255,0.07);border:1px solid rgba(74,158,255,0.2);border-radius:var(--radius);padding:14px 16px;margin-bottom:16px">
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:12px;gap:10px">
+      <div>
+        <div style="font-size:15px;font-weight:700;color:var(--text)">${lead.firstName||''} ${lead.lastName||''}</div>
+        <a href="tel:${lead.phone||''}" style="font-size:13px;color:var(--blue);font-family:'DM Mono',monospace">${lead.phone||''}</a>
+      </div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap">
+        <button class="mini-copy-btn" onclick="copyLeadSnippet()" title="Copy quick summary to paste in a text">📋 Copy for Text</button>
+        <button class="btn" style="font-size:11px;padding:4px 10px" onclick="openVehicleSearch()">🔄 Change Vehicle</button>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+      <div>
+        <div class="field-label">Timeframe</div>
+        <select style="width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:6px;font-family:'Syne',sans-serif;font-size:13px;outline:none" onchange="updateLeadFieldFromDrawer('timeframe',this.value)">
+          <option value="">Select…</option>${timeframeOpts}
+        </select>
+      </div>
+      <div>
+        <div class="field-label">Status</div>
+        <select style="width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:6px;font-family:'Syne',sans-serif;font-size:13px;outline:none" onchange="updateLeadFieldFromDrawer('status',this.value)">
+          ${statusOpts}
+        </select>
+      </div>
+    </div>
+    <div>
+      <div class="field-label">Notes</div>
+      <input type="text" style="width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:6px;font-family:'Syne',sans-serif;font-size:13px;outline:none" value="${(lead.notes||'').replace(/"/g,'&quot;')}" placeholder="Add note…" onblur="updateLeadFieldFromDrawer('notes',this.value)" onkeydown="if(event.key==='Enter')this.blur()">
+    </div>
+    <div id="lead-copy-snippet" style="display:none;white-space:pre">${snippet.replace(/</g,'&lt;')}</div>
+  </div>`;
 }
 
 function renderDrawer(c){
@@ -1000,7 +1096,14 @@ function renderDrawer(c){
   const origP = c.originalPrice||0;
   const hasMismatch = c.fbStatus==='posted' && currentFbP && websiteP && currentFbP !== websiteP;
   const daysPosted = c.fbPostedDate ? Math.floor((Date.now()-new Date(c.fbPostedDate))/86400000) : 0;
+  const isLeadContext = currentLeadRowIndex !== null;
   let h='';
+
+  // Lead section at top when opened from leads tab
+  if(isLeadContext){
+    const lead=leadsData.find(l=>l.rowIndex===currentLeadRowIndex);
+    if(lead) h+=buildLeadSectionHtml(lead,c);
+  }
 
   // Delist alert
   if((c.websiteStatus||'').includes('Delist') && c.fbStatus==='posted')
@@ -1045,11 +1148,11 @@ function renderDrawer(c){
     <div class="field-value" style="font-family:'DM Mono',monospace;color:var(--text3)">${fmtPrice(displayOrigP)}</div>
   </div>`;
 
-  // Website price + copy button (copy unlocks FB price field)
+  // Website price + copy button (copy unlocks FB price field — hidden in lead context)
   h+=`<div class="field-group"><div class="field-label">Website Price <span style="font-size:10px;color:var(--text3);font-weight:400">(live from site)</span></div>
     <div style="display:flex;align-items:center;gap:8px">
       <div class="field-value" style="font-size:18px;font-weight:600;font-family:'DM Mono',monospace;flex:1">${websiteP?fmtPrice(websiteP):'—'}</div>
-      ${websiteP?`<button class="mini-copy-btn" id="website-price-copy" onclick="copyWebsitePrice(${websiteP},this)">Copy</button>`:''}
+      ${websiteP&&!isLeadContext?`<button class="mini-copy-btn" id="website-price-copy" onclick="copyWebsitePrice(${websiteP},this)">Copy</button>`:''}
     </div>
   </div>`;
 
@@ -1545,7 +1648,7 @@ function renderLeads(){
          </div>`
       : `<span style="font-size:12px;color:var(--text2)">${lead.vehicle||'—'}</span>`;
 
-    return `<tr class="${isSelected?'lead-selected':''}">
+    return `<tr class="${isSelected?'lead-selected':''}" onclick="openDrawerFromLead(${lead.rowIndex})" style="cursor:pointer">
       <td onclick="event.stopPropagation()"><input type="checkbox" ${isSelected?'checked':''} onchange="toggleLeadSelect(${lead.rowIndex},this)"></td>
       <td style="color:var(--text3);font-family:'DM Mono',monospace;font-size:11px;white-space:nowrap">${date}</td>
       <td class="td-main" style="white-space:nowrap">${lead.firstName||''} ${lead.lastName||''}</td>
@@ -1728,6 +1831,64 @@ async function submitManualLead(){
     showToast('Lead added');
     await loadLeads();
   } catch(e){ showToast('Failed to add lead: '+e.message); }
+}
+
+// ── Lead Drawer Helpers ───────────────────────────────────────
+function copyLeadSnippet(){
+  const el=document.getElementById('lead-copy-snippet'); if(!el) return;
+  navigator.clipboard.writeText(el.textContent.trim()).then(()=>showToast('Copied for text!'));
+}
+
+async function updateLeadFieldFromDrawer(field, value){
+  if(currentLeadRowIndex===null) return;
+  const lead=leadsData.find(l=>l.rowIndex===currentLeadRowIndex);
+  if(lead) lead[field]=value;
+  if(field==='status') updateLeadsSubtitle();
+  try { await apiPost('updateLead',{rowIndex:currentLeadRowIndex,field,value}); }
+  catch(e){ showToast('Save failed'); }
+}
+
+// ── Vehicle Search (for leads) ────────────────────────────────
+function openVehicleSearch(){
+  document.getElementById('vs-search').value='';
+  renderVehicleSearchResults('');
+  document.getElementById('vehicle-search-modal').classList.add('open');
+  setTimeout(()=>document.getElementById('vs-search').focus(),100);
+}
+function closeVehicleSearch(){ document.getElementById('vehicle-search-modal').classList.remove('open'); }
+
+function renderVehicleSearchResults(q){
+  const results=document.getElementById('vs-results');
+  q=q.toLowerCase().trim();
+  const cars=inventory.filter(c=>{
+    if((c.websiteStatus||'').toLowerCase().includes('sold')||c.soldDate) return false;
+    if(!q) return true;
+    return [c.year,c.make,c.model,c.trim,c.color,c.stock].join(' ').toLowerCase().includes(q);
+  }).slice(0,40);
+  if(!cars.length){ results.innerHTML='<div style="padding:20px;text-align:center;color:var(--text3)">No vehicles match</div>'; return; }
+  results.innerHTML=cars.map(c=>`
+    <div onclick="selectVehicleForLead('${c.vin}')" style="padding:11px 14px;border-bottom:1px solid var(--border);cursor:pointer;transition:background 0.1s" onmouseover="this.style.background='var(--bg3)'" onmouseout="this.style.background=''">
+      <div style="font-size:13px;font-weight:600;color:var(--text)">${getTitle(c)}</div>
+      <div style="font-size:11px;color:var(--text3);font-family:'DM Mono',monospace;margin-top:2px">${c.vin}${c.stock?' · #'+c.stock:''}${c.websitePrice?' · '+fmtPrice(c.websitePrice):''}${c.mileage?' · '+fmtMiles(c.mileage):''}</div>
+    </div>`).join('');
+}
+
+async function selectVehicleForLead(vin){
+  if(currentLeadRowIndex===null) return;
+  const car=inventory.find(c=>c.vin===vin); if(!car) return;
+  closeVehicleSearch();
+  const lead=leadsData.find(l=>l.rowIndex===currentLeadRowIndex);
+  if(lead){ lead.vin=vin; lead.vehicle=getTitle(car); }
+  try {
+    await apiPost('updateLead',{rowIndex:currentLeadRowIndex,field:'vin',value:vin});
+    await apiPost('updateLead',{rowIndex:currentLeadRowIndex,field:'vehicle',value:getTitle(car)});
+  } catch(e){ showToast('Failed to save vehicle change'); return; }
+  currentVin=vin;
+  document.getElementById('drawer-title').textContent=getTitle(car);
+  document.getElementById('drawer-vin').textContent=car.vin;
+  renderDrawer(car);
+  showToast('Vehicle updated');
+  renderLeads();
 }
 
 function showToast(msg){ const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2800); }
