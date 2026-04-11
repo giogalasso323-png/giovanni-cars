@@ -400,7 +400,7 @@ function renderGrid(cars) {
   grid.innerHTML = '<div class="car-grid">' + cars.map(car => {
     const price = Number(car.websitePrice) || Number(car.price) || 0;
     const vin   = (car.vin || '').toLowerCase();
-    const photoUrl = vin ? `https://www.dublintoyota.com/inventoryphotos/${DEALER_ID}/${vin}/ip/1.jpg` : '';
+    const photoUrl = vin ? `https://www.dublintoyota.com/inventoryphotos/${DEALER_ID}/${vin}/ip/2.jpg` : '';
     const cert  = car.certification ? `<div style="margin-top:8px"><span class="badge badge-certified">&#10003; ${car.certification}</span></div>` : '';
     return `
       <div class="car-card" onclick='openCar(${JSON.stringify(car).replace(/'/g, "&#39;")})'>
@@ -520,6 +520,7 @@ async function loadPhotos(vin) {
 
   photos = [];
   for (let i = 2; i <= 8; i++) {
+    if (i === 5) continue;
     const url = `https://www.dublintoyota.com/inventoryphotos/${DEALER_ID}/${vinLower}/ip/${i}.jpg`;
     const ok = await checkImage(url);
     if (!ok) break;
