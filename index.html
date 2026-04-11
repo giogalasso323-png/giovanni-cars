@@ -460,13 +460,10 @@ function openCar(car) {
   document.getElementById('detailRows').innerHTML = rows.map(([label, val]) => `
     <div class="detail-row"><span class="detail-label">${label}</span><span class="detail-val">${val}</span></div>`).join('');
 
-  // CARFAX
+  // Vehicle history (no external links)
   const cfArea = document.getElementById('carfaxArea');
-  cfArea.innerHTML = car.carfaxUrl
-    ? `<a class="carfax-link" href="${car.carfaxUrl}" target="_blank" rel="noopener">&#128202; View CARFAX Report</a>` : '';
-  if (car.vehicleHistory) {
-    cfArea.innerHTML += `<div style="margin-top:10px;font-size:13px;color:#6b7280;line-height:1.8;">${car.vehicleHistory}</div>`;
-  }
+  cfArea.innerHTML = car.vehicleHistory
+    ? `<div style="margin-top:10px;font-size:13px;color:#6b7280;line-height:1.8;">${car.vehicleHistory}</div>` : '';
 
   // Features
   const featArea = document.getElementById('featuresArea');
@@ -522,7 +519,7 @@ async function loadPhotos(vin) {
   placeholder.textContent = 'Loading photos...';
 
   photos = [];
-  for (let i = 1; i <= 30; i++) {
+  for (let i = 2; i <= 8; i++) {
     const url = `https://www.dublintoyota.com/inventoryphotos/${DEALER_ID}/${vinLower}/ip/${i}.jpg`;
     const ok = await checkImage(url);
     if (!ok) break;
