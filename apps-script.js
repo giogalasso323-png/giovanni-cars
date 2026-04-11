@@ -40,6 +40,7 @@ function handleRequest(e) {
       case 'submitLead':     result = submitLead(body);                            break;
       case 'getLeads':       result = getLeads();                                  break;
       case 'updateLead':     result = updateLead(body.rowIndex, body.field, body.value); break;
+      case 'deleteLead':     result = deleteLead(body.rowIndex);                   break;
       case 'ping':           result = { ok: true };                                break;
       default:               result = { error: 'Unknown action: ' + action };
     }
@@ -88,11 +89,18 @@ function submitLead(data) {
     data.vin        || '',
     data.timeframe  || '',
     data.source     || 'website',
-    'New',
-    '',
+    data.status     || 'New',
+    data.notes      || '',
     ''
   ];
   sh.appendRow(row);
+  return { ok: true };
+}
+
+function deleteLead(rowIndex) {
+  if (!rowIndex) return { error: 'Missing rowIndex' };
+  var sh = getLeadsSheet();
+  sh.deleteRow(Number(rowIndex));
   return { ok: true };
 }
 

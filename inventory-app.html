@@ -187,18 +187,27 @@
   .leads-view { display: none; }
   .lead-table { width: 100%; border-collapse: collapse; font-size: 13px; }
   .lead-table th { text-align: left; padding: 8px 12px; color: var(--text3); font-size: 11px; font-weight: 600; letter-spacing: 0.6px; text-transform: uppercase; border-bottom: 1px solid var(--border); white-space: nowrap; }
-  .lead-table td { padding: 11px 12px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+  .lead-table td { padding: 10px 12px; border-bottom: 1px solid var(--border); vertical-align: middle; }
   .lead-table tbody tr:hover td { background: var(--bg2); }
-  .lead-status-sel { padding: 3px 9px; border-radius: 5px; font-size: 11px; font-weight: 600; cursor: pointer; border: 1px solid transparent; font-family: 'Syne', sans-serif; outline: none; }
-  .lead-status-sel.s-new { background: var(--blue-bg); color: var(--blue); }
-  .lead-status-sel.s-contacted { background: var(--amber-bg); color: var(--amber); }
-  .lead-status-sel.s-qualified { background: var(--green-bg); color: var(--green); }
-  .lead-status-sel.s-sold { background: var(--red-bg); color: var(--red); }
-  .lead-status-sel.s-lost { background: var(--bg3); color: var(--text3); }
-  .lead-note-input { background: transparent; border: none; border-bottom: 1px dashed var(--border2); color: var(--text2); font-family: 'Syne', sans-serif; font-size: 12px; width: 160px; outline: none; padding: 2px 4px; }
+  .lead-table tbody tr.lead-selected td { background: rgba(74,158,255,0.06); }
+  .lead-status-sel { padding: 3px 8px; border-radius: 5px; font-size: 11px; font-weight: 600; cursor: pointer; border: 1px solid transparent; font-family: 'Syne', sans-serif; outline: none; max-width: 160px; }
+  .lead-status-sel.s-new        { background: var(--blue-bg);                   color: var(--blue); }
+  .lead-status-sel.s-oneway     { background: var(--amber-bg);                  color: var(--amber); }
+  .lead-status-sel.s-twoway     { background: var(--green-bg);                  color: var(--green); }
+  .lead-status-sel.s-cold       { background: var(--bg3);                       color: var(--text3); }
+  .lead-status-sel.s-appt       { background: rgba(139,92,246,0.12);            color: #a78bfa; }
+  .lead-status-sel.s-sold       { background: var(--green-bg);                  color: var(--green); font-weight: 700; }
+  .lead-status-sel.s-lost       { background: var(--red-bg);                    color: var(--red); }
+  .lead-note-input { background: transparent; border: none; border-bottom: 1px dashed var(--border2); color: var(--text2); font-family: 'Syne', sans-serif; font-size: 12px; width: 150px; outline: none; padding: 2px 4px; }
   .lead-note-input:focus { border-bottom-color: var(--accent); color: var(--text); }
-  .leads-toolbar { display: flex; align-items: center; justify-content: space-between; padding: 12px 28px; border-bottom: 1px solid var(--border); background: var(--bg2); }
+  .leads-toolbar { display: flex; align-items: center; justify-content: space-between; padding: 12px 28px; border-bottom: 1px solid var(--border); background: var(--bg2); flex-wrap: wrap; gap: 8px; }
   .leads-toolbar h2 { font-size: 16px; font-weight: 700; }
+  .leads-toolbar-right { display: flex; gap: 8px; align-items: center; }
+  .leads-action-bar { display: none; align-items: center; gap: 10px; padding: 10px 28px; background: var(--bg3); border-bottom: 1px solid var(--border); font-size: 13px; color: var(--text2); }
+  .leads-action-bar.show { display: flex; }
+  .icon-btn { background: none; border: none; color: var(--text3); cursor: pointer; padding: 4px 6px; border-radius: 4px; display: inline-flex; align-items: center; transition: all 0.15s; }
+  .icon-btn:hover { background: var(--bg3); color: var(--red); }
+  .lead-vehicle-match { display: inline-flex; align-items: center; gap: 5px; }
 </style>
 </head>
 <body>
@@ -380,6 +389,68 @@
 </div>
 
 <div class="toast" id="toast"></div>
+
+<!-- ADD LEAD MODAL -->
+<div class="modal-overlay" id="add-lead-modal">
+  <div class="modal" style="width:500px">
+    <h2>Add Lead</h2>
+    <p>Manually add a lead to track a conversation you're already having.</p>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+      <div>
+        <div style="font-size:11px;font-weight:600;color:var(--text3);margin-bottom:5px;text-transform:uppercase;letter-spacing:0.5px">First Name *</div>
+        <input type="text" id="al-firstname" class="url-row" style="width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:8px 10px;border-radius:var(--radius);font-family:'Syne',sans-serif;font-size:13px;outline:none" placeholder="Jane">
+      </div>
+      <div>
+        <div style="font-size:11px;font-weight:600;color:var(--text3);margin-bottom:5px;text-transform:uppercase;letter-spacing:0.5px">Last Name *</div>
+        <input type="text" id="al-lastname" style="width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:8px 10px;border-radius:var(--radius);font-family:'Syne',sans-serif;font-size:13px;outline:none" placeholder="Smith">
+      </div>
+    </div>
+    <div style="margin-bottom:10px">
+      <div style="font-size:11px;font-weight:600;color:var(--text3);margin-bottom:5px;text-transform:uppercase;letter-spacing:0.5px">Phone *</div>
+      <input type="tel" id="al-phone" style="width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:8px 10px;border-radius:var(--radius);font-family:'Syne',sans-serif;font-size:13px;outline:none" placeholder="(555) 000-0000">
+    </div>
+    <div style="margin-bottom:10px">
+      <div style="font-size:11px;font-weight:600;color:var(--text3);margin-bottom:5px;text-transform:uppercase;letter-spacing:0.5px">Vehicle Interested In</div>
+      <select id="al-vehicle" style="width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:8px 10px;border-radius:var(--radius);font-family:'Syne',sans-serif;font-size:13px;outline:none;appearance:none">
+        <option value="">Select a vehicle…</option>
+      </select>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+      <div>
+        <div style="font-size:11px;font-weight:600;color:var(--text3);margin-bottom:5px;text-transform:uppercase;letter-spacing:0.5px">Timeframe</div>
+        <select id="al-timeframe" style="width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:8px 10px;border-radius:var(--radius);font-family:'Syne',sans-serif;font-size:13px;outline:none;appearance:none">
+          <option value="">Select…</option>
+          <option value="ASAP">ASAP</option>
+          <option value="Within 2 weeks">Within 2 weeks</option>
+          <option value="Within a month">Within a month</option>
+          <option value="1-3 months">1–3 months</option>
+          <option value="Just browsing">Just browsing</option>
+        </select>
+      </div>
+      <div>
+        <div style="font-size:11px;font-weight:600;color:var(--text3);margin-bottom:5px;text-transform:uppercase;letter-spacing:0.5px">Status</div>
+        <select id="al-status" style="width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:8px 10px;border-radius:var(--radius);font-family:'Syne',sans-serif;font-size:13px;outline:none;appearance:none">
+          <option value="New">New</option>
+          <option value="One Way Communication">One Way Communication</option>
+          <option value="Two Way Communication">Two Way Communication</option>
+          <option value="Cold">Cold</option>
+          <option value="Appt">Appt</option>
+          <option value="Sold">Sold</option>
+          <option value="Lost">Lost</option>
+        </select>
+      </div>
+    </div>
+    <div style="margin-bottom:10px">
+      <div style="font-size:11px;font-weight:600;color:var(--text3);margin-bottom:5px;text-transform:uppercase;letter-spacing:0.5px">Notes</div>
+      <input type="text" id="al-notes" style="width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:8px 10px;border-radius:var(--radius);font-family:'Syne',sans-serif;font-size:13px;outline:none" placeholder="Optional note…">
+    </div>
+    <div id="al-error" style="font-size:12px;color:var(--red);margin-bottom:8px;display:none">Please fill in all required fields.</div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeAddLeadModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="submitManualLead()">Add Lead</button>
+    </div>
+  </div>
+</div>
 
 <!-- BULK VIN MODAL -->
 <div class="modal-overlay" id="bulk-vin-modal">
@@ -1396,7 +1467,12 @@ function applyBulkVinSelect(){
 
 // ── LEADS ──────────────────────────────────────────────────
 let leadsData = [];
-const LEAD_STATUS_COLORS = { 'New':'s-new','Contacted':'s-contacted','Qualified':'s-qualified','Sold':'s-sold','Lost':'s-lost' };
+let selectedLeads = new Set();
+const LEAD_STATUSES = ['New','One Way Communication','Two Way Communication','Cold','Appt','Sold','Lost'];
+const LEAD_STATUS_COLORS = {
+  'New':'s-new','One Way Communication':'s-oneway','Two Way Communication':'s-twoway',
+  'Cold':'s-cold','Appt':'s-appt','Sold':'s-sold','Lost':'s-lost'
+};
 
 function showLeadsView(){
   document.getElementById('leads-view').style.display='block';
@@ -1405,16 +1481,31 @@ function showLeadsView(){
   document.getElementById('card-view').style.display='none';
   document.getElementById('action-bar').classList.remove('show');
   document.querySelector('.toolbar').style.visibility='hidden';
+  selectedLeads.clear();
   loadLeads();
 }
 function hideLeadsView(){
   document.getElementById('leads-view').style.display='none';
   document.querySelector('.toolbar').style.visibility='';
+  selectedLeads.clear();
 }
 
 async function loadLeads(){
   const view = document.getElementById('leads-view');
-  view.innerHTML=`<div class="leads-toolbar"><h2>Leads <span id="leads-subtitle" style="font-size:13px;font-weight:400;color:var(--text3)"></span></h2><button class="btn" onclick="loadLeads()"><svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M4 4v5h5"/><path d="M20 20v-5h-5"/><path d="M4 9a9 9 0 0115.47-3.47"/><path d="M20 15a9 9 0 01-15.47 3.47"/></svg> Refresh</button></div><div class="main" id="leads-content"><div style="text-align:center;padding:40px;color:var(--text3)"><span class="saving-dot"></span> Loading…</div></div>`;
+  view.innerHTML=`
+    <div class="leads-toolbar">
+      <h2>Leads <span id="leads-subtitle" style="font-size:13px;font-weight:400;color:var(--text3)"></span></h2>
+      <div class="leads-toolbar-right">
+        <button class="btn" onclick="loadLeads()"><svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M4 4v5h5"/><path d="M20 20v-5h-5"/><path d="M4 9a9 9 0 0115.47-3.47"/><path d="M20 15a9 9 0 01-15.47 3.47"/></svg> Refresh</button>
+        <button class="btn btn-primary" onclick="openAddLeadModal()"><svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> Add Lead</button>
+      </div>
+    </div>
+    <div class="leads-action-bar" id="leads-action-bar">
+      <span id="leads-selected-count" style="font-size:13px">0 selected</span>
+      <button class="btn" onclick="refreshSelectedLeadVehicles()"><svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M4 4v5h5"/><path d="M20 20v-5h-5"/><path d="M4 9a9 9 0 0115.47-3.47"/><path d="M20 15a9 9 0 01-15.47 3.47"/></svg> Refresh Vehicles</button>
+      <button class="btn" style="color:var(--text3)" onclick="clearLeadSelection()">Clear</button>
+    </div>
+    <div class="main" id="leads-content"><div style="text-align:center;padding:40px;color:var(--text3)"><span class="saving-dot"></span> Loading…</div></div>`;
   try {
     const res = await apiGet('getLeads');
     if(res.error) throw new Error(res.error);
@@ -1431,39 +1522,129 @@ function renderLeads(){
   const subtitle = document.getElementById('leads-subtitle');
   if(!leadsData.length){
     if(subtitle) subtitle.textContent='';
-    content.innerHTML=`<div class="empty"><svg width="36" height="36" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" style="color:var(--text3)"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg><h3>No leads yet</h3><p>When someone fills out the form on your website, they'll appear here.</p></div>`;
+    content.innerHTML=`<div class="empty"><svg width="36" height="36" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" style="color:var(--text3)"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg><h3>No leads yet</h3><p>Add one manually or leads from your website will appear here.</p></div>`;
     return;
   }
-  if(subtitle) subtitle.textContent='('+leadsData.length+')';
-  const newCount = leadsData.filter(l=>l.status==='New'||!l.status).length;
-  if(newCount && subtitle) subtitle.textContent += ' — '+newCount+' new';
+  updateLeadsSubtitle();
 
   const rows = leadsData.map(lead=>{
     const date = lead.timestamp ? new Date(lead.timestamp).toLocaleDateString([],{month:'short',day:'numeric',year:'numeric'}) : '—';
     const status = lead.status || 'New';
     const cls = LEAD_STATUS_COLORS[status]||'s-new';
-    const statusOpts = ['New','Contacted','Qualified','Sold','Lost'].map(s=>`<option value="${s}"${s===status?' selected':''}>${s}</option>`).join('');
-    return `<tr>
+    const statusOpts = LEAD_STATUSES.map(s=>`<option value="${s}"${s===status?' selected':''}>${s}</option>`).join('');
+    const isSelected = selectedLeads.has(lead.rowIndex);
+
+    // Match to inventory by VIN
+    const matchedCar = lead.vin ? inventory.find(c=>c.vin===lead.vin) : null;
+    const vehicleCell = matchedCar
+      ? `<div class="lead-vehicle-match">
+           <span style="font-size:12px;color:var(--text2)">${lead.vehicle||getTitle(matchedCar)}</span>
+           <button class="icon-btn" title="Refresh this vehicle's web data" onclick="refreshLeadVehicle('${lead.vin}',this)" style="color:var(--blue);padding:2px 4px">
+             <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M4 4v5h5"/><path d="M20 20v-5h-5"/><path d="M4 9a9 9 0 0115.47-3.47"/><path d="M20 15a9 9 0 01-15.47 3.47"/></svg>
+           </button>
+         </div>`
+      : `<span style="font-size:12px;color:var(--text2)">${lead.vehicle||'—'}</span>`;
+
+    return `<tr class="${isSelected?'lead-selected':''}">
+      <td onclick="event.stopPropagation()"><input type="checkbox" ${isSelected?'checked':''} onchange="toggleLeadSelect(${lead.rowIndex},this)"></td>
       <td style="color:var(--text3);font-family:'DM Mono',monospace;font-size:11px;white-space:nowrap">${date}</td>
       <td class="td-main" style="white-space:nowrap">${lead.firstName||''} ${lead.lastName||''}</td>
       <td><a href="tel:${lead.phone||''}" style="color:var(--blue);font-family:'DM Mono',monospace;font-size:12px">${lead.phone||'—'}</a></td>
-      <td style="color:var(--text2);max-width:180px;font-size:12px">${lead.vehicle||'—'}</td>
+      <td>${vehicleCell}</td>
       <td><span style="font-size:11px;background:var(--bg3);padding:2px 8px;border-radius:4px;color:var(--text3);white-space:nowrap">${lead.timeframe||'—'}</span></td>
-      <td><select class="lead-status-sel ${cls}" data-row="${lead.rowIndex}" onchange="updateLeadStatus(${lead.rowIndex},this)">${statusOpts}</select></td>
+      <td><select class="lead-status-sel ${cls}" onchange="updateLeadStatus(${lead.rowIndex},this)">${statusOpts}</select></td>
       <td><input class="lead-note-input" type="text" value="${(lead.notes||'').replace(/"/g,'&quot;')}" placeholder="Add note…" onblur="saveLeadNote(${lead.rowIndex},this)" onkeydown="if(event.key==='Enter')this.blur()"></td>
+      <td onclick="event.stopPropagation()">
+        <button class="icon-btn" title="Delete lead" onclick="confirmDeleteLead(${lead.rowIndex})">
+          <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2"/></svg>
+        </button>
+      </td>
     </tr>`;
   }).join('');
 
-  content.innerHTML=`<div class="table-wrap"><table class="lead-table"><thead><tr><th>Date</th><th>Name</th><th>Phone</th><th>Vehicle</th><th>Timeframe</th><th>Status</th><th>Notes</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+  content.innerHTML=`<div class="table-wrap"><table class="lead-table"><thead><tr>
+    <th style="width:32px"><input type="checkbox" onchange="toggleAllLeads(this)"></th>
+    <th>Date</th><th>Name</th><th>Phone</th><th>Vehicle</th><th>Timeframe</th><th>Status</th><th>Notes</th><th></th>
+  </tr></thead><tbody>${rows}</tbody></table></div>`;
 }
 
+function updateLeadsSubtitle(){
+  const subtitle = document.getElementById('leads-subtitle');
+  if(!subtitle) return;
+  const newCount = leadsData.filter(l=>l.status==='New'||!l.status).length;
+  subtitle.textContent = '('+leadsData.length+')' + (newCount?' — '+newCount+' new':'');
+}
+
+// ── Lead Selection ────────────────────────────────────────────
+function toggleLeadSelect(rowIndex, cb){
+  if(cb.checked) selectedLeads.add(rowIndex); else selectedLeads.delete(rowIndex);
+  updateLeadActionBar();
+  const row = cb.closest('tr');
+  if(row) row.classList.toggle('lead-selected', cb.checked);
+}
+function toggleAllLeads(cb){
+  leadsData.forEach(l=>{ if(cb.checked) selectedLeads.add(l.rowIndex); else selectedLeads.delete(l.rowIndex); });
+  updateLeadActionBar();
+  renderLeads();
+}
+function clearLeadSelection(){ selectedLeads.clear(); updateLeadActionBar(); renderLeads(); }
+function updateLeadActionBar(){
+  const bar = document.getElementById('leads-action-bar');
+  const cnt = document.getElementById('leads-selected-count');
+  if(!bar) return;
+  if(selectedLeads.size>0){ bar.classList.add('show'); cnt.textContent=selectedLeads.size+' selected'; }
+  else { bar.classList.remove('show'); }
+}
+
+// ── Refresh Vehicle Data from Leads ──────────────────────────
+async function refreshLeadVehicle(vin, btn){
+  if(!vin) return;
+  const orig = btn.innerHTML;
+  btn.innerHTML='<span class="spinner" style="width:11px;height:11px"></span>';
+  btn.disabled=true;
+  try {
+    const res = await apiPost('scrapeVehicles',{vins:[vin]});
+    if(res.error) throw new Error(res.error);
+    (res.results||[]).forEach(result=>{
+      const car=inventory.find(c=>c.vin===result.vin); if(!car) return;
+      if(result.websitePrice) car.websitePrice=result.websitePrice;
+      if(result.websiteStatus) car.websiteStatus=result.websiteStatus;
+      if(result.websiteUrl) car.websiteUrl=result.websiteUrl;
+      car.lastChecked=new Date().toISOString();
+      car.fbDescription=buildFBDesc(car);
+    });
+    showToast('Vehicle data refreshed');
+  } catch(e){ showToast('Refresh failed: '+e.message); }
+  btn.innerHTML=orig; btn.disabled=false;
+}
+
+async function refreshSelectedLeadVehicles(){
+  const vins=[...selectedLeads].map(ri=>{ const l=leadsData.find(x=>x.rowIndex===ri); return l&&l.vin?l.vin:null; }).filter(Boolean);
+  if(!vins.length){ showToast('No vehicles with VINs in selection'); return; }
+  showToast('Refreshing '+vins.length+' vehicle(s)…');
+  try {
+    const BATCH=5;
+    for(let i=0;i<vins.length;i+=BATCH){
+      const res=await apiPost('scrapeVehicles',{vins:vins.slice(i,i+BATCH)});
+      (res.results||[]).forEach(result=>{
+        const car=inventory.find(c=>c.vin===result.vin); if(!car) return;
+        if(result.websitePrice) car.websitePrice=result.websitePrice;
+        if(result.websiteStatus) car.websiteStatus=result.websiteStatus;
+        car.lastChecked=new Date().toISOString();
+        car.fbDescription=buildFBDesc(car);
+      });
+    }
+    showToast('Done — '+vins.length+' vehicle(s) refreshed');
+  } catch(e){ showToast('Refresh failed: '+e.message); }
+}
+
+// ── Status / Notes ────────────────────────────────────────────
 async function updateLeadStatus(rowIndex, sel){
   const status = sel.value;
   sel.className = 'lead-status-sel ' + (LEAD_STATUS_COLORS[status]||'s-new');
   const lead = leadsData.find(l=>l.rowIndex===rowIndex);
   if(lead) lead.status=status;
-  const subtitle = document.getElementById('leads-subtitle');
-  if(subtitle){ const n=leadsData.filter(l=>l.status==='New'||!l.status).length; subtitle.textContent='('+leadsData.length+')' + (n?' — '+n+' new':''); }
+  updateLeadsSubtitle();
   try { await apiPost('updateLead',{rowIndex,field:'status',value:status}); showToast('Status updated'); }
   catch(e){ showToast('Save failed: '+e.message); }
 }
@@ -1475,6 +1656,78 @@ async function saveLeadNote(rowIndex, input){
   if(lead) lead.notes=note;
   try { await apiPost('updateLead',{rowIndex,field:'notes',value:note}); }
   catch(e){ showToast('Note save failed'); }
+}
+
+// ── Delete Lead ───────────────────────────────────────────────
+function confirmDeleteLead(rowIndex){
+  const lead = leadsData.find(l=>l.rowIndex===rowIndex);
+  const name = lead ? (lead.firstName+' '+lead.lastName).trim() : 'this lead';
+  if(!confirm('Delete '+name+'? This cannot be undone.')) return;
+  doDeleteLead(rowIndex);
+}
+async function doDeleteLead(rowIndex){
+  try {
+    await apiPost('deleteLead',{rowIndex});
+    leadsData = leadsData.filter(l=>l.rowIndex!==rowIndex);
+    selectedLeads.delete(rowIndex);
+    document.getElementById('cnt-leads').textContent=leadsData.length;
+    updateLeadActionBar();
+    renderLeads();
+    showToast('Lead deleted');
+    // Reload to get correct row indexes after deletion
+    setTimeout(()=>loadLeads(), 1500);
+  } catch(e){ showToast('Delete failed: '+e.message); }
+}
+
+// ── Add Lead Manually ─────────────────────────────────────────
+function openAddLeadModal(){
+  // Populate vehicle dropdown from inventory
+  const sel = document.getElementById('al-vehicle');
+  sel.innerHTML='<option value="">Select a vehicle…</option>';
+  inventory.filter(c=>(c.websiteStatus||'').toLowerCase().includes('live')&&!c.soldDate)
+    .sort((a,b)=>getTitle(a).localeCompare(getTitle(b)))
+    .forEach(c=>{
+      const o=document.createElement('option');
+      o.value=c.vin;
+      o.textContent=getTitle(c)+(c.stock?' — #'+c.stock:'');
+      sel.appendChild(o);
+    });
+  ['al-firstname','al-lastname','al-phone','al-notes'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('al-timeframe').value='';
+  document.getElementById('al-status').value='New';
+  document.getElementById('al-error').style.display='none';
+  document.getElementById('add-lead-modal').classList.add('open');
+}
+function closeAddLeadModal(){ document.getElementById('add-lead-modal').classList.remove('open'); }
+
+async function submitManualLead(){
+  const firstName = document.getElementById('al-firstname').value.trim();
+  const lastName  = document.getElementById('al-lastname').value.trim();
+  const phone     = document.getElementById('al-phone').value.trim();
+  const vinVal    = document.getElementById('al-vehicle').value;
+  const timeframe = document.getElementById('al-timeframe').value;
+  const status    = document.getElementById('al-status').value;
+  const notes     = document.getElementById('al-notes').value.trim();
+
+  if(!firstName||!lastName||!phone){ document.getElementById('al-error').style.display='block'; return; }
+  document.getElementById('al-error').style.display='none';
+
+  const car = vinVal ? inventory.find(c=>c.vin===vinVal) : null;
+  const vehicleText = car ? getTitle(car) : '';
+
+  try {
+    await apiPost('submitLead',{
+      firstName,lastName,phone,timeframe,
+      vehicle: vehicleText,
+      vin: vinVal||'',
+      status,
+      notes,
+      source:'manual'
+    });
+    closeAddLeadModal();
+    showToast('Lead added');
+    await loadLeads();
+  } catch(e){ showToast('Failed to add lead: '+e.message); }
 }
 
 function showToast(msg){ const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2800); }
