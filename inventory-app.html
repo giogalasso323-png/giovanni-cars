@@ -1,0 +1,1485 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dublin Toyota — Inventory Manager</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #0f0f10; --bg2: #181819; --bg3: #222224; --bg4: #2c2c2f;
+    --border: rgba(255,255,255,0.08); --border2: rgba(255,255,255,0.14);
+    --text: #f0efe8; --text2: #9a9994; --text3: #5c5c58;
+    --red: #e8473f; --red-bg: rgba(232,71,63,0.12);
+    --green: #3fb950; --green-bg: rgba(63,185,80,0.12);
+    --amber: #f0a030; --amber-bg: rgba(240,160,48,0.12);
+    --blue: #4a9eff; --blue-bg: rgba(74,158,255,0.12);
+    --accent: #e8473f; --radius: 8px; --radius-lg: 12px;
+  }
+  body { font-family: 'Syne', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; font-size: 14px; }
+
+  /* SETUP */
+  .setup-screen { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; }
+  .setup-card { background: var(--bg2); border: 1px solid var(--border2); border-radius: var(--radius-lg); padding: 36px; width: 580px; max-width: 100%; }
+  .setup-card h1 { font-size: 22px; font-weight: 700; margin-bottom: 6px; }
+  .setup-sub { color: var(--text2); font-size: 13px; margin-bottom: 28px; line-height: 1.6; }
+  .step { display: flex; gap: 14px; margin-bottom: 22px; }
+  .step-num { width: 26px; height: 26px; border-radius: 50%; background: var(--accent); color: #fff; font-size: 12px; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 2px; }
+  .step-body h3 { font-size: 14px; font-weight: 600; margin-bottom: 5px; }
+  .step-body p { font-size: 12px; color: var(--text2); line-height: 1.7; margin-bottom: 8px; }
+  .step-body strong { color: var(--text); }
+  .mono { font-family: 'DM Mono', monospace; font-size: 11px; color: var(--text3); background: var(--bg3); padding: 2px 6px; border-radius: 3px; }
+  .url-row { display: flex; gap: 8px; margin-top: 8px; }
+  .url-row input { flex: 1; background: var(--bg3); border: 1px solid var(--border); color: var(--text); padding: 9px 12px; border-radius: var(--radius); font-family: 'Syne', sans-serif; font-size: 13px; outline: none; }
+  .url-row input:focus { border-color: var(--border2); }
+  .url-row input::placeholder { color: var(--text3); }
+  .connect-status { font-size: 12px; margin-top: 8px; min-height: 18px; }
+  .connect-status.ok { color: var(--green); } .connect-status.err { color: var(--red); } .connect-status.loading { color: var(--text3); }
+
+  /* HEADER */
+  #app { display: none; }
+  .header { display: flex; align-items: center; justify-content: space-between; padding: 16px 28px; border-bottom: 1px solid var(--border); background: var(--bg2); position: sticky; top: 0; z-index: 100; }
+  .logo { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 16px; }
+  .logo-badge { background: var(--accent); color: #fff; font-size: 10px; font-weight: 700; padding: 3px 7px; border-radius: 4px; letter-spacing: 1px; }
+  .header-right { display: flex; align-items: center; gap: 16px; }
+  .header-stats { display: flex; gap: 20px; }
+  .stat-pill { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text2); }
+  .stat-pill strong { color: var(--text); font-size: 15px; font-weight: 600; }
+  .dot { width: 7px; height: 7px; border-radius: 50%; }
+  .sync-info { font-size: 11px; color: var(--text3); font-family: 'DM Mono', monospace; }
+  .saving-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--amber); display: inline-block; animation: pulse 1s ease-in-out infinite; }
+  @keyframes pulse { 0%,100%{opacity:1}50%{opacity:0.3} }
+
+  /* TABS */
+  .filter-tabs { display: flex; gap: 4px; padding: 0 28px; border-bottom: 1px solid var(--border); background: var(--bg2); overflow-x: auto; }
+  .filter-tab { padding: 10px 14px; font-size: 13px; font-weight: 500; color: var(--text3); cursor: pointer; border: none; background: none; border-bottom: 2px solid transparent; font-family: 'Syne', sans-serif; transition: all 0.15s; white-space: nowrap; }
+  .filter-tab:hover { color: var(--text2); }
+  .filter-tab.active { color: var(--text); border-bottom-color: var(--accent); }
+  .tab-count { background: var(--bg3); color: var(--text3); font-size: 10px; padding: 1px 6px; border-radius: 10px; margin-left: 4px; font-family: 'DM Mono', monospace; }
+  .filter-tab.active .tab-count { background: var(--red-bg); color: var(--red); }
+
+  /* TOOLBAR */
+  .toolbar { display: flex; align-items: center; gap: 10px; padding: 12px 28px; border-bottom: 1px solid var(--border); background: var(--bg2); flex-wrap: wrap; }
+  .search-wrap { position: relative; flex: 1; min-width: 180px; max-width: 320px; }
+  .search-wrap svg { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); opacity: 0.4; pointer-events: none; }
+  input[type="search"] { width: 100%; background: var(--bg3); border: 1px solid var(--border); color: var(--text); padding: 8px 10px 8px 34px; border-radius: var(--radius); font-family: 'Syne', sans-serif; font-size: 13px; outline: none; }
+  input[type="search"]:focus { border-color: var(--border2); }
+  select { background: var(--bg3); border: 1px solid var(--border); color: var(--text); padding: 8px 28px 8px 12px; border-radius: var(--radius); font-family: 'Syne', sans-serif; font-size: 13px; outline: none; cursor: pointer; appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' fill='none'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%239a9994' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 10px center; }
+  .btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px; border-radius: var(--radius); font-family: 'Syne', sans-serif; font-size: 13px; font-weight: 500; cursor: pointer; border: 1px solid var(--border); background: var(--bg3); color: var(--text); transition: all 0.15s; white-space: nowrap; }
+  .btn:hover { background: var(--bg4); border-color: var(--border2); }
+  .btn:disabled { opacity: 0.45; cursor: not-allowed; }
+  .btn-primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .btn-primary:hover { background: #d03c35; border-color: #d03c35; }
+  .toolbar-right { display: flex; gap: 8px; margin-left: auto; }
+  .view-toggle { display: flex; background: var(--bg3); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+  .view-btn { padding: 7px 10px; cursor: pointer; color: var(--text2); border: none; background: transparent; transition: all 0.15s; display: flex; align-items: center; }
+  .view-btn.active { background: var(--bg4); color: var(--text); }
+
+  /* ACTION BAR */
+  .action-bar { display: none; align-items: center; gap: 10px; padding: 10px 28px; background: var(--bg3); border-bottom: 1px solid var(--border); font-size: 13px; color: var(--text2); }
+  .action-bar.show { display: flex; }
+
+  /* TABLE */
+  .main { padding: 20px 28px; }
+  .table-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  thead th { text-align: left; padding: 8px 12px; color: var(--text3); font-size: 11px; font-weight: 600; letter-spacing: 0.6px; text-transform: uppercase; border-bottom: 1px solid var(--border); white-space: nowrap; cursor: pointer; user-select: none; transition: color 0.15s; }
+  thead th:hover { color: var(--text2); }
+  tbody tr { border-bottom: 1px solid var(--border); cursor: pointer; transition: background 0.1s; }
+  tbody tr:hover { background: var(--bg2); }
+  tbody td { padding: 11px 12px; color: var(--text2); vertical-align: middle; font-family: 'DM Mono', monospace; font-size: 12px; }
+  .td-main { font-family: 'Syne', sans-serif; font-size: 13px; color: var(--text); font-weight: 500; }
+  .td-vin { font-family: 'DM Mono', monospace; font-size: 11px; color: var(--text3); letter-spacing: 0.5px; }
+
+  /* BADGES */
+  .badge { display: inline-flex; align-items: center; padding: 3px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; font-family: 'Syne', sans-serif; white-space: nowrap; }
+  .badge-live { background: var(--green-bg); color: var(--green); }
+  .badge-sold { background: var(--red-bg); color: var(--red); }
+  .badge-notfound { background: var(--bg3); color: var(--text3); }
+  .badge-posted { background: var(--blue-bg); color: var(--blue); }
+  .badge-delist { background: var(--amber-bg); color: var(--amber); font-weight: 700; }
+  .badge-pricedrop { background: var(--red-bg); color: var(--red); font-weight: 700; }
+  .badge-priceup { background: rgba(240,160,48,0.15); color: var(--amber); font-weight: 700; }
+  .badge-noprice { background: rgba(240,160,48,0.15); color: var(--amber); font-weight: 700; }
+  .badge-unposted { background: var(--bg3); color: var(--text3); }
+
+  /* CARDS */
+  .card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; }
+  .card { background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 16px; cursor: pointer; transition: all 0.15s; }
+  .card:hover { border-color: var(--border2); background: var(--bg3); }
+  .card-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px; }
+  .card-title { font-size: 14px; font-weight: 600; color: var(--text); line-height: 1.3; }
+  .card-vin { font-family: 'DM Mono', monospace; font-size: 10px; color: var(--text3); margin-top: 3px; }
+  .card-price { font-size: 18px; font-weight: 700; color: var(--text); margin-top: 10px; font-family: 'DM Mono', monospace; }
+  .card-meta { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; font-size: 12px; color: var(--text2); }
+  .card-footer { display: flex; justify-content: space-between; align-items: center; margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--border); }
+  .days-badge { font-size: 11px; color: var(--text3); font-family: 'DM Mono', monospace; }
+  .days-badge.hot { color: var(--red); } .days-badge.warm { color: var(--amber); }
+
+  /* DRAWER */
+  .overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 200; display: none; align-items: flex-start; justify-content: flex-end; }
+  .overlay.open { display: flex; }
+  .drawer { width: 560px; max-width: 100vw; height: 100vh; background: var(--bg2); border-left: 1px solid var(--border); overflow-y: auto; animation: slideIn 0.2s ease; }
+  @keyframes slideIn { from { transform: translateX(100%); } to { transform: translateX(0); } }
+  .drawer-header { display: flex; align-items: center; justify-content: space-between; padding: 20px 24px; border-bottom: 1px solid var(--border); position: sticky; top: 0; background: var(--bg2); z-index: 10; }
+  .drawer-title { font-size: 16px; font-weight: 600; }
+  .drawer-body { padding: 20px 24px; }
+  .close-btn { background: none; border: none; color: var(--text2); cursor: pointer; padding: 4px; border-radius: 4px; }
+  .close-btn:hover { background: var(--bg3); color: var(--text); }
+  .field-group { margin-bottom: 20px; }
+  .field-label { font-size: 11px; font-weight: 600; color: var(--text3); letter-spacing: 0.6px; text-transform: uppercase; margin-bottom: 8px; }
+  .field-value { font-size: 14px; color: var(--text); line-height: 1.6; }
+  .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .section-title { font-size: 11px; font-weight: 600; color: var(--text3); letter-spacing: 0.6px; text-transform: uppercase; margin-bottom: 12px; margin-top: 24px; }
+  .fb-box { background: var(--bg3); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 14px 14px 14px; font-family: 'DM Mono', monospace; font-size: 12px; color: var(--text2); line-height: 1.7; white-space: pre-wrap; word-break: break-word; position: relative; padding-top: 38px; }
+  .copy-btn { position: absolute; top: 10px; right: 10px; background: var(--bg4); border: 1px solid var(--border); color: var(--text2); padding: 5px 10px; border-radius: 5px; font-size: 11px; cursor: pointer; font-family: 'Syne', sans-serif; font-weight: 500; transition: all 0.15s; }
+  .copy-btn:hover { color: var(--text); } .copy-btn.copied { color: var(--green); border-color: var(--green); }
+  .photo-drop-zone { border: 2px dashed var(--border2); border-radius: var(--radius); padding: 20px; text-align: center; cursor: pointer; transition: all 0.15s; margin-bottom: 10px; }
+  .photo-drop-zone:hover, .photo-drop-zone.drag-over { border-color: var(--accent); background: rgba(232,71,63,0.04); }
+  .photo-preview-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; margin: 10px 0; }
+  .photo-thumb { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 4px; border: 1px solid var(--border); }
+  .photo-thumb-wrap { position: relative; }
+  .photo-thumb-remove { position: absolute; top: 2px; right: 2px; background: rgba(0,0,0,0.7); color: #fff; border: none; border-radius: 50%; width: 16px; height: 16px; font-size: 10px; cursor: pointer; display: flex; align-items: center; justify-content: center; line-height: 1; }
+  .upload-progress { font-size: 12px; color: var(--text2); margin-top: 6px; }
+  .mini-copy-btn { background: var(--bg4); border: 1px solid var(--border); color: var(--text3); padding: 3px 9px; border-radius: 4px; font-size: 11px; cursor: pointer; font-family: 'Syne', sans-serif; font-weight: 500; transition: all 0.15s; white-space: nowrap; flex-shrink: 0; }
+  .mini-copy-btn:hover { color: var(--text); border-color: var(--border2); }
+  .mini-copy-btn.copied { color: var(--green); border-color: var(--green); }
+  .fb-price-input { background: var(--bg3); border: 1px solid var(--border); color: var(--text3); padding: 6px 10px; border-radius: var(--radius); font-family: 'DM Mono', monospace; font-size: 14px; font-weight: 600; width: 120px; outline: none; cursor: not-allowed; opacity: 0.5; }
+  .fb-price-input.unlocked { border-color: var(--amber); color: var(--text); cursor: text; opacity: 1; }
+  .fb-price-input.match { border-color: var(--green); color: var(--green); opacity: 1; }
+  .fb-price-input.mismatch { border-color: var(--red); color: var(--red); opacity: 1; }
+  tbody tr.row-active { background: rgba(74,158,255,0.07) !important; }
+  tbody tr.row-active td { border-bottom-color: rgba(74,158,255,0.2); }
+  .status-control { display: flex; gap: 8px; flex-wrap: wrap; }
+  .status-btn { padding: 6px 14px; border-radius: 5px; font-size: 12px; font-weight: 600; cursor: pointer; border: 1px solid var(--border); background: var(--bg3); color: var(--text2); font-family: 'Syne', sans-serif; transition: all 0.15s; }
+  .status-btn:hover { border-color: var(--border2); }
+  .status-btn.s-posted { background: var(--blue-bg); color: var(--blue); border-color: var(--blue); }
+  .status-btn.s-unposted { background: var(--amber-bg); color: var(--amber); border-color: var(--amber); }
+  .status-btn.s-sold { background: var(--red-bg); color: var(--red); border-color: var(--red); }
+  .carfax-link { display: inline-flex; align-items: center; gap: 6px; color: var(--blue); font-size: 12px; text-decoration: none; padding: 5px 10px; background: var(--blue-bg); border-radius: 5px; font-weight: 500; }
+  .edmunds-badge { display: inline-flex; align-items: center; padding: 5px 12px; border-radius: 5px; font-size: 12px; font-weight: 600; background: var(--green-bg); color: var(--green); }
+  .features-list { font-size: 12px; color: var(--text2); line-height: 1.9; }
+
+  /* MODALS */
+  .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.8); z-index: 300; display: none; align-items: center; justify-content: center; }
+  .modal-overlay.open { display: flex; }
+  .modal { background: var(--bg2); border: 1px solid var(--border2); border-radius: var(--radius-lg); padding: 28px; width: 480px; max-width: 95vw; animation: fadeIn 0.15s ease; }
+  @keyframes fadeIn { from { opacity: 0; transform: scale(0.97); } to { opacity: 1; transform: scale(1); } }
+  .modal h2 { font-size: 18px; font-weight: 600; margin-bottom: 6px; }
+  .modal p { color: var(--text2); font-size: 13px; margin-bottom: 20px; line-height: 1.5; }
+  .upload-zone { border: 2px dashed var(--border2); border-radius: var(--radius); padding: 28px 20px; text-align: center; cursor: pointer; transition: all 0.15s; }
+  .upload-zone:hover, .upload-zone.drag { border-color: var(--accent); background: rgba(232,71,63,0.04); }
+  #file-input { display: none; }
+  .modal-footer { display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px; }
+  .scrape-row { display: flex; align-items: center; gap: 10px; padding: 7px 0; border-bottom: 1px solid var(--border); font-size: 12px; }
+  .scrape-vin { font-family: 'DM Mono', monospace; color: var(--text3); width: 140px; flex-shrink: 0; font-size: 11px; }
+  .spinner { width: 13px; height: 13px; border: 2px solid var(--border2); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.6s linear infinite; flex-shrink: 0; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .empty { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 80px 20px; text-align: center; color: var(--text3); gap: 12px; }
+  .empty h3 { color: var(--text2); font-size: 16px; } .empty p { font-size: 13px; max-width: 300px; line-height: 1.6; }
+  .toast { position: fixed; bottom: 28px; left: 50%; transform: translateX(-50%); background: var(--bg4); border: 1px solid var(--border2); color: var(--text); padding: 10px 20px; border-radius: var(--radius); font-size: 13px; z-index: 500; opacity: 0; transition: opacity 0.2s; pointer-events: none; white-space: nowrap; }
+  .toast.show { opacity: 1; }
+  input[type="checkbox"] { width: 15px; height: 15px; accent-color: var(--accent); cursor: pointer; }
+
+  /* LEADS */
+  .leads-view { display: none; }
+  .lead-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .lead-table th { text-align: left; padding: 8px 12px; color: var(--text3); font-size: 11px; font-weight: 600; letter-spacing: 0.6px; text-transform: uppercase; border-bottom: 1px solid var(--border); white-space: nowrap; }
+  .lead-table td { padding: 11px 12px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+  .lead-table tbody tr:hover td { background: var(--bg2); }
+  .lead-status-sel { padding: 3px 9px; border-radius: 5px; font-size: 11px; font-weight: 600; cursor: pointer; border: 1px solid transparent; font-family: 'Syne', sans-serif; outline: none; }
+  .lead-status-sel.s-new { background: var(--blue-bg); color: var(--blue); }
+  .lead-status-sel.s-contacted { background: var(--amber-bg); color: var(--amber); }
+  .lead-status-sel.s-qualified { background: var(--green-bg); color: var(--green); }
+  .lead-status-sel.s-sold { background: var(--red-bg); color: var(--red); }
+  .lead-status-sel.s-lost { background: var(--bg3); color: var(--text3); }
+  .lead-note-input { background: transparent; border: none; border-bottom: 1px dashed var(--border2); color: var(--text2); font-family: 'Syne', sans-serif; font-size: 12px; width: 160px; outline: none; padding: 2px 4px; }
+  .lead-note-input:focus { border-bottom-color: var(--accent); color: var(--text); }
+  .leads-toolbar { display: flex; align-items: center; justify-content: space-between; padding: 12px 28px; border-bottom: 1px solid var(--border); background: var(--bg2); }
+  .leads-toolbar h2 { font-size: 16px; font-weight: 700; }
+</style>
+</head>
+<body>
+
+<!-- SETUP SCREEN -->
+<div id="setup-screen" class="setup-screen">
+  <div class="setup-card">
+    <h1>Connect to Google Sheets</h1>
+    <p class="setup-sub">One-time setup — your inventory will live safely in your Google Drive, accessible from any computer.</p>
+
+    <div class="step">
+      <div class="step-num">1</div>
+      <div class="step-body">
+        <h3>Create a new Google Sheet</h3>
+        <p>Go to <strong>sheets.new</strong> in your browser. Name it <em>Dublin Toyota Inventory</em>.</p>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">2</div>
+      <div class="step-body">
+        <h3>Open Apps Script</h3>
+        <p>In the sheet, click <strong>Extensions → Apps Script</strong>. Delete everything in the editor. Paste in the code from <strong>apps-script.js</strong> (in your download). Click <strong>Save</strong> (floppy disk icon).</p>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">3</div>
+      <div class="step-body">
+        <h3>Deploy as a Web App</h3>
+        <p>Click <strong>Deploy → New deployment</strong>. Click the gear icon and choose <strong>Web app</strong>. Set <em>Execute as</em> → <strong>Me</strong>. Set <em>Who has access</em> → <strong>Only myself</strong>. Click <strong>Deploy</strong>, authorize when prompted, then copy the URL it gives you.</p>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">4</div>
+      <div class="step-body">
+        <h3>Paste your Web App URL here</h3>
+        <p>Looks like: <span class="mono">https://script.google.com/macros/s/…/exec</span></p>
+        <div class="url-row">
+          <input type="text" id="api-url-input" placeholder="https://script.google.com/macros/s/…/exec">
+          <button class="btn btn-primary" onclick="testAndSaveUrl()">Connect</button>
+        </div>
+        <div class="connect-status" id="connect-status"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MAIN APP -->
+<div id="app">
+  <header class="header">
+    <div class="logo"><span class="logo-badge">DT</span> Inventory Manager</div>
+    <div class="header-right">
+      <div class="header-stats" id="header-stats"></div>
+      <span class="sync-info" id="sync-info"></span>
+      <button class="btn" style="font-size:11px;padding:5px 10px;color:var(--text3)" onclick="resetSetup()">⚙ Reconnect</button>
+    </div>
+  </header>
+
+  <div class="filter-tabs">
+    <button class="filter-tab active" data-filter="all">All <span class="tab-count" id="cnt-all">0</span></button>
+    <button class="filter-tab" data-filter="live">Live <span class="tab-count" id="cnt-live">0</span></button>
+    <button class="filter-tab" data-filter="posted">FB Posted <span class="tab-count" id="cnt-posted">0</span></button>
+    <button class="filter-tab" data-filter="unposted">Not Posted <span class="tab-count" id="cnt-unposted">0</span></button>
+    <button class="filter-tab" data-filter="sold">Sold <span class="tab-count" id="cnt-sold">0</span></button>
+    <button class="filter-tab" data-filter="leads">Leads <span class="tab-count" id="cnt-leads">0</span></button>
+  </div>
+
+  <div class="toolbar">
+    <div class="search-wrap">
+      <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+      <input type="search" id="search" placeholder="Search VIN, make, model…">
+    </div>
+    <button class="btn" onclick="openBulkVinModal()" title="Paste multiple VINs to find and select them">
+      <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><line x1="9" y1="12" x2="15" y2="12"/><line x1="9" y1="16" x2="13" y2="16"/></svg>
+      Bulk Select
+    </button>
+    <select id="sort-select">
+      <option value="date-desc">Newest First</option>
+      <option value="date-asc">Oldest First</option>
+      <option value="price-desc">Price High–Low</option>
+      <option value="price-asc">Price Low–High</option>
+      <option value="days-desc">Most Days on Lot</option>
+      <option value="alpha">A–Z</option>
+    </select>
+    <div class="toolbar-right">
+      <button class="btn" onclick="openScrapeModal()">
+        <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M4 4v5h5"/><path d="M20 20v-5h-5"/><path d="M4 9a9 9 0 0115.47-3.47"/><path d="M20 15a9 9 0 01-15.47 3.47"/></svg>
+        Refresh Web Data
+      </button>
+      <button class="btn btn-primary" onclick="openUploadModal()">
+        <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        Import CSV
+      </button>
+      <div class="view-toggle">
+        <button class="view-btn active" id="btn-table" onclick="setView('table')"><svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg></button>
+        <button class="view-btn" id="btn-cards" onclick="setView('cards')"><svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg></button>
+      </div>
+    </div>
+  </div>
+
+  <div class="action-bar" id="action-bar">
+    <span id="selected-count">0 selected</span>
+    <button class="btn" onclick="bulkMarkPosted()">Mark as FB Posted</button>
+    <button class="btn" onclick="bulkMarkSold()">Mark as Sold</button>
+    <button class="btn" style="color:var(--red)" onclick="clearSelection()">Clear</button>
+  </div>
+
+  <div class="main">
+    <div class="empty" id="empty-state">
+      <svg width="40" height="40" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" style="color:var(--text3)"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v2"/></svg>
+      <h3>No inventory yet</h3>
+      <p>Import your Dealer Daily CSV to get started. Your data will sync to Google Sheets automatically.</p>
+      <button class="btn btn-primary" style="margin-top:8px" onclick="openUploadModal()">Import CSV</button>
+    </div>
+    <div class="table-wrap" id="table-view" style="display:none">
+      <table>
+        <thead><tr id="table-head-row">
+          <th style="width:32px"><input type="checkbox" id="chk-all" onchange="toggleAll(this)"></th>
+          <th onclick="sortBy('title')">Vehicle</th>
+          <th onclick="sortBy('price')" id="th-price">Price</th>
+          <th onclick="sortBy('mileage')">Miles</th>
+          <th onclick="sortBy('status')">Website</th>
+          <th onclick="sortBy('fbStatus')">Facebook</th>
+          <th onclick="sortBy('days')">Days on Lot</th>
+          <th id="th-daysposted" style="display:none">Days Posted</th>
+          <th>Stock #</th>
+        </tr></thead>
+        <tbody id="table-body"></tbody>
+      </table>
+    </div>
+    <div class="card-grid" id="card-view" style="display:none"></div>
+    <div class="leads-view" id="leads-view"></div>
+  </div>
+</div>
+
+<!-- DRAWER -->
+<div class="overlay" id="drawer-overlay" onclick="closeDrawerOverlay(event)">
+  <div class="drawer" onclick="event.stopPropagation()">
+    <div class="drawer-header">
+      <div>
+        <div class="drawer-title" id="drawer-title"></div>
+        <div id="drawer-vin" style="font-family:'DM Mono',monospace;font-size:11px;color:var(--text3);margin-top:3px"></div>
+      </div>
+      <button class="close-btn" onclick="closeDrawer()"><svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+    </div>
+    <div class="drawer-body" id="drawer-body"></div>
+  </div>
+</div>
+
+<!-- UPLOAD MODAL -->
+<div class="modal-overlay" id="upload-modal">
+  <div class="modal">
+    <h2>Import Inventory CSV</h2>
+    <p>Drop your Dealer Daily export here. New VINs get added; existing ones get updated. Your FB status, descriptions, and history are always preserved.</p>
+    <div class="upload-zone" id="upload-zone" onclick="document.getElementById('file-input').click()" ondragover="event.preventDefault();this.classList.add('drag')" ondragleave="this.classList.remove('drag')" ondrop="handleDrop(event)">
+      <svg width="30" height="30" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" style="color:var(--text3);margin-bottom:8px"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+      <p style="font-size:14px;font-weight:500;color:var(--text)">Click to browse or drag CSV here</p>
+      <p style="font-size:12px;color:var(--text3);margin-top:4px">Dealer Daily export (.csv)</p>
+    </div>
+    <input type="file" id="file-input" accept=".csv,.txt" onchange="handleFileSelect(this)">
+    <div id="upload-preview" style="margin-top:14px;font-size:13px;color:var(--text2);display:none"></div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeUploadModal()">Cancel</button>
+      <button class="btn btn-primary" id="import-btn" onclick="doImport()" disabled>Import</button>
+    </div>
+  </div>
+</div>
+
+<!-- SCRAPE MODAL -->
+<div class="modal-overlay" id="scrape-modal">
+  <div class="modal" style="width:520px">
+    <h2>Refresh Web Data</h2>
+    <p>Pulls live price, website status, CARFAX, features, and Edmunds value for each active VIN from DublinToyota.com. Results save directly to your Google Sheet.</p>
+    <div id="scrape-log" style="max-height:260px;overflow-y:auto;border:1px solid var(--border);border-radius:var(--radius);padding:10px;background:var(--bg3);display:none"></div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeScrapeModal()">Close</button>
+      <button class="btn btn-primary" id="scrape-btn" onclick="startScrape()">Start Refresh</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<!-- BULK VIN MODAL -->
+<div class="modal-overlay" id="bulk-vin-modal">
+  <div class="modal" style="width:500px">
+    <h2>Bulk VIN Select</h2>
+    <p>Paste your VINs below — one per line, or separated by spaces or commas. All matching vehicles will be selected so you can bulk mark them as Posted.</p>
+    <textarea id="bulk-vin-input" style="width:100%;height:160px;background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:10px;border-radius:var(--radius);font-family:'DM Mono',monospace;font-size:12px;outline:none;resize:vertical;line-height:1.6" placeholder="1C4JJXP6XMW676527&#10;5TDERKEC5RS194481&#10;5TFVC5DB3RX066424&#10;..."></textarea>
+    <div id="bulk-vin-result" style="font-size:13px;color:var(--text2);margin-top:10px;min-height:18px"></div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeBulkVinModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="applyBulkVinSelect()">Find &amp; Select</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const URL_KEY = 'dt_api_url_v1';
+let API_URL = '', inventory = [], filtered = [];
+let currentView = 'table', activeFilter = 'all', sortKey = 'date-desc';
+let selectedVins = new Set(), pendingCsvData = null, currentVin = null, lastOpenedVin = null;
+let pendingPhotos = [];
+
+// ── SETUP ──────────────────────────────────────────────────
+function init() {
+  const saved = localStorage.getItem(URL_KEY);
+  if (saved) { API_URL = saved; showApp(); loadFromSheet(); }
+  else { document.getElementById('setup-screen').style.display = 'flex'; }
+}
+
+async function testAndSaveUrl() {
+  const val = document.getElementById('api-url-input').value.trim();
+  const st = document.getElementById('connect-status');
+  if (!val.includes('script.google.com')) { st.className='connect-status err'; st.textContent='That doesn\'t look like a valid Apps Script URL.'; return; }
+  st.className='connect-status loading'; st.textContent='Connecting…';
+  try {
+    const res = await apiFetch(val, 'ping');
+    if (res && res.ok) {
+      localStorage.setItem(URL_KEY, val); API_URL = val;
+      st.className='connect-status ok'; st.textContent='✓ Connected!';
+      setTimeout(() => { showApp(); loadFromSheet(); }, 500);
+    } else throw new Error(res.error || 'Bad response');
+  } catch(e) { st.className='connect-status err'; st.textContent='✗ ' + (e.message || 'Check URL and try again'); }
+}
+
+function showApp() { document.getElementById('setup-screen').style.display='none'; document.getElementById('app').style.display='block'; }
+function resetSetup() {
+  if (!confirm('Disconnect? Your data stays safe in Google Sheets.')) return;
+  localStorage.removeItem(URL_KEY); API_URL=''; inventory=[];
+  document.getElementById('app').style.display='none';
+  document.getElementById('setup-screen').style.display='flex';
+}
+
+// ── API ────────────────────────────────────────────────────
+async function apiFetch(url, action, body) {
+  if (!body) {
+    const r = await fetch(`${url}?action=${action}`, {redirect:'follow'});
+    return r.json();
+  }
+  // Apps Script doesnt handle JSON POST well - use form-encoded instead
+  const params = new URLSearchParams();
+  params.append('action', action);
+  params.append('payload', JSON.stringify(body));
+  const r = await fetch(url, { method:'POST', redirect:'follow', body: params });
+  return r.json();
+}
+const apiGet  = (action)       => apiFetch(API_URL, action);
+const apiPost = (action, body) => apiFetch(API_URL, action, body);
+
+async function loadFromSheet() {
+  setSyncInfo('loading');
+  try {
+    const res = await apiGet('getAll');
+    if (res.error) throw new Error(res.error);
+    inventory = (res.cars||[]).map(c => ({ ...c, mileage: Number(c.mileage)||0, price: Number(c.price)||0, websitePrice: Number(c.websitePrice)||0 }));
+    render(); setSyncInfo('ok');
+  } catch(e) { setSyncInfo('error'); showToast('Sheet load error: ' + e.message); }
+}
+
+function setSyncInfo(state) {
+  const el = document.getElementById('sync-info');
+  if (state==='loading') el.innerHTML='<span class="saving-dot"></span> Loading…';
+  else if (state==='saving') el.innerHTML='<span class="saving-dot"></span> Saving…';
+  else if (state==='ok') el.textContent='Synced ' + new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
+  else el.textContent='⚠ Sync error';
+}
+
+// ── DATA ───────────────────────────────────────────────────
+const normVin = v => String(v||'').toUpperCase().replace(/[^A-Z0-9]/g,'').trim();
+const daysOnLot = c => c.dis!=null && c.dis!=='' ? Number(c.dis)||0 : (c.addedDate ? Math.floor((Date.now()-new Date(c.addedDate))/86400000) : 0);
+const getTitle  = c => [c.year,c.make,c.model,c.trim].filter(Boolean).join(' ') || c.vin;
+const fmtPrice  = p => p ? '$'+Number(p).toLocaleString() : '—';
+const fmtMiles  = m => m ? Number(m).toLocaleString()+' mi' : '—';
+
+function statusBadge(c) {
+  const s=(c.websiteStatus||'').toLowerCase();
+  if(s.includes('sold')||s.includes('unavailable')) return '<span class="badge badge-sold">Sold</span>';
+
+  if(s.includes('delist')) {
+    if(c.fbStatus==='posted') return '<span class="badge badge-delist">Check FB — Delist</span>';
+    return '<span class="badge badge-notfound">Not on Website</span>';
+  }
+
+  if(s.includes('live')) {
+    // Price flags — only for posted cars
+    if(c.fbStatus==='posted'){
+      const webP=Number(c.websitePrice)||0;
+      const fbP=Number(c.currentFbPrice)||0;
+      if(!fbP && webP) return '<span class="badge badge-live">Live</span><span class="badge badge-noprice" style="margin-left:5px">Missing Price</span>';
+      if(fbP && webP && webP < fbP) return '<span class="badge badge-live">Live</span><span class="badge badge-pricedrop" style="margin-left:5px">⬇ Price Drop</span>';
+      if(fbP && webP && webP > fbP) return '<span class="badge badge-live">Live</span><span class="badge badge-priceup" style="margin-left:5px">⬆ Price Up</span>';
+    }
+    return '<span class="badge badge-live">Live</span>';
+  }
+  if(s.includes('fetch error')) return '<span class="badge badge-notfound">Fetch Error</span>';
+  if(s.includes('not found')) return '<span class="badge badge-notfound">Not Found</span>';
+  if(!c.websiteStatus) return '<span class="badge badge-notfound">Not Checked</span>';
+  return '<span class="badge badge-notfound">—</span>';
+}
+const fbBadge = c => c.fbStatus==='posted' ? '<span class="badge badge-posted">Posted</span>' : '<span class="badge badge-unposted">Not Posted</span>';
+const daysClass = d => d>60?'hot':d>30?'warm':'';
+
+// ── CSV ────────────────────────────────────────────────────
+function parseCSV(text) {
+  const lines=text.trim().split('\n'); if(lines.length<2) return [];
+  const hdrs=lines[0].split(',').map(h=>h.replace(/^"|"$/g,'').trim().toLowerCase());
+  return lines.slice(1).map(line=>{
+    const cells=splitCSV(line), obj={};
+    hdrs.forEach((h,i)=>{ obj[h]=(cells[i]||'').replace(/^"|"$/g,'').trim(); });
+    return obj;
+  }).filter(r=>Object.values(r).some(v=>v));
+}
+function splitCSV(line) {
+  const r=[]; let cur='',inQ=false;
+  for(const c of line){ if(c==='"'){inQ=!inQ;}else if(c===','&&!inQ){r.push(cur);cur='';}else{cur+=c;} }
+  r.push(cur); return r;
+}
+function findCol(row,keys) {
+  // exact match first
+  for(const k of keys) for(const rk of Object.keys(row)) if(rk.toLowerCase()===k.toLowerCase()) return row[rk];
+  // then partial
+  for(const k of keys) for(const rk of Object.keys(row)) if(rk.toLowerCase().includes(k.toLowerCase())) return row[rk];
+  return '';
+}
+function rowToCar(row) {
+  const vin = normVin(findCol(row,['vin']));
+  if(!vin) return null;
+
+  const modelDesc = (row['Model Desc'] || row['model desc'] || row['MODEL DESC'] || '').trim();
+  const year      = (row['Year'] || row['year'] || '').trim();
+  const ext       = (row['Ext'] || row['ext'] || '').trim();
+  const stock     = (row['Stock'] || row['stock'] || '').trim();
+  const mileage   = parseInt((row['Mileage'] || row['mileage'] || '0').replace(/\D/g,''))||0;
+  const priceRaw  = (row['Price'] || row['price'] || '0').replace(/[^0-9.]/g,'');
+  const price     = Math.round(parseFloat(priceRaw)||0);
+  const vtype     = (row['Vehicle Type'] || row['vehicle type'] || '').toUpperCase();
+
+  // Derive make from Vehicle Type or model description
+  const toyotaModels = ['4RUNNER','AVALON','BZ4X','BZ','CAMRY','C-HR','COROLLA','CROWN','FJ','GR86','HIGHLANDER','LAND CRUISER','MIRAI','PRIUS','RAV4','SEQUOIA','SIENNA','SUPRA','TACOMA','TUNDRA','VENZA','GRAND HIGHLANDER'];
+  const isToyota = vtype.includes('TCUV') || vtype.includes('TOYOTA') || toyotaModels.some(m => modelDesc.toUpperCase().startsWith(m));
+
+  let make = 'Toyota';
+  if (!isToyota) {
+    const makeMap = {
+      'Accord':'Honda','Civic':'Honda','CR-V':'Honda','HR-V':'Honda','Odyssey':'Honda','Pilot':'Honda',
+      'Wrangler':'Jeep','Gladiator':'Jeep','Cherokee':'Jeep',
+      'Model':'Tesla','Model 3':'Tesla','Model Y':'Tesla','Model S':'Tesla','Model X':'Tesla',
+      'Challenger':'Dodge','Charger':'Dodge','Durango':'Dodge',
+      'Aviator':'Lincoln','Nautilus':'Lincoln','Navigator':'Lincoln',
+      'GV80':'Genesis','GV70':'Genesis','G70':'Genesis','G80':'Genesis',
+      'Range Rover':'Land Rover',
+      'Jetta':'Volkswagen','Tiguan':'Volkswagen','Atlas':'Volkswagen',
+      'Sentra':'Nissan','Altima':'Nissan','Rogue':'Nissan','Pathfinder':'Nissan',
+      'RX':'Lexus','NX':'Lexus','ES':'Lexus','IS':'Lexus','GX':'Lexus','LX':'Lexus',
+      'M440i':'BMW','M3':'BMW','M5':'BMW','X3':'BMW','X5':'BMW',
+      'HUMMER':'GMC','Silverado':'Chevrolet','Corvette':'Chevrolet','Equinox':'Chevrolet',
+    };
+    const first = modelDesc.split(' ')[0];
+    const firstTwo = modelDesc.split(' ').slice(0,2).join(' ');
+    make = makeMap[firstTwo] || makeMap[first] || 'Other';
+  }
+
+  return { vin, year, make, model:modelDesc, trim:'', color:ext, mileage, price, stock,
+    fbStatus:'unposted', websiteStatus:'', websitePrice:0, fbDescription:'', drivePhotoFolder:'', drivePhotoCount:0,
+    carfaxUrl:'', edmundsLabel:'', edmundsBelow:'', vehicleInfo:'',
+    vehicleHistory:'', features:'', certification: vtype.includes('TCUV') ? 'Toyota Certified Used Vehicle' : '',
+    addedDate:new Date().toISOString(), dis:parseInt(findCol(row,['dis','days in stock','daysinstock'])||'0')||0, lastChecked:null, fbPostedDate:null, soldDate:null };
+}
+function mergeImport(rows) {
+  const map={}; inventory.forEach(c=>map[c.vin]=c);
+  const toAdd=[], toUpdate=[], added_l=[], updated_l=[];
+  rows.forEach(row=>{ const car=rowToCar(row); if(!car) return;
+    if(map[car.vin]){ const e=map[car.vin]; ['year','make','model','trim','color','mileage','price','stock','dis'].forEach(f=>{if(car[f]||car[f]===0)e[f]=car[f];}); toUpdate.push(e); updated_l.push(car.vin); }
+    else { inventory.push(car); map[car.vin]=car; toAdd.push(car); added_l.push(car.vin); }
+  });
+  return { added:toAdd.length, updated:toUpdate.length, toAdd, toUpdate };
+}
+
+// ── RENDER ─────────────────────────────────────────────────
+function applyFilters() {
+  const q=document.getElementById('search').value.toLowerCase();
+  filtered=inventory.filter(c=>{
+    const t=getTitle(c).toLowerCase();
+    const sf=[t,c.vin,(c.stock||''),(c.color||''),(c.make||''),(c.year||''),(c.certification||'')].map(s=>String(s).toLowerCase());
+    const ok=!q||sf.some(f=>f.includes(q));
+    if(!ok) return false;
+    if(activeFilter==='live') return (c.websiteStatus||'').toLowerCase().includes('live');
+    if(activeFilter==='posted') return c.fbStatus==='posted';
+    if(activeFilter==='unposted') return c.fbStatus!=='posted'&&!(c.websiteStatus||'').toLowerCase().includes('sold');
+    if(activeFilter==='sold') return (c.websiteStatus||'').toLowerCase().includes('sold')||c.fbStatus==='sold';
+    return true;
+  });
+  // Show Days Posted column only on FB Posted tab
+  const dpCol = document.getElementById('th-daysposted');
+  if(dpCol) dpCol.style.display = activeFilter==='posted' ? '' : 'none';
+  filtered.sort((a,b)=>{
+    // FB Posted tab: oldest posted at top (most days posted first)
+    if(activeFilter==='posted'){
+      const da = a.fbPostedDate ? new Date(a.fbPostedDate).getTime() : 0;
+      const db = b.fbPostedDate ? new Date(b.fbPostedDate).getTime() : 0;
+      if(da && db) return da - db; // oldest date first
+      if(da) return -1; // a has date, b doesn't — a goes first
+      if(db) return 1;  // b has date, a doesn't — b goes first
+      return daysOnLot(b) - daysOnLot(a); // fallback: most days on lot first
+    }
+    if(sortKey==='date-desc') return new Date(b.addedDate)-new Date(a.addedDate);
+    if(sortKey==='date-asc') return new Date(a.addedDate)-new Date(b.addedDate);
+    if(sortKey==='price-desc') return (b.websitePrice||b.price||0)-(a.websitePrice||a.price||0);
+    if(sortKey==='price-asc') return (a.websitePrice||a.price||0)-(b.websitePrice||b.price||0);
+    if(sortKey==='days-desc') return daysOnLot(b)-daysOnLot(a);
+    if(sortKey==='alpha') return getTitle(a).localeCompare(getTitle(b));
+    // Live tab default: fewest days on lot first (newest cars at top)
+    if(activeFilter==='live') return daysOnLot(a) - daysOnLot(b);
+    return 0;
+  });
+}
+
+function render() {
+  if(activeFilter==='leads') return;
+  applyFilters(); updateCounts(); updateHeaderStats();
+  const has=inventory.length>0;
+  document.getElementById('empty-state').style.display=has?'none':'flex';
+  if(!has){ document.getElementById('table-view').style.display='none'; document.getElementById('card-view').style.display='none'; return; }
+  currentView==='table' ? renderTable() : renderCards();
+}
+
+function renderTable() {
+  document.getElementById('table-view').style.display='block'; document.getElementById('card-view').style.display='none';
+  const tb=document.getElementById('table-body');
+  const isPostedTab = activeFilter==='posted';
+  if(!filtered.length){ tb.innerHTML=`<tr><td colspan="${isPostedTab?9:8}" style="text-align:center;padding:40px;color:var(--text3)">No vehicles match</td></tr>`; return; }
+  tb.innerHTML=filtered.map(c=>{
+    const d=daysOnLot(c), chk=selectedVins.has(c.vin)?'checked':'';
+    const isActive = c.vin===lastOpenedVin;
+
+    // Price column logic
+    let priceDisplay, priceStyle;
+    if(c.fbStatus==='posted'){
+      const fbP = c.currentFbPrice||0;
+      const webP = c.websitePrice||0;
+      const hasMismatch = fbP && webP && fbP !== webP;
+      priceDisplay = fbP ? fmtPrice(fbP) : (webP ? fmtPrice(webP) : '—');
+      priceStyle = hasMismatch ? 'color:var(--red);font-weight:600' : 'color:var(--text);font-weight:500';
+    } else {
+      // Not posted — show website price dimmed
+      const webP = c.websitePrice||c.price||0;
+      priceDisplay = webP ? fmtPrice(webP) : '—';
+      priceStyle = 'color:var(--text3);font-weight:400';
+    }
+
+    // Days posted for FB Posted tab
+    const daysPosted = c.fbPostedDate ? Math.floor((Date.now()-new Date(c.fbPostedDate))/86400000) : 0;
+
+    return `<tr onclick="openDrawer('${c.vin}')" class="${isActive?'row-active':''}">
+      <td onclick="event.stopPropagation()"><input type="checkbox" ${chk} onchange="toggleSelect('${c.vin}',this)"></td>
+      <td><div class="td-main">${getTitle(c)}</div><div class="td-vin">${c.vin}</div></td>
+      <td style="${priceStyle}">${priceDisplay}</td>
+      <td>${fmtMiles(c.mileage)}</td>
+      <td>${statusBadge(c)}</td>
+      <td>${fbBadge(c)}</td>
+      <td><span class="days-badge ${daysClass(d)}">${d}d</span></td>
+      ${isPostedTab?`<td><span class="days-badge ${daysClass(daysPosted)}">${daysPosted}d posted</span></td>`:''}
+      <td style="color:var(--text3)">${c.stock||'—'}</td>
+    </tr>`;
+  }).join('');
+}
+
+function renderCards() {
+  document.getElementById('table-view').style.display='none'; document.getElementById('card-view').style.display='grid';
+  const g=document.getElementById('card-view');
+  if(!filtered.length){ g.innerHTML='<div style="grid-column:1/-1;text-align:center;padding:40px;color:var(--text3)">No vehicles match</div>'; return; }
+  g.innerHTML=filtered.map(c=>{
+    const d=daysOnLot(c), p=c.websitePrice||c.price;
+    return `<div class="card" onclick="openDrawer('${c.vin}')">
+      <div class="card-header"><div><div class="card-title">${getTitle(c)}</div><div class="card-vin">${c.vin}</div></div>${fbBadge(c)}</div>
+      ${statusBadge(c)}
+      ${p?`<div class="card-price">${fmtPrice(p)}</div>`:''}
+      <div class="card-meta">${c.mileage?`<span>${fmtMiles(c.mileage)}</span>`:''}${c.color?`<span>${c.color}</span>`:''}${c.stock?`<span>#${c.stock}</span>`:''}</div>
+      <div class="card-footer"><span class="days-badge ${daysClass(d)}">${d}d on lot</span>${c.edmundsLabel?`<span style="font-size:11px;color:var(--green)">${c.edmundsLabel}</span>`:''}</div>
+    </div>`;
+  }).join('');
+}
+
+function updateCounts() {
+  document.getElementById('cnt-all').textContent=inventory.length;
+  document.getElementById('cnt-live').textContent=inventory.filter(c=>(c.websiteStatus||'').toLowerCase().includes('live')).length;
+  document.getElementById('cnt-posted').textContent=inventory.filter(c=>c.fbStatus==='posted').length;
+  document.getElementById('cnt-unposted').textContent=inventory.filter(c=>c.fbStatus!=='posted'&&!(c.websiteStatus||'').toLowerCase().includes('sold')).length;
+  document.getElementById('cnt-sold').textContent=inventory.filter(c=>(c.websiteStatus||'').toLowerCase().includes('sold')||c.fbStatus==='sold').length;
+}
+function updateHeaderStats() {
+  const live=inventory.filter(c=>(c.websiteStatus||'').toLowerCase().includes('live')).length;
+  const posted=inventory.filter(c=>c.fbStatus==='posted').length;
+  const sold=inventory.filter(c=>(c.websiteStatus||'').toLowerCase().includes('sold')).length;
+  document.getElementById('header-stats').innerHTML=`
+    <div class="stat-pill"><div class="dot" style="background:var(--green)"></div><strong>${live}</strong> Live</div>
+    <div class="stat-pill"><div class="dot" style="background:var(--blue)"></div><strong>${posted}</strong> Posted</div>
+    <div class="stat-pill"><div class="dot" style="background:var(--red)"></div><strong>${sold}</strong> Sold</div>`;
+}
+
+function setView(v) {
+  currentView=v;
+  document.getElementById('btn-table').classList.toggle('active',v==='table');
+  document.getElementById('btn-cards').classList.toggle('active',v==='cards');
+  render();
+}
+function sortBy(k){ sortKey=k; render(); }
+
+// ── SELECTION ──────────────────────────────────────────────
+function toggleSelect(vin,el){ if(el.checked)selectedVins.add(vin);else selectedVins.delete(vin); updateActionBar(); }
+function toggleAll(el){ filtered.forEach(c=>{ if(el.checked)selectedVins.add(c.vin);else selectedVins.delete(c.vin); }); updateActionBar(); render(); }
+function clearSelection(){ selectedVins.clear(); document.getElementById('chk-all').checked=false; updateActionBar(); render(); }
+function updateActionBar(){
+  const bar=document.getElementById('action-bar');
+  selectedVins.size>0?(bar.classList.add('show'),document.getElementById('selected-count').textContent=selectedVins.size+' selected'):bar.classList.remove('show');
+}
+
+async function bulkMarkPosted() {
+  const vins=[...selectedVins];
+  vins.forEach(v=>{ const c=inventory.find(x=>x.vin===v); if(c){c.fbStatus='posted';c.fbPostedDate=new Date().toISOString();} });
+  clearSelection(); render(); setSyncInfo('saving');
+  await apiPost('upsertMany',{cars:vins.map(v=>inventory.find(c=>c.vin===v)).filter(Boolean)});
+  setSyncInfo('ok'); showToast(vins.length+' marked as FB Posted');
+}
+async function bulkMarkSold() {
+  const vins=[...selectedVins];
+  vins.forEach(v=>{ const c=inventory.find(x=>x.vin===v); if(c){c.fbStatus='sold';c.websiteStatus='Sold/Unavailable';c.soldDate=new Date().toISOString();} });
+  clearSelection(); render(); setSyncInfo('saving');
+  await apiPost('upsertMany',{cars:vins.map(v=>inventory.find(c=>c.vin===v)).filter(Boolean)});
+  setSyncInfo('ok'); showToast('Marked as sold');
+}
+
+// ── FILTER TABS / SEARCH / SORT ────────────────────────────
+document.querySelectorAll('.filter-tab').forEach(t=>t.addEventListener('click',()=>{
+  document.querySelectorAll('.filter-tab').forEach(x=>x.classList.remove('active'));
+  t.classList.add('active'); activeFilter=t.dataset.filter;
+  if(activeFilter==='leads'){ showLeadsView(); } else { hideLeadsView(); render(); }
+}));
+document.getElementById('search').addEventListener('input',()=>render());
+document.getElementById('sort-select').addEventListener('change',function(){sortKey=this.value;render();});
+
+// ── UPLOAD ─────────────────────────────────────────────────
+function openUploadModal(){ document.getElementById('upload-modal').classList.add('open'); }
+function closeUploadModal(){ document.getElementById('upload-modal').classList.remove('open'); pendingCsvData=null; document.getElementById('upload-preview').style.display='none'; document.getElementById('import-btn').disabled=true; document.getElementById('file-input').value=''; }
+function handleDrop(e){ e.preventDefault(); document.getElementById('upload-zone').classList.remove('drag'); if(e.dataTransfer.files[0]) readCSVFile(e.dataTransfer.files[0]); }
+function handleFileSelect(i){ if(i.files[0]) readCSVFile(i.files[0]); }
+function readCSVFile(file){
+  const r=new FileReader();
+  r.onload=e=>{
+    const rows=parseCSV(e.target.result);
+    const valid=rows.filter(r=>normVin(findCol(r,['vin']))).length;
+    pendingCsvData=rows;
+    const p=document.getElementById('upload-preview');
+    p.style.display='block';
+    p.innerHTML=`<span style="color:var(--green)">✓</span> Found <strong style="color:var(--text)">${valid}</strong> vehicles in <em>${file.name}</em>`;
+    document.getElementById('import-btn').disabled=valid===0;
+  };
+  r.readAsText(file);
+}
+async function doImport(){
+  if(!pendingCsvData) return;
+  const btn=document.getElementById('import-btn');
+  btn.disabled=true;
+  const {added,updated,toAdd,toUpdate}=mergeImport(pendingCsvData);
+  render();
+  const all=[...toAdd,...toUpdate];
+  const BATCH=25;
+  setSyncInfo('saving');
+  for(let i=0;i<all.length;i+=BATCH){
+    const batch=all.slice(i,i+BATCH);
+    btn.textContent=`Saving… ${Math.min(i+BATCH,all.length)}/${all.length}`;
+    await apiPost('upsertMany',{cars:batch});
+    await new Promise(r=>setTimeout(r,200));
+  }
+  setSyncInfo('ok'); closeUploadModal();
+  showToast(`Done — ${added} added, ${updated} updated`);
+}
+
+// ── SCRAPE ─────────────────────────────────────────────────
+function openScrapeModal(){ scrapeRunning=false; document.getElementById('scrape-modal').classList.add('open'); document.getElementById('scrape-log').style.display='none'; document.getElementById('scrape-btn').disabled=false; document.getElementById('scrape-btn').textContent='Start Refresh'; }
+let scrapeRunning=false;
+function closeScrapeModal(){
+  scrapeRunning=false;
+  document.getElementById('scrape-modal').classList.remove('open');
+}
+
+async function startScrape(){
+  const btn=document.getElementById('scrape-btn'); btn.disabled=true; btn.textContent='Running…';
+  const log=document.getElementById('scrape-log'); log.style.display='block'; log.innerHTML='';
+
+  const toScrape=inventory.filter(c=>c.websiteStatus!=='Sold/Unavailable'&&c.fbStatus!=='sold');
+
+  if(!toScrape.length){ btn.disabled=false; btn.textContent='Start Refresh'; showToast('No vehicles to refresh'); return; }
+  scrapeRunning=true;
+
+  // Show starting message
+  log.innerHTML='<div style="color:var(--text3);font-size:12px;padding:4px 0">Sending '+toScrape.length+' VINs to Google Apps Script for scraping…</div>';
+
+  // Send all VINs to Apps Script which does the actual fetching (no CORS issues)
+  const BATCH=5;
+  for(let i=0;i<toScrape.length;i+=BATCH){
+    const batch=toScrape.slice(i,i+BATCH);
+    const vins=batch.map(c=>c.vin);
+    btn.textContent='Refreshing… '+Math.min(i+BATCH,toScrape.length)+'/'+toScrape.length;
+
+    try {
+      const res=await apiPost('scrapeVehicles',{vins});
+      if(res.error) throw new Error(res.error);
+
+      // Process results
+      (res.results||[]).forEach(result=>{
+        const car=inventory.find(c=>c.vin===result.vin);
+        if(!car) return;
+
+        const row=document.createElement('div');
+        row.className='scrape-row';
+
+        // Both status fields used depending on version
+        const ws = result.websiteStatus || result.status || '';
+        car.websiteStatus = ws;
+        car.lastChecked = new Date().toISOString();
+        if(ws.includes('Delist') || ws.includes('delist')){
+          car.websiteUrl='';
+          row.innerHTML=`<span style="color:var(--amber)">!</span><span class="scrape-vin">${car.vin}</span><span style="font-size:12px;color:var(--amber)">Not on site</span>`;
+        } else {
+          // Always update websiteStatus — even Fetch Error is better than stale dash
+          car.websiteStatus = result.websiteStatus || car.websiteStatus;
+          // Only update websiteUrl if we got a real one back
+          if(result.websiteUrl) car.websiteUrl=result.websiteUrl;
+          // On fetch error keep existing price, otherwise update
+          if(result.websitePrice) car.websitePrice=result.websitePrice;
+          if(result.stock)         car.stock=result.stock;
+          if(result.carfaxUrl)     car.carfaxUrl=result.carfaxUrl;
+          if(result.vehicleInfo)   car.vehicleInfo=result.vehicleInfo;
+          if(result.vehicleHistory)car.vehicleHistory=result.vehicleHistory;
+          if(result.features)      car.features=result.features;
+          if(result.certification) car.certification=result.certification;
+          car.lastChecked=new Date().toISOString();
+
+          // Set originalPrice on first scrape (never changes)
+          if(!car.originalPrice && car.websitePrice) car.originalPrice=car.websitePrice;
+          // Price drop: compare website price to currentFbPrice (what they posted)
+          if(car.currentFbPrice && car.websitePrice){
+            car.priceDropped = car.currentFbPrice !== car.websitePrice;
+          } else {
+            car.priceDropped = false;
+          }
+
+          car.fbDescription=buildFBDesc(car);
+
+          const priceNote=car.priceDropped
+            ?' ⬇ '+fmtPrice(car.fbPostedPrice)+'→'+fmtPrice(car.websitePrice)
+            :(car.websitePrice?' — '+fmtPrice(car.websitePrice):'');
+          row.innerHTML=`<span style="color:var(--green)">✓</span><span class="scrape-vin">${car.vin}</span><span style="font-size:12px;color:${car.priceDropped?'var(--red)':'var(--text2)'}">${car.websiteStatus||'Live'}${priceNote}</span>`;
+        }
+        log.appendChild(row);
+        log.scrollTop=log.scrollHeight;
+      });
+
+      // Save batch to sheet
+      await apiPost('upsertMany',{cars:batch.map(v=>inventory.find(c=>c.vin===v.vin)).filter(Boolean)});
+
+    } catch(err){
+      const row=document.createElement('div');
+      row.className='scrape-row';
+      row.innerHTML=`<span style="color:var(--red)">✗</span><span class="scrape-vin">Batch ${i/BATCH+1}</span><span style="font-size:12px;color:var(--text3)">${err.message||'Failed'}</span>`;
+      log.appendChild(row);
+    }
+    await new Promise(r=>setTimeout(r,300));
+    if(!scrapeRunning) break;
+  }
+
+  scrapeRunning=false;
+  render(); setSyncInfo('ok'); btn.disabled=false; btn.textContent='Done ✓';
+  showToast('Refreshed '+toScrape.length+' vehicles');
+}
+
+
+function buildFBDesc(c){
+  var lines=[];
+  if(c.stock) lines.push('Ref: '+c.stock);
+  var year=c.year||'';
+  var make=(c.make&&c.make!=='Other')?c.make:'';
+  var model=(c.model||'').trim();
+  var titleParts=[year,make,model].filter(Boolean);
+  if(titleParts.length) lines.push('Used '+titleParts.join(' '));
+  lines.push('VIN: '+c.vin);
+  var hist=(c.vehicleHistory||'').trim();
+  if(hist){ lines.push(''); lines.push('Vehicle History:'); lines.push(hist); }
+  // Use scraped vehicleInfo if clean, otherwise build from CSV data
+  var info=(c.vehicleInfo||'').trim();
+  var infoIsJunk = info.indexOf('dataset') >= 0 || info.indexOf('vehicleBody') >= 0 || info.indexOf('vehicleEngine }') >= 0 || info.indexOf('.dataset.') >= 0;
+  if(info && !infoIsJunk){
+    lines.push(''); lines.push('Vehicle Information:'); lines.push(info);
+  } else {
+    // Fall back to CSV data we already have
+    var csvInfo = [];
+    if(c.color) csvInfo.push('Exterior Color: '+c.color);
+    if(c.mileage) csvInfo.push('Mileage: '+Number(c.mileage).toLocaleString());
+    if(csvInfo.length){ lines.push(''); lines.push('Vehicle Information:'); lines.push(csvInfo.join('\n')); }
+  }
+  var feat=(c.features||'').trim();
+  if(feat){ lines.push(''); lines.push('Highlighted Features:'); lines.push(feat); }
+  if(c.carfaxUrl){ lines.push(''); lines.push('CARFAX Report:'); lines.push(c.carfaxUrl); }
+  return lines.join('\n');
+}
+
+function openDrawer(vin){
+  currentVin=vin;
+  lastOpenedVin=vin;
+  const c=inventory.find(x=>x.vin===vin); if(!c) return;
+  document.getElementById('drawer-title').textContent=getTitle(c);
+  document.getElementById('drawer-vin').textContent=c.vin;
+  renderDrawer(c);
+  document.getElementById('drawer-overlay').classList.add('open');
+  // Highlight the row
+  document.querySelectorAll('tbody tr').forEach(tr=>tr.classList.remove('row-active'));
+  document.querySelectorAll('tbody tr').forEach(tr=>{
+    if(tr.onclick&&tr.onclick.toString().includes(vin)) tr.classList.add('row-active');
+  });
+}
+
+function renderDrawer(c){
+  const d=daysOnLot(c);
+  const fb=buildFBDesc(c);
+  const websiteP = c.websitePrice||c.price||0;
+  const currentFbP = c.currentFbPrice||0;
+  const origP = c.originalPrice||0;
+  const hasMismatch = c.fbStatus==='posted' && currentFbP && websiteP && currentFbP !== websiteP;
+  const daysPosted = c.fbPostedDate ? Math.floor((Date.now()-new Date(c.fbPostedDate))/86400000) : 0;
+  let h='';
+
+  // Delist alert
+  if((c.websiteStatus||'').includes('Delist') && c.fbStatus==='posted')
+    h+=`<div style="background:var(--amber-bg);border:1px solid var(--amber);border-radius:var(--radius);padding:12px 14px;margin-bottom:16px;font-size:13px;color:var(--amber)"><strong>! Not on website</strong> &mdash; Removed from DublinToyota.com. Delist on Facebook then mark Sold below.</div>`;
+
+  // ── FACEBOOK FIELDS ──────────────────────────────────────
+  h+=`<div class="section-title">Facebook Listing Fields</div>`;
+
+  // Fuel type
+  var fuelType='';
+  if(c.vehicleInfo){ var fm=c.vehicleInfo.match(/Fuel Type:\s*([^\n]+)/i); if(fm) fuelType=fm[1].trim(); }
+
+  const mileageNum=c.mileage?Number(c.mileage).toLocaleString():'—';
+
+  h+=`<div class="field-row">
+    <div class="field-group"><div class="field-label">Year</div><div class="field-value">${c.year||'—'}</div></div>
+    <div class="field-group"><div class="field-label">Make</div><div class="field-value">${c.make||'—'}</div></div>
+  </div>`;
+
+  h+=`<div class="field-group"><div class="field-label">Model</div>
+    <div style="display:flex;align-items:center;gap:8px">
+      <div class="field-value" style="flex:1">${c.model||'—'}</div>
+      <button class="mini-copy-btn" onclick="copyText('${(c.model||'').replace(/'/g,"\\'")}',this)">Copy</button>
+    </div></div>`;
+
+  h+=`<div class="field-row">
+    <div class="field-group"><div class="field-label">Mileage</div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <div class="field-value" style="font-size:18px;font-weight:600;font-family:'DM Mono',monospace">${mileageNum}</div>
+        <button class="mini-copy-btn" onclick="copyText('${c.mileage||''}',this)">Copy</button>
+      </div>
+    </div>
+    <div class="field-group"><div class="field-label">Fuel Type</div><div class="field-value">${fuelType||'—'}</div></div>
+  </div>`;
+
+  // ── PRICE CONTROL SECTION ─────────────────────────────────
+  h+=`<div class="section-title">Price Control</div>`;
+
+  // Original price — use originalPrice or fall back to fbPostedPrice
+  const displayOrigP = origP || c.fbPostedPrice || 0;
+  if(displayOrigP) h+=`<div class="field-group"><div class="field-label">Original Price <span style="font-size:10px;color:var(--text3);font-weight:400">(first listed)</span></div>
+    <div class="field-value" style="font-family:'DM Mono',monospace;color:var(--text3)">${fmtPrice(displayOrigP)}</div>
+  </div>`;
+
+  // Website price + copy button (copy unlocks FB price field)
+  h+=`<div class="field-group"><div class="field-label">Website Price <span style="font-size:10px;color:var(--text3);font-weight:400">(live from site)</span></div>
+    <div style="display:flex;align-items:center;gap:8px">
+      <div class="field-value" style="font-size:18px;font-weight:600;font-family:'DM Mono',monospace;flex:1">${websiteP?fmtPrice(websiteP):'—'}</div>
+      ${websiteP?`<button class="mini-copy-btn" id="website-price-copy" onclick="copyWebsitePrice(${websiteP},this)">Copy</button>`:''}
+    </div>
+  </div>`;
+
+  // Current FB price — locked input
+  const fbPriceClass = !currentFbP ? 'fb-price-input' : (hasMismatch ? 'fb-price-input mismatch' : 'fb-price-input match');
+  const fbPriceVal = currentFbP ? '$'+Number(currentFbP).toLocaleString() : '';
+  const fbPricePlaceholder = currentFbP ? '' : 'Locked — copy website price first';
+  h+=`<div class="field-group">
+    <div class="field-label">Current FB Price <span style="font-size:10px;color:var(--text3);font-weight:400">(what you posted)</span>
+      ${hasMismatch?'<span style="color:var(--red);font-size:11px;margin-left:6px">⚠ Mismatch — update FB post</span>':''}
+      ${!hasMismatch&&currentFbP?'<span style="color:var(--green);font-size:11px;margin-left:6px">✓ Matches website</span>':''}
+    </div>
+    <div style="display:flex;align-items:center;gap:8px">
+      <input type="text" id="fb-price-field" class="${fbPriceClass}" value="${fbPriceVal}" placeholder="${fbPricePlaceholder||'Locked — copy website price first'}" readonly
+        oninput="checkFbPriceMatch(this,${websiteP})"
+        onkeydown="if(event.key==='Enter'){confirmFbPrice();}else if((event.key==='Delete'||event.key==='Backspace')&&!this.hasAttribute('readonly')){this.value='';checkFbPriceMatch(this,${websiteP});}">
+      <button class="mini-copy-btn" id="fb-price-confirm" onclick="confirmFbPrice()" style="display:none;background:var(--green-bg);color:var(--green);border-color:var(--green);font-size:13px;padding:5px 14px">✓ Confirm</button>
+    </div>
+    <div style="font-size:11px;color:var(--text3);margin-top:4px" id="fb-price-hint">Copy Website Price above to unlock this field</div>
+    <div style="font-size:11px;color:var(--text3);margin-top:4px">Copy Website Price above to unlock this field</div>
+  </div>`;
+
+  // ── VIN / STOCK ───────────────────────────────────────────
+  h+=`<div class="field-row">
+    <div class="field-group"><div class="field-label">VIN</div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <div class="field-value" style="flex:1;font-family:'DM Mono',monospace;font-size:12px;letter-spacing:0.5px">${c.vin}</div>
+        <button class="mini-copy-btn" onclick="copyText('${c.vin}',this)">Copy</button>
+      </div>
+    </div>
+    <div class="field-group"><div class="field-label">Stock #</div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <div class="field-value" style="flex:1">${c.stock||'—'}</div>
+        ${c.stock?`<button class="mini-copy-btn" onclick="copyText('${c.stock}',this)">Copy</button>`:''}
+      </div>
+    </div>
+  </div>`;
+
+  // ── LINKS ─────────────────────────────────────────────────
+  h+=`<div style="display:flex;gap:10px;flex-wrap:wrap;margin:16px 0">`;
+  if(c.websiteUrl) h+=`<a href="${c.websiteUrl}" class="carfax-link" target="_blank" style="background:var(--blue-bg);color:var(--blue)"><svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>View on DublinToyota.com</a>`;
+  if(c.carfaxUrl) h+=`<a href="${c.carfaxUrl}" class="carfax-link" target="_blank"><svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>CARFAX Report</a>`;
+  h+=`</div>`;
+
+  // ── PHOTOS ───────────────────────────────────────────────
+  h+=`<div class="section-title">Photos</div>
+  <div class="field-group">`;
+
+  if(c.drivePhotoFolder){
+    h+=`<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px">
+      <a href="${c.drivePhotoFolder}" target="_blank" class="carfax-link" style="background:var(--green-bg);color:var(--green)">
+        <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>
+        Open Photos in Drive ${c.drivePhotoCount?'('+c.drivePhotoCount+' photos)':''}
+      </a>
+    </div>
+    <div style="font-size:11px;color:var(--text3);margin-bottom:8px">Add more photos or replace existing ones:</div>`;
+  }
+
+  h+=`<div class="photo-drop-zone" id="photo-drop-zone"
+    ondragover="event.preventDefault();this.classList.add('drag-over')"
+    ondragleave="this.classList.remove('drag-over')"
+    ondrop="handlePhotoDrop(event)"
+    onclick="document.getElementById('photo-file-input').click()">
+    <svg width="24" height="24" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" style="color:var(--text3);margin-bottom:6px"><path d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+    <div style="font-size:13px;font-weight:500;color:var(--text)">Drop photos here or click to browse</div>
+    <div style="font-size:11px;color:var(--text3);margin-top:4px">JPG, PNG, WEBP — max 10 photos</div>
+  </div>
+  <input type="file" id="photo-file-input" accept="image/*" multiple style="display:none" onchange="handlePhotoFileSelect(this)">
+  <div id="photo-preview-grid" class="photo-preview-grid"></div>
+  <div id="photo-upload-status" class="upload-progress"></div>
+  ${pendingPhotos.length>0?`<button class="btn btn-primary" style="font-size:12px;padding:6px 16px;margin-top:8px" onclick="uploadPendingPhotos()">
+    <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+    Save ${pendingPhotos.length} Photo${pendingPhotos.length>1?'s':''} to Drive
+  </button>`:''}`;
+
+  h+=`</div>`;
+
+  // ── DESCRIPTION ───────────────────────────────────────────
+  h+=`<div class="section-title">Description</div>
+  <div class="field-group">
+    <div class="fb-box" style="padding-top:38px">
+      <button class="copy-btn" id="copy-btn" onclick="copyFB()">Copy</button>${fb||'<span style="color:var(--text3)">Run web refresh to generate</span>'}
+    </div>
+  </div>`;
+
+  // ── FB STATUS ─────────────────────────────────────────────
+  h+=`<div class="section-title">Facebook Status</div>
+  <div class="field-group">
+    <div class="status-control">
+      <button class="status-btn ${c.fbStatus==='posted'?'s-posted':''}" onclick="setFbStatus('posted')">Posted</button>
+      <button class="status-btn ${c.fbStatus==='unposted'?'s-unposted':''}" onclick="setFbStatus('unposted')">Not Posted</button>
+      <button class="status-btn ${c.fbStatus==='sold'?'s-sold':''}" onclick="setFbStatus('sold')">Sold</button>
+    </div>
+    ${c.fbPostedDate?`<div style="font-size:11px;color:var(--text3);margin-top:6px">Posted ${new Date(c.fbPostedDate).toLocaleDateString()} &mdash; ${daysPosted}d ago</div>`:''}
+  </div>
+  ${c.lastChecked?'<div style="font-size:11px;color:var(--text3);padding-bottom:24px">Last refreshed: '+new Date(c.lastChecked).toLocaleString()+'</div>':''}`;
+
+  document.getElementById('drawer-body').innerHTML=h;
+}
+
+
+
+async function setFbStatus(status){
+  const vin=currentVin;
+  const c=inventory.find(x=>x.vin===vin); if(!c) return;
+  c.fbStatus=status;
+  if(status==='posted' && !c.fbPostedDate) c.fbPostedDate=new Date().toISOString();
+  if(status==='unposted' || status==='posted'){
+    if((c.websiteStatus||'').toLowerCase().includes('sold')) c.websiteStatus='';
+  }
+  c.fbDescription=buildFBDesc(c);
+  currentVin=vin;
+  renderDrawer(c);
+  render();
+  setSyncInfo('saving');
+  try {
+    await apiPost('updateField',{vin:c.vin,field:'fbStatus',value:status});
+    if((c.websiteStatus||'')==='') await apiPost('updateField',{vin:c.vin,field:'websiteStatus',value:''});
+    if(status==='posted') await apiPost('updateField',{vin:c.vin,field:'fbPostedDate',value:c.fbPostedDate});
+    setSyncInfo('ok'); showToast('Status saved');
+  } catch(e) { setSyncInfo('error'); showToast('Save failed: '+e.message); }
+
+  // If marking sold and has Drive photos, prompt to delete
+  if(status==='sold' && c.drivePhotoFolder){
+    showDeletePhotosPrompt(c);
+  }
+}
+
+function showDeletePhotosPrompt(c){
+  // Show inline prompt in drawer
+  const body = document.getElementById('drawer-body');
+  if(!body) return;
+  const prompt = document.createElement('div');
+  prompt.id = 'delete-photos-prompt';
+  prompt.style.cssText = 'position:sticky;bottom:0;background:var(--bg2);border-top:1px solid var(--border);padding:14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;';
+  prompt.innerHTML = `
+    <span style="font-size:13px;color:var(--text);flex:1">Delete photos from Google Drive?</span>
+    <button class="btn" style="color:var(--red);border-color:var(--red);font-size:12px" onclick="deletePhotosFromDrive()">Yes, Delete</button>
+    <button class="btn" style="font-size:12px" onclick="document.getElementById('delete-photos-prompt').remove()">Keep Photos</button>
+  `;
+  body.appendChild(prompt);
+}
+
+async function deletePhotosFromDrive(){
+  const c=inventory.find(x=>x.vin===currentVin); if(!c) return;
+  const prompt=document.getElementById('delete-photos-prompt');
+  if(prompt) prompt.innerHTML='<span style="font-size:13px;color:var(--text2)">Deleting photos…</span>';
+  try{
+    const res=await apiPost('deletePhotos',{vin:c.vin});
+    if(res.error) throw new Error(res.error);
+    c.drivePhotoFolder='';
+    c.drivePhotoCount=0;
+    await apiPost('updateField',{vin:c.vin,field:'drivePhotoFolder',value:''});
+    await apiPost('updateField',{vin:c.vin,field:'drivePhotoCount',value:0});
+    if(prompt) prompt.remove();
+    renderDrawer(c);
+    showToast('Photos deleted from Drive');
+  } catch(e){
+    if(prompt) prompt.innerHTML='<span style="font-size:13px;color:var(--red)">Delete failed: '+e.message+'</span>';
+  }
+}
+
+function copyWebsitePrice(price, btn){
+  if(!price) return;
+  navigator.clipboard.writeText(String(price)).then(()=>{
+    const orig=btn.textContent;
+    btn.textContent='✓'; btn.classList.add('copied');
+    setTimeout(()=>{ btn.textContent=orig; btn.classList.remove('copied'); },1500);
+  });
+  // Unlock the FB price field and show confirm button
+  const field=document.getElementById('fb-price-field');
+  const confirm=document.getElementById('fb-price-confirm');
+  const hint=document.getElementById('fb-price-hint');
+  if(field){
+    field.removeAttribute('readonly');
+    field.classList.remove('fb-price-input','match','mismatch');
+    field.classList.add('fb-price-input','unlocked');
+    field.value='';
+    field.focus();
+  }
+  if(confirm) confirm.style.display='';
+  if(hint) hint.textContent='Paste the price you entered on Facebook, then hit Enter or Confirm';
+}
+
+function checkFbPriceMatch(input, websitePrice){
+  const raw=String(input.value).replace(/[$,]/g,'').trim();
+  const val=parseInt(raw)||0;
+  input.classList.remove('match','mismatch','unlocked');
+  if(!val){ input.classList.add('unlocked'); return; }
+  if(val===websitePrice) input.classList.add('match');
+  else input.classList.add('mismatch');
+}
+
+function confirmFbPrice(){
+  const input=document.getElementById('fb-price-field');
+  if(input) saveFbPrice(input);
+}
+
+async function saveFbPrice(input){
+  const c=inventory.find(x=>x.vin===currentVin); if(!c) return;
+  const raw=String(input.value).replace(/[$,]/g,'').trim();
+  const val=parseInt(raw)||0;
+  const confirm=document.getElementById('fb-price-confirm');
+  const hint=document.getElementById('fb-price-hint');
+  // Lock field back
+  input.setAttribute('readonly','');
+  input.classList.remove('unlocked','match','mismatch');
+  if(confirm) confirm.style.display='none';
+  if(!val){
+    input.classList.add('fb-price-input');
+    c.currentFbPrice=0;
+    c.priceDropped=false;
+    if(hint) hint.textContent='Copy Website Price above to unlock this field';
+    render(); setSyncInfo('saving');
+    try{
+      await apiPost('updateField',{vin:c.vin,field:'currentFbPrice',value:''});
+      await apiPost('updateField',{vin:c.vin,field:'priceDropped',value:false});
+      setSyncInfo('ok'); showToast('FB price cleared');
+    } catch(e){ setSyncInfo('error'); }
+    return;
+  }
+  c.currentFbPrice=val;
+  c.priceDropped = !!(c.websitePrice && val && val !== c.websitePrice);
+  input.classList.add(c.priceDropped?'mismatch':'match');
+  // Format display as $XX,XXX
+  input.value='$'+Number(val).toLocaleString();
+  if(hint) hint.textContent = c.priceDropped
+    ? '⚠ Does not match website price of '+fmtPrice(c.websitePrice)+' — check your FB post'
+    : '✓ Matches website price';
+  render(); setSyncInfo('saving');
+  try{
+    await apiPost('updateField',{vin:c.vin,field:'currentFbPrice',value:val});
+    await apiPost('updateField',{vin:c.vin,field:'priceDropped',value:c.priceDropped});
+    setSyncInfo('ok'); showToast(c.priceDropped?'⚠ Price mismatch — update your FB post':'✓ Price saved and confirmed');
+  } catch(e){ setSyncInfo('error'); }
+}
+
+function fileToBase64(file){
+  return new Promise((resolve,reject)=>{
+    const r=new FileReader();
+    r.onload=e=>resolve(e.target.result.split(',')[1]);
+    r.onerror=reject;
+    r.readAsDataURL(file);
+  });
+}
+
+function handlePhotoDrop(e){
+  e.preventDefault();
+  document.getElementById('photo-drop-zone').classList.remove('drag-over');
+  addPendingPhotos(Array.from(e.dataTransfer.files));
+}
+
+function handlePhotoFileSelect(input){
+  addPendingPhotos(Array.from(input.files));
+  input.value='';
+}
+
+function addPendingPhotos(files){
+  const allowed=['image/jpeg','image/jpg','image/png','image/webp'];
+  files.forEach(f=>{
+    if(!allowed.includes(f.type)) return;
+    if(pendingPhotos.length>=10){ showToast('Max 10 photos'); return; }
+    pendingPhotos.push(f);
+  });
+  renderPhotoPreview();
+  // Re-render drawer to show upload button
+  const c=inventory.find(x=>x.vin===currentVin);
+  if(c) renderDrawer(c);
+}
+
+function removePhoto(idx){
+  pendingPhotos.splice(idx,1);
+  renderPhotoPreview();
+  const c=inventory.find(x=>x.vin===currentVin);
+  if(c) renderDrawer(c);
+}
+
+function renderPhotoPreview(){
+  const grid=document.getElementById('photo-preview-grid');
+  if(!grid) return;
+  if(!pendingPhotos.length){ grid.innerHTML=''; return; }
+  grid.innerHTML=pendingPhotos.map((f,i)=>{
+    const url=URL.createObjectURL(f);
+    return `<div class="photo-thumb-wrap">
+      <img class="photo-thumb" src="${url}" alt="${f.name}">
+      <button class="photo-thumb-remove" onclick="removePhoto(${i})">✕</button>
+    </div>`;
+  }).join('');
+}
+
+async function uploadPendingPhotos(){
+  const c=inventory.find(x=>x.vin===currentVin); if(!c||!pendingPhotos.length) return;
+  const status=document.getElementById('photo-upload-status');
+  const BATCH=3;
+  let uploaded=0;
+  let folderUrl=c.drivePhotoFolder||'';
+
+  for(let i=0;i<pendingPhotos.length;i+=BATCH){
+    const batch=pendingPhotos.slice(i,i+BATCH);
+    if(status) status.textContent='Uploading '+Math.min(i+BATCH,pendingPhotos.length)+'/'+pendingPhotos.length+'…';
+
+    // Convert to base64
+    const photos=await Promise.all(batch.map(async f=>({
+      name:f.name,
+      mimeType:f.type,
+      data:await fileToBase64(f)
+    })));
+
+    try{
+      const res=await apiPost('uploadPhotos',{vin:c.vin,stock:c.stock||'',photos});
+      if(res.error) throw new Error(res.error);
+      folderUrl=res.folderUrl;
+      uploaded+=res.saved;
+      c.drivePhotoCount=res.total;
+    } catch(e){
+      if(status) status.textContent='Error on batch: '+e.message;
+      showToast('Upload error: '+e.message);
+      return;
+    }
+    await new Promise(r=>setTimeout(r,200));
+  }
+
+  c.drivePhotoFolder=folderUrl;
+  await apiPost('updateField',{vin:c.vin,field:'drivePhotoFolder',value:folderUrl});
+  await apiPost('updateField',{vin:c.vin,field:'drivePhotoCount',value:c.drivePhotoCount});
+  pendingPhotos=[];
+  renderDrawer(c);
+  showToast('✓ '+uploaded+' photos saved to Drive');
+}
+
+function copyText(text, btn){
+  if(!text||text==='—') return;
+  navigator.clipboard.writeText(text).then(()=>{
+    const orig=btn.textContent;
+    btn.textContent='✓'; btn.classList.add('copied');
+    setTimeout(()=>{ btn.textContent=orig; btn.classList.remove('copied'); },1500);
+  });
+}
+function copyFB(){
+  const c=inventory.find(x=>x.vin===currentVin); if(!c) return;
+  const text=buildFBDesc(c);
+  navigator.clipboard.writeText(text).then(()=>{
+    const btn=document.getElementById('copy-btn');
+    btn.textContent='Copied!'; btn.classList.add('copied');
+    setTimeout(()=>{ btn.textContent='Copy'; btn.classList.remove('copied'); },2000);
+  });
+}
+
+async function clearPriceAlert(){
+  const c=inventory.find(x=>x.vin===currentVin); if(!c) return;
+  c.fbPostedPrice=c.websitePrice;
+  c.priceDropped=false;
+  renderDrawer(c); render(); setSyncInfo('saving');
+  await apiPost('updateField',{vin:c.vin,field:'fbPostedPrice',value:c.fbPostedPrice});
+  await apiPost('updateField',{vin:c.vin,field:'priceDropped',value:false});
+  setSyncInfo('ok'); showToast('Price alert cleared');
+}
+function closeDrawer(){ pendingPhotos=[]; document.getElementById('drawer-overlay').classList.remove('open'); currentVin=null; }
+function closeDrawerOverlay(e){ if(e.target===document.getElementById('drawer-overlay')) closeDrawer(); }
+
+function openBulkVinModal(){
+  document.getElementById('bulk-vin-modal').classList.add('open');
+  document.getElementById('bulk-vin-input').value='';
+  document.getElementById('bulk-vin-result').textContent='';
+  setTimeout(()=>document.getElementById('bulk-vin-input').focus(),100);
+}
+
+function closeBulkVinModal(){
+  document.getElementById('bulk-vin-modal').classList.remove('open');
+}
+
+function applyBulkVinSelect(){
+  const raw = document.getElementById('bulk-vin-input').value;
+  // Parse VINs — split by newlines, spaces, commas, tabs
+  const vins = raw.split(/[\n\r,\t ]+/)
+    .map(v=>v.toUpperCase().replace(/[^A-Z0-9]/g,'').trim())
+    .filter(v=>v.length>=5);
+
+  if(!vins.length){
+    document.getElementById('bulk-vin-result').textContent='No VINs found — check your input.';
+    return;
+  }
+
+  // Find matching inventory
+  const matched=[];
+  const notFound=[];
+  vins.forEach(vin=>{
+    const c=inventory.find(x=>x.vin===vin||x.vin.includes(vin)||vin.includes(x.vin));
+    if(c) matched.push(c.vin);
+    else notFound.push(vin);
+  });
+
+  if(!matched.length){
+    document.getElementById('bulk-vin-result').innerHTML='<span style="color:var(--red)">No matches found. Check that these VINs are in your inventory.</span>';
+    return;
+  }
+
+  // Switch to All tab, clear existing selection, select matched VINs
+  document.querySelectorAll('.filter-tab').forEach(t=>t.classList.remove('active'));
+  document.querySelector('[data-filter="all"]').classList.add('active');
+  activeFilter='all';
+  selectedVins.clear();
+  matched.forEach(vin=>selectedVins.add(vin));
+  updateActionBar();
+  render();
+
+  const result = document.getElementById('bulk-vin-result');
+  let msg = '<span style="color:var(--green)">✓ '+matched.length+' vehicle'+( matched.length>1?'s':'')+' selected</span>';
+  if(notFound.length) msg += ' &mdash; <span style="color:var(--amber)">'+notFound.length+' not found: '+notFound.slice(0,3).join(', ')+(notFound.length>3?' …':'')+' </span>';
+  result.innerHTML = msg;
+
+  // Close after short delay so user sees the result
+  setTimeout(()=>closeBulkVinModal(), 1500);
+}
+
+// ── LEADS ──────────────────────────────────────────────────
+let leadsData = [];
+const LEAD_STATUS_COLORS = { 'New':'s-new','Contacted':'s-contacted','Qualified':'s-qualified','Sold':'s-sold','Lost':'s-lost' };
+
+function showLeadsView(){
+  document.getElementById('leads-view').style.display='block';
+  document.getElementById('empty-state').style.display='none';
+  document.getElementById('table-view').style.display='none';
+  document.getElementById('card-view').style.display='none';
+  document.getElementById('action-bar').classList.remove('show');
+  document.querySelector('.toolbar').style.visibility='hidden';
+  loadLeads();
+}
+function hideLeadsView(){
+  document.getElementById('leads-view').style.display='none';
+  document.querySelector('.toolbar').style.visibility='';
+}
+
+async function loadLeads(){
+  const view = document.getElementById('leads-view');
+  view.innerHTML=`<div class="leads-toolbar"><h2>Leads <span id="leads-subtitle" style="font-size:13px;font-weight:400;color:var(--text3)"></span></h2><button class="btn" onclick="loadLeads()"><svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M4 4v5h5"/><path d="M20 20v-5h-5"/><path d="M4 9a9 9 0 0115.47-3.47"/><path d="M20 15a9 9 0 01-15.47 3.47"/></svg> Refresh</button></div><div class="main" id="leads-content"><div style="text-align:center;padding:40px;color:var(--text3)"><span class="saving-dot"></span> Loading…</div></div>`;
+  try {
+    const res = await apiGet('getLeads');
+    if(res.error) throw new Error(res.error);
+    leadsData = (res.leads||[]).reverse();
+    document.getElementById('cnt-leads').textContent = leadsData.length;
+    renderLeads();
+  } catch(e) {
+    document.getElementById('leads-content').innerHTML=`<div style="text-align:center;padding:40px;color:var(--red)">Error loading leads: ${e.message}</div>`;
+  }
+}
+
+function renderLeads(){
+  const content = document.getElementById('leads-content');
+  const subtitle = document.getElementById('leads-subtitle');
+  if(!leadsData.length){
+    if(subtitle) subtitle.textContent='';
+    content.innerHTML=`<div class="empty"><svg width="36" height="36" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" style="color:var(--text3)"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg><h3>No leads yet</h3><p>When someone fills out the form on your website, they'll appear here.</p></div>`;
+    return;
+  }
+  if(subtitle) subtitle.textContent='('+leadsData.length+')';
+  const newCount = leadsData.filter(l=>l.status==='New'||!l.status).length;
+  if(newCount && subtitle) subtitle.textContent += ' — '+newCount+' new';
+
+  const rows = leadsData.map(lead=>{
+    const date = lead.timestamp ? new Date(lead.timestamp).toLocaleDateString([],{month:'short',day:'numeric',year:'numeric'}) : '—';
+    const status = lead.status || 'New';
+    const cls = LEAD_STATUS_COLORS[status]||'s-new';
+    const statusOpts = ['New','Contacted','Qualified','Sold','Lost'].map(s=>`<option value="${s}"${s===status?' selected':''}>${s}</option>`).join('');
+    return `<tr>
+      <td style="color:var(--text3);font-family:'DM Mono',monospace;font-size:11px;white-space:nowrap">${date}</td>
+      <td class="td-main" style="white-space:nowrap">${lead.firstName||''} ${lead.lastName||''}</td>
+      <td><a href="tel:${lead.phone||''}" style="color:var(--blue);font-family:'DM Mono',monospace;font-size:12px">${lead.phone||'—'}</a></td>
+      <td style="color:var(--text2);max-width:180px;font-size:12px">${lead.vehicle||'—'}</td>
+      <td><span style="font-size:11px;background:var(--bg3);padding:2px 8px;border-radius:4px;color:var(--text3);white-space:nowrap">${lead.timeframe||'—'}</span></td>
+      <td><select class="lead-status-sel ${cls}" data-row="${lead.rowIndex}" onchange="updateLeadStatus(${lead.rowIndex},this)">${statusOpts}</select></td>
+      <td><input class="lead-note-input" type="text" value="${(lead.notes||'').replace(/"/g,'&quot;')}" placeholder="Add note…" onblur="saveLeadNote(${lead.rowIndex},this)" onkeydown="if(event.key==='Enter')this.blur()"></td>
+    </tr>`;
+  }).join('');
+
+  content.innerHTML=`<div class="table-wrap"><table class="lead-table"><thead><tr><th>Date</th><th>Name</th><th>Phone</th><th>Vehicle</th><th>Timeframe</th><th>Status</th><th>Notes</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+}
+
+async function updateLeadStatus(rowIndex, sel){
+  const status = sel.value;
+  sel.className = 'lead-status-sel ' + (LEAD_STATUS_COLORS[status]||'s-new');
+  const lead = leadsData.find(l=>l.rowIndex===rowIndex);
+  if(lead) lead.status=status;
+  const subtitle = document.getElementById('leads-subtitle');
+  if(subtitle){ const n=leadsData.filter(l=>l.status==='New'||!l.status).length; subtitle.textContent='('+leadsData.length+')' + (n?' — '+n+' new':''); }
+  try { await apiPost('updateLead',{rowIndex,field:'status',value:status}); showToast('Status updated'); }
+  catch(e){ showToast('Save failed: '+e.message); }
+}
+
+async function saveLeadNote(rowIndex, input){
+  const note = input.value.trim();
+  const lead = leadsData.find(l=>l.rowIndex===rowIndex);
+  if(lead && lead.notes===note) return;
+  if(lead) lead.notes=note;
+  try { await apiPost('updateLead',{rowIndex,field:'notes',value:note}); }
+  catch(e){ showToast('Note save failed'); }
+}
+
+function showToast(msg){ const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2800); }
+
+init();
+</script>
+</body>
+</html>
