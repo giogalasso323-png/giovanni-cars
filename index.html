@@ -63,6 +63,11 @@ nav {
 .about-text p { font-size: 15px; color: var(--text2); line-height: 1.7; margin-bottom: 0; }
 @media (max-width: 600px) { .about { flex-direction: column; text-align: center; gap: 24px; } }
 
+/* DELIVERY PHOTOS */
+.delivery-strip { max-width: 1200px; margin: 0 auto; padding: 0 24px 36px; display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.delivery-strip img { width: 100%; height: 280px; object-fit: cover; border-radius: 12px; box-shadow: var(--shadow-md); }
+@media (max-width: 600px) { .delivery-strip { grid-template-columns: 1fr; } .delivery-strip img { height: 220px; } }
+
 /* BOTTOM SEARCH */
 .bottom-search-section { background: var(--bg2); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); padding: 56px 24px; text-align: center; }
 .bottom-search-inner { max-width: 560px; margin: 0 auto; }
@@ -219,6 +224,14 @@ footer { background: var(--text); color: rgba(255,255,255,0.7); padding: 36px 24
       <h2>Hi, I'm Giovanni.</h2>
       <p>I'm a Toyota Sales Specialist based in Dublin, CA. I believe buying a car should be straightforward — no pressure, no runaround. Browse my current inventory below, reach out directly, and I'll make the process as smooth as possible. My customers keep coming back because I keep my word.</p>
     </div>
+  </div>
+</section>
+
+<!-- DELIVERY PHOTOS -->
+<section>
+  <div class="delivery-strip">
+    <img src="delivery1.jpg" alt="Giovanni with a customer delivery">
+    <img src="delivery2.jpg" alt="Happy customers with their new Toyota">
   </div>
 </section>
 
