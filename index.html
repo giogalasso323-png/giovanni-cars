@@ -87,7 +87,7 @@ nav {
 
 /* DELIVERY PHOTOS */
 .delivery-strip { max-width: 1200px; margin: 0 auto; padding: 0 24px 36px; display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-.delivery-strip img { width: 100%; height: 280px; object-fit: cover; object-position: top; border-radius: 12px; box-shadow: var(--shadow-md); }
+.delivery-strip img { width: 100%; height: 280px; object-fit: cover; object-position: center 30%; border-radius: 12px; box-shadow: var(--shadow-md); }
 @media (max-width: 600px) { .delivery-strip { grid-template-columns: 1fr; } .delivery-strip img { height: 220px; } }
 
 /* BOTTOM SEARCH */
@@ -240,6 +240,9 @@ footer { background: var(--text); color: rgba(255,255,255,0.7); padding: 36px 24
 
 <!-- HERO -->
 <section class="hero-top">
+  <div style="text-align:right;max-width:1200px;margin:0 auto;padding:12px 24px 0;">
+    <button onclick="document.querySelector('.inventory').scrollIntoView({behavior:'smooth'})" style="background:var(--red);color:#fff;border:none;border-radius:8px;padding:8px 18px;font-size:13px;font-weight:600;cursor:pointer;font-family:'Inter',sans-serif;">Browse Inventory ↓</button>
+  </div>
   <div class="hero-top-inner">
     <img class="hero-top-photo" src="giovanni.jpg" alt="Giovanni Galasso">
     <div class="hero-top-text">
@@ -253,7 +256,10 @@ footer { background: var(--text); color: rgba(255,255,255,0.7); padding: 36px 24
 <!-- VALUE PROPS -->
 <section>
   <div class="value-props">
-    <div class="value-props-title">What working with Giovanni actually looks like</div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;">
+      <div class="value-props-title" style="margin-bottom:0;">What working with Giovanni actually looks like</div>
+      <button onclick="document.querySelector('.inventory').scrollIntoView({behavior:'smooth'})" style="background:var(--red);color:#fff;border:none;border-radius:8px;padding:8px 18px;font-size:13px;font-weight:600;cursor:pointer;font-family:'Inter',sans-serif;white-space:nowrap;">Browse Inventory ↓</button>
+    </div>
     <div class="value-row">
       <div class="value-cell value-cell-left">
         <div class="value-label">What I do</div>
@@ -267,7 +273,7 @@ footer { background: var(--text); color: rgba(255,255,255,0.7); padding: 36px 24
     <div class="value-row">
       <div class="value-cell value-cell-left">
         <div class="value-label">What I do</div>
-        <div class="value-text">I'll talk you out of a car that doesn't make sense for you — payments, towing, hybrid, new vs used.</div>
+        <div class="value-text">I'll talk you out of a car that doesn't make sense for you.</div>
       </div>
       <div class="value-cell value-cell-right">
         <div class="value-label">What that means for you</div>
@@ -304,8 +310,12 @@ footer { background: var(--text); color: rgba(255,255,255,0.7); padding: 36px 24
 </section>
 
 <!-- REVIEWS -->
+
 <section class="reviews-section">
   <div class="reviews-inner">
+    <div style="text-align:right;margin-bottom:16px;">
+      <button onclick="document.querySelector('.inventory').scrollIntoView({behavior:'smooth'})" style="background:var(--red);color:#fff;border:none;border-radius:8px;padding:8px 18px;font-size:13px;font-weight:600;cursor:pointer;font-family:'Inter',sans-serif;">Browse Inventory ↓</button>
+    </div>
     <div class="reviews-header">
       <div class="reviews-stars-summary">
         <span class="stars">★★★★★</span>
@@ -316,48 +326,45 @@ footer { background: var(--text); color: rgba(255,255,255,0.7); padding: 36px 24
       <p>Real reviews from real buyers on Facebook Marketplace</p>
     </div>
     <div class="reviews-grid">
-      <div class="review-card">
+      <div class="review-card" data-page="1">
         <span class="stars">★★★★★</span>
         <div class="review-name">Avihi</div>
         <div class="review-date">March 2026</div>
         <div class="review-text">"I had a great experience buying my new Toyota from Giovanni. He was professional, honest, and made the whole process smooth and stress-free. Highly recommend working with him!"</div>
       </div>
-      <div class="review-card">
+      <div class="review-card" data-page="1">
         <span class="stars">★★★★★</span>
         <div class="review-name">Rachel</div>
         <div class="review-date">February 2026</div>
         <div class="review-text">"Giovanni was kind and very personable. He was patient working with me on the pricing and I purchased a quality vehicle. I highly recommend him if you want to purchase a Toyota or any other quality vehicle."</div>
       </div>
-      <div class="review-card">
+      <div class="review-card" data-page="1">
         <span class="stars">★★★★★</span>
         <div class="review-name">Jake</div>
         <div class="review-date">January 2026</div>
         <div class="review-text">"Giovanni was great to work with. He stood by his word, and held the truck for me at the price we agreed on. I will be referring other buyers to him. Thanks Giovanni!"</div>
       </div>
-      <div class="review-card">
+      <div class="review-card" data-page="2" style="display:none">
         <span class="stars">★★★★★</span>
         <div class="review-name">Savoeun</div>
         <div class="review-date">February 2026</div>
         <div class="review-text">"He went above and beyond to make sure we got what we asked for. Very honest and straight forward. I would definitely recommend him to my friends and family that need a car. Thank you Giovanni!"</div>
       </div>
-      <div class="review-card">
+      <div class="review-card" data-page="2" style="display:none">
         <span class="stars">★★★★★</span>
         <div class="review-name">Ilana</div>
         <div class="review-date">February 2026</div>
         <div class="review-text">"Giovanni is great. Walked us through the whole process. Great experience."</div>
       </div>
-      <div class="review-card">
+      <div class="review-card" data-page="2" style="display:none">
         <span class="stars">★★★★★</span>
         <div class="review-name">Jim</div>
         <div class="review-date">February 2026</div>
         <div class="review-text">"Giovanni — great sales experience — great job!"</div>
       </div>
-      <div class="review-card">
-        <span class="stars">★★★★★</span>
-        <div class="review-name">Nikoye</div>
-        <div class="review-date">February 2026</div>
-        <div class="review-text">"Thank you so much Giovanni and Samiullah!"</div>
-      </div>
+    </div>
+    <div style="text-align:center;margin-top:24px;">
+      <button id="reviewsToggle" onclick="toggleReviews()" style="background:var(--bg);border:1px solid var(--border);color:var(--text);padding:10px 24px;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;font-family:'Inter',sans-serif;">Show More Reviews</button>
     </div>
   </div>
 </section>
@@ -582,6 +589,14 @@ function applyFilters() {
     return true;
   });
   renderGrid(filteredCars);
+}
+
+function toggleReviews() {
+  const page2 = document.querySelectorAll('.review-card[data-page="2"]');
+  const btn = document.getElementById('reviewsToggle');
+  const showing = page2[0].style.display !== 'none';
+  page2.forEach(c => c.style.display = showing ? 'none' : '');
+  btn.textContent = showing ? 'Show More Reviews' : 'Show Less';
 }
 
 function handleSearch(val) {
