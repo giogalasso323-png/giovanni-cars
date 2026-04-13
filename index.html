@@ -65,19 +65,21 @@ nav {
 .hero-top-text h1 { font-size: clamp(26px, 4vw, 42px); font-weight: 800; letter-spacing: -0.8px; line-height: 1.15; margin-bottom: 12px; }
 .hero-top-text h1 span { color: var(--red); }
 .hero-top-text p { font-size: 16px; color: var(--text2); line-height: 1.65; max-width: 560px; }
+.hero-quote { font-size: 20px !important; font-weight: 700; color: var(--text) !important; letter-spacing: -0.3px; }
 @media (max-width: 640px) { .hero-top-inner { flex-direction: column; text-align: center; gap: 20px; } .hero-top-text p { max-width: 100%; } }
 
 /* VALUE PROPS */
 .value-props { max-width: 1200px; margin: 0 auto; padding: 48px 24px 0; }
-.value-props-title { font-size: 13px; font-weight: 700; color: var(--text3); text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 24px; }
-.value-row { display: grid; grid-template-columns: 1fr 1fr; gap: 0; border: 1px solid var(--border); border-radius: 12px; overflow: hidden; margin-bottom: 12px; }
-.value-cell { padding: 24px 28px; }
-.value-cell-left { background: var(--bg); border-right: 1px solid var(--border); }
-.value-cell-right { background: var(--bg2); }
-.value-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px; color: var(--red); margin-bottom: 8px; }
-.value-text { font-size: 15px; color: var(--text); line-height: 1.6; font-weight: 500; }
-.value-result { font-size: 14px; color: var(--text2); line-height: 1.65; }
-@media (max-width: 600px) { .value-row { grid-template-columns: 1fr; } .value-cell-left { border-right: none; border-bottom: 1px solid var(--border); } }
+.value-table { border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+.value-table-header { display: grid; grid-template-columns: 1fr 1fr; background: var(--bg2); border-bottom: 1px solid var(--border); }
+.value-table-header-cell { padding: 12px 28px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px; color: var(--red); }
+.value-table-header-cell:first-child { border-right: 1px solid var(--border); }
+.value-row { display: grid; grid-template-columns: 1fr 1fr; border-top: 1px solid var(--border); }
+.value-row:first-of-type { border-top: none; }
+.value-cell { padding: 24px 28px; font-size: 15px; line-height: 1.65; }
+.value-cell-left { color: var(--text); border-right: 1px solid var(--border); background: var(--bg); }
+.value-cell-right { color: var(--text2); background: var(--bg2); font-size: 14px; }
+@media (max-width: 600px) { .value-table-header { grid-template-columns: 1fr; } .value-table-header-cell:first-child { border-right: none; border-bottom: 1px solid var(--border); } .value-row { grid-template-columns: 1fr; } .value-cell-left { border-right: none; border-bottom: 1px solid var(--border); } }
 
 /* PULLQUOTE */
 .pullquote { max-width: 1200px; margin: 24px auto 0; padding: 0 24px 48px; }
@@ -240,15 +242,14 @@ footer { background: var(--text); color: rgba(255,255,255,0.7); padding: 36px 24
 
 <!-- HERO -->
 <section class="hero-top">
-  <div style="text-align:right;max-width:1200px;margin:0 auto;padding:12px 24px 0;">
-    <button onclick="document.querySelector('.inventory').scrollIntoView({behavior:'smooth'})" style="background:var(--red);color:#fff;border:none;border-radius:8px;padding:8px 18px;font-size:13px;font-weight:600;cursor:pointer;font-family:'Inter',sans-serif;">Browse Inventory ↓</button>
-  </div>
   <div class="hero-top-inner">
     <img class="hero-top-photo" src="giovanni.jpg" alt="Giovanni Galasso">
     <div class="hero-top-text">
       <div class="hero-tag">Toyota Specialist · Dublin, CA</div>
-      <h1>I don't sell cars.<br><span>I sell customer service.</span></h1>
-      <p>Anyone can show you a vehicle. What most salespeople won't do is stay — before the purchase, through the process, and long after you drive off the lot.</p>
+      <h1>Anyone can show you a vehicle.<br><span>What most salespeople won't do is stay.</span></h1>
+      <p class="hero-quote">I don't sell cars. I sell customer service.</p>
+      <p style="margin-top:12px;font-size:15px;color:var(--text2);line-height:1.65;">Before the purchase, through the process, and long after you drive off the lot.</p>
+      <button onclick="document.querySelector('.inventory').scrollIntoView({behavior:'smooth'})" style="margin-top:20px;background:var(--red);color:#fff;border:none;border-radius:8px;padding:10px 22px;font-size:14px;font-weight:600;cursor:pointer;font-family:'Inter',sans-serif;">Browse Inventory ↓</button>
     </div>
   </div>
 </section>
@@ -256,45 +257,23 @@ footer { background: var(--text); color: rgba(255,255,255,0.7); padding: 36px 24
 <!-- VALUE PROPS -->
 <section>
   <div class="value-props">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;">
-      <div class="value-props-title" style="margin-bottom:0;">What working with Giovanni actually looks like</div>
-      <button onclick="document.querySelector('.inventory').scrollIntoView({behavior:'smooth'})" style="background:var(--red);color:#fff;border:none;border-radius:8px;padding:8px 18px;font-size:13px;font-weight:600;cursor:pointer;font-family:'Inter',sans-serif;white-space:nowrap;">Browse Inventory ↓</button>
-    </div>
-    <div class="value-row">
-      <div class="value-cell value-cell-left">
-        <div class="value-label">What I do</div>
-        <div class="value-text">When you're not ready to buy, I tell you — and I help you figure it all out with zero pressure.</div>
+    <div class="value-table">
+      <div class="value-table-header">
+        <div class="value-table-header-cell">What I do</div>
+        <div class="value-table-header-cell">What that means for you</div>
       </div>
-      <div class="value-cell value-cell-right">
-        <div class="value-label">What that means for you</div>
-        <div class="value-result">You never feel rushed into a decision — so that when you're ready, you're confident. Not second-guessing yourself at 2am.</div>
+      <div class="value-row">
+        <div class="value-cell value-cell-left">I meet you where you are in the process and adjust to you, not the other way around.</div>
+        <div class="value-cell value-cell-right">Whether you're just starting to look or ready to pull the trigger, you never feel rushed or out of place. You get to move at your own pace, and when you do make a decision, it feels right — not like something you talked yourself into at the dealership.</div>
       </div>
-    </div>
-    <div class="value-row">
-      <div class="value-cell value-cell-left">
-        <div class="value-label">What I do</div>
-        <div class="value-text">I'll talk you out of a car that doesn't make sense for you.</div>
+      <div class="value-row">
+        <div class="value-cell value-cell-left">I say what I mean and lay everything out clearly — no surprises, no pressure, no steering you somewhere that isn't right for you.</div>
+        <div class="value-cell value-cell-right">You know exactly what you're getting and what it costs. There's nothing hidden, nothing pushed on you, and if a car isn't the right fit, I'll be the first to say so. You can trust what comes out of my mouth — every single time.</div>
       </div>
-      <div class="value-cell value-cell-right">
-        <div class="value-label">What that means for you</div>
-        <div class="value-result">You get the right car, not the easy sale — so six months from now you're still happy, not stuck with the wrong payment or the wrong vehicle.</div>
+      <div class="value-row">
+        <div class="value-cell value-cell-left">I'm with you through the whole process — not just the sale.</div>
+        <div class="value-cell value-cell-right">I'm going to make this easy, keep it fun, and make sure you never walk away with a question unanswered or anything left unhandled. Before you even know what you need next, I'm already on it.</div>
       </div>
-    </div>
-    <div class="value-row">
-      <div class="value-cell value-cell-left">
-        <div class="value-label">What I do</div>
-        <div class="value-text">I stay involved after the sale — setup, navigation, CarPlay, a ride home if you need it.</div>
-      </div>
-      <div class="value-cell value-cell-right">
-        <div class="value-label">What that means for you</div>
-        <div class="value-result">The relationship doesn't end when you sign — so I'm the person your whole family calls. Not just once, but every time.</div>
-      </div>
-    </div>
-  </div>
-  <div class="pullquote">
-    <div class="pullquote-inner">
-      <blockquote>"Most salespeople want to sell you a car once. I want to sell you your next three."</blockquote>
-      <cite>— Giovanni Galasso, Dublin CA</cite>
     </div>
   </div>
 </section>
@@ -310,7 +289,6 @@ footer { background: var(--text); color: rgba(255,255,255,0.7); padding: 36px 24
 </section>
 
 <!-- REVIEWS -->
-
 <section class="reviews-section">
   <div class="reviews-inner">
     <div style="text-align:right;margin-bottom:16px;">
@@ -320,7 +298,7 @@ footer { background: var(--text); color: rgba(255,255,255,0.7); padding: 36px 24
       <div class="reviews-stars-summary">
         <span class="stars">★★★★★</span>
         <span style="font-size:15px;font-weight:700;">5.0</span>
-        <span style="font-size:13px;color:var(--text2);">· 7 Facebook Reviews</span>
+        <span style="font-size:13px;color:var(--text2);">· 6 Facebook Reviews</span>
       </div>
       <h2>What Customers Are Saying</h2>
       <p>Real reviews from real buyers on Facebook Marketplace</p>
@@ -368,6 +346,14 @@ footer { background: var(--text); color: rgba(255,255,255,0.7); padding: 36px 24
     </div>
   </div>
 </section>
+
+<!-- PULLQUOTE -->
+<div class="pullquote">
+  <div class="pullquote-inner">
+    <blockquote>"Most salespeople want to sell you a car once. I want to sell you your next three."</blockquote>
+    <cite>— Giovanni Galasso, Dublin CA</cite>
+  </div>
+</div>
 
 <!-- INVENTORY -->
 <section class="inventory">
