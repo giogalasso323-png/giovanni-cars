@@ -79,7 +79,11 @@ nav {
 .value-cell { padding: 24px 28px; font-size: 15px; line-height: 1.65; }
 .value-cell-left { color: var(--text); border-right: 1px solid var(--border); background: var(--bg); }
 .value-cell-right { color: var(--text2); background: var(--bg2); font-size: 14px; }
-@media (max-width: 600px) { .value-table-header { grid-template-columns: 1fr; } .value-table-header-cell:first-child { border-right: none; border-bottom: 1px solid var(--border); } .value-row { grid-template-columns: 1fr; } .value-cell-left { border-right: none; border-bottom: 1px solid var(--border); } }
+@media (max-width: 600px) {
+  .value-table-header-cell { padding: 10px 14px; font-size: 10px; }
+  .value-cell { padding: 14px; font-size: 13px; }
+  .value-cell-right { font-size: 12px; }
+}
 
 /* PULLQUOTE */
 .pullquote { max-width: 1200px; margin: 24px auto 0; padding: 0 24px 48px; }
@@ -510,6 +514,54 @@ footer { background: var(--text); color: rgba(255,255,255,0.7); padding: 36px 24
   </div>
 </div>
 
+<!-- CONTACT MODAL -->
+<div id="contactOverlay" onclick="if(event.target===this)closeContactModal()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1000;align-items:center;justify-content:center;padding:20px;">
+  <div style="background:#fff;border-radius:16px;padding:32px;max-width:460px;width:100%;position:relative;box-shadow:0 20px 60px rgba(0,0,0,0.2);">
+    <button onclick="closeContactModal()" style="position:absolute;top:14px;right:14px;background:none;border:none;cursor:pointer;font-size:20px;color:#6b7280;line-height:1;">&times;</button>
+    <div id="contactSuccess" style="display:none;text-align:center;padding:20px 0;">
+      <div style="font-size:40px;margin-bottom:12px;">&#10003;</div>
+      <h4 style="font-size:17px;font-weight:700;margin-bottom:8px;">Got it! I'll be in touch soon.</h4>
+      <p style="font-size:14px;color:#6b7280;line-height:1.6;">Thanks for reaching out. Giovanni will contact you personally — usually within a few hours.</p>
+    </div>
+    <div id="contactFormContent">
+      <h3 style="font-size:20px;font-weight:800;margin-bottom:6px;">Get in Touch</h3>
+      <p style="font-size:13px;color:#6b7280;margin-bottom:20px;line-height:1.5;">Fill this out and Giovanni will reach out directly — no dealership runaround.</p>
+      <form onsubmit="submitContactForm(event)">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">
+          <div>
+            <label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:4px;">First Name *</label>
+            <input class="form-input" type="text" id="cFirstName" placeholder="Jane" required>
+          </div>
+          <div>
+            <label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:4px;">Last Name *</label>
+            <input class="form-input" type="text" id="cLastName" placeholder="Smith" required>
+          </div>
+        </div>
+        <div style="margin-bottom:12px;">
+          <label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:4px;">Phone Number *</label>
+          <input class="form-input" type="tel" id="cPhone" placeholder="(555) 000-0000" required>
+        </div>
+        <div style="margin-bottom:12px;">
+          <label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:4px;">What are you looking for?</label>
+          <input class="form-input" type="text" id="cVehicle" placeholder="e.g. RAV4, Tacoma, anything reliable...">
+        </div>
+        <div style="margin-bottom:20px;">
+          <label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:4px;">When are you looking to buy? *</label>
+          <select class="form-input" id="cTimeframe" required>
+            <option value="">Select timeframe...</option>
+            <option value="ASAP">As soon as possible</option>
+            <option value="Within 2 weeks">Within 2 weeks</option>
+            <option value="Within a month">Within a month</option>
+            <option value="1-3 months">1–3 months</option>
+            <option value="Just browsing">Just browsing</option>
+          </select>
+        </div>
+        <button class="form-submit" type="submit">Send to Giovanni</button>
+      </form>
+    </div>
+  </div>
+</div>
+
 <script>
 const API_URL = 'https://script.google.com/macros/s/AKfycbwKodPA7tuxeblfpakHxSd0XFu5MkCguo7rIjBltynkiDEQZky3qCck6_C0sftzgF9Qhg/exec';
 const DEALER_ID = '13444';
@@ -722,10 +774,43 @@ function handleOverlayClick(e) {
 }
 
 function openContactModal() {
-  if (allCars.length) {
-    openCar(allCars[0]);
-    document.getElementById('fVehicle').value = '';
-  }
+  const el = document.getElementById('contactOverlay');
+  el.style.display = 'flex';
+  document.getElementById('contactSuccess').style.display = 'none';
+  document.getElementById('contactFormContent').style.display = '';
+  document.getElementById('cFirstName').value = '';
+  document.getElementById('cLastName').value = '';
+  document.getElementById('cPhone').value = '';
+  document.getElementById('cVehicle').value = '';
+  document.getElementById('cTimeframe').value = '';
+}
+
+function closeContactModal() {
+  document.getElementById('contactOverlay').style.display = 'none';
+}
+
+async function submitContactForm(e) {
+  e.preventDefault();
+  const btn = e.target.querySelector('button[type=submit]');
+  btn.disabled = true; btn.textContent = 'Sending...';
+  try {
+    await fetch(API_URL, {
+      method: 'POST', mode: 'no-cors',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'submitLead',
+        firstName: document.getElementById('cFirstName').value.trim(),
+        lastName:  document.getElementById('cLastName').value.trim(),
+        phone:     document.getElementById('cPhone').value.trim(),
+        vehicle:   document.getElementById('cVehicle').value.trim(),
+        timeframe: document.getElementById('cTimeframe').value,
+        source:    'Website - Get in Touch',
+        status:    'New'
+      })
+    });
+  } catch(err) {}
+  document.getElementById('contactFormContent').style.display = 'none';
+  document.getElementById('contactSuccess').style.display = '';
 }
 
 // ── Photos ────────────────────────────────────────────────────
