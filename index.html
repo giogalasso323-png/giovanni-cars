@@ -242,24 +242,27 @@ footer { background: var(--text); color: rgba(255,255,255,0.7); padding: 36px 24
 
 <!-- HERO -->
 <section class="hero-top">
-  <div class="hero-top-inner">
-    <img class="hero-top-photo" src="giovanni.jpg" alt="Giovanni Galasso">
-    <div class="hero-top-text">
-      <div class="hero-tag">Toyota Specialist · Dublin, CA</div>
-      <h1>Anyone can show you a vehicle.<br><span>What most salespeople won't do is stay.</span></h1>
-      <p class="hero-quote">I don't sell cars. I sell customer service.</p>
-      <button onclick="document.querySelector('.inventory').scrollIntoView({behavior:'smooth'})" style="margin-top:20px;background:var(--red);color:#fff;border:none;border-radius:8px;padding:10px 22px;font-size:14px;font-weight:600;cursor:pointer;font-family:'Inter',sans-serif;">Browse Inventory ↓</button>
+  <div class="hero-top-text" style="text-align:center;max-width:700px;margin:0 auto;">
+    <h1>Anyone can show you a vehicle.<br><span>What most salespeople won't do is stay.</span></h1>
+    <p class="hero-quote" style="margin-top:12px;">I don't sell cars. I sell customer service.</p>
+    <div class="reviews-stars-summary" style="justify-content:center;margin:16px 0 20px;">
+      <span class="stars">★★★★★</span>
+      <span style="font-size:15px;font-weight:700;">5.0</span>
+      <span style="font-size:13px;color:var(--text2);">· 6 Facebook Reviews</span>
     </div>
+    <button class="nav-cta" onclick="openContactModal()">Get in Touch</button>
   </div>
-</section>
-
-<!-- DELIVERY PHOTOS -->
-<section>
-  <div class="delivery-strip">
+  <div style="margin-top:32px;text-align:center;">
+    <img class="hero-top-photo" src="giovanni.jpg" alt="Giovanni Galasso">
+  </div>
+  <div class="delivery-strip" style="margin-top:16px;">
     <img src="delivery1.jpg" alt="Giovanni with a customer delivery">
     <img src="delivery2.jpg" alt="Happy customers with their new Toyota">
     <img src="655076526_10237388162875563_3665841162583419758_n.jpg" alt="Keys handoff — another happy customer">
     <img src="654303215_10237388119914489_8735413931493061675_n.jpg" alt="Happy customers with their new Toyota">
+  </div>
+  <div style="text-align:center;margin-top:20px;font-size:13px;color:var(--text2);">
+    Giovanni Galasso &middot; Toyota Sales Specialist &middot; Dublin, CA
   </div>
 </section>
 
