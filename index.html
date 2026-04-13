@@ -361,9 +361,14 @@ footer { background: var(--text); color: rgba(255,255,255,0.7); padding: 36px 24
 
 <!-- INVENTORY -->
 <section class="inventory">
+  <div style="display:flex;gap:4px;margin-bottom:16px;border-bottom:1px solid var(--border);padding-bottom:0;">
+    <button id="tab-used" onclick="switchInventoryTab('used')" style="padding:10px 18px;font-size:14px;font-weight:600;border:none;background:none;cursor:pointer;border-bottom:2px solid var(--red);color:var(--text);font-family:'Inter',sans-serif;">Used</button>
+    <button id="tab-new" onclick="switchInventoryTab('new')" style="padding:10px 18px;font-size:14px;font-weight:600;border:none;background:none;cursor:pointer;border-bottom:2px solid transparent;color:var(--text2);font-family:'Inter',sans-serif;">New</button>
+  </div>
+  <div id="used-inventory-section">
   <div class="inv-header">
     <div>
-      <span class="inv-title">Available Now</span>
+      <span class="inv-title">Used — Available Now</span>
       <span class="inv-count" id="carCount"></span>
     </div>
     <div class="filters">
@@ -387,6 +392,28 @@ footer { background: var(--text); color: rgba(255,255,255,0.7); padding: 36px 24
       <div class="loading-spinner"></div>
       <div>Loading inventory...</div>
     </div>
+  </div>
+  </div><!-- end used-inventory-section -->
+  <div id="new-inventory-section" style="display:none;">
+    <div class="inv-header">
+      <div>
+        <span class="inv-title">New — Available Now</span>
+        <span class="inv-count" id="newCarCount"></span>
+      </div>
+      <div class="filters">
+        <select class="filter" id="filterNewModel" onchange="applyNewFilters()">
+          <option value="">All Models</option>
+        </select>
+        <select class="filter" id="filterNewPrice" onchange="applyNewFilters()">
+          <option value="">Any Price</option>
+          <option value="0-30000">Under $30,000</option>
+          <option value="30000-40000">$30k – $40k</option>
+          <option value="40000-55000">$40k – $55k</option>
+          <option value="55000-999999">$55k+</option>
+        </select>
+      </div>
+    </div>
+    <div id="newCarGrid"><div class="loading"><div class="loading-spinner"></div><div>Loading new inventory...</div></div></div>
   </div>
 </section>
 
@@ -635,6 +662,123 @@ function toggleReviews() {
   const showing = page2[0].style.display !== 'none';
   page2.forEach(c => c.style.display = showing ? 'none' : '');
   btn.textContent = showing ? 'Show More Reviews' : 'Show Less';
+}
+
+// ── New Inventory ─────────────────────────────────────────────
+let allNewCars = [], filteredNewCars = [];
+let currentInventoryTab = 'used';
+
+const EXT_COLORS = {
+  '0040':'Black','0089':'Super White','0090':'Black','0202':'Magnetic Gray',
+  '0218':'Wind Chill Pearl','01F7':'Silver','01G3':'Cement','01J9':'Blueprint',
+  '01K3':'Midnight Black','01L0':'Lunar Rock','01L5':'Cavalry Blue','01L7':'Lunar Rock',
+  '02PS':'Supersonic Red','02SC':'Supersonic Red','02XY':'Smoked Habanero',
+  '02YJ':'Midnight Black','02ZD':'Bronze Age','03T3':'Glacier White','03U5':'Army Green',
+  '04V8':'Blueprint','04Z2':'Black','06X1':'Solar Octane','06X3':'Stratosphere',
+  '07ZX':'Nori Green','08Q4':'Supersonic Red','08X0':'Midnight Black',
+  '08X8':'Calcite','0D10':'Ice Cap','0D11':'Ice Cap','0M04':'Oxygen'
+};
+const extColor = code => EXT_COLORS[code] || code || '';
+
+function switchInventoryTab(tab) {
+  currentInventoryTab = tab;
+  const usedBtn = document.getElementById('tab-used');
+  const newBtn  = document.getElementById('tab-new');
+  const usedSec = document.getElementById('used-inventory-section');
+  const newSec  = document.getElementById('new-inventory-section');
+  if (tab === 'used') {
+    usedBtn.style.borderBottomColor = 'var(--red)'; usedBtn.style.color = 'var(--text)';
+    newBtn.style.borderBottomColor  = 'transparent'; newBtn.style.color = 'var(--text2)';
+    usedSec.style.display = ''; newSec.style.display = 'none';
+  } else {
+    newBtn.style.borderBottomColor  = 'var(--red)'; newBtn.style.color = 'var(--text)';
+    usedBtn.style.borderBottomColor = 'transparent'; usedBtn.style.color = 'var(--text2)';
+    usedSec.style.display = 'none'; newSec.style.display = '';
+    if (!allNewCars.length) loadNewInventory();
+  }
+}
+
+async function loadNewInventory() {
+  try {
+    const res = await fetch(API_URL + '?action=getNewInventory');
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    allNewCars = (data.cars || []).filter(c =>
+      (c.onlineStatus||'').toLowerCase() === 'online' &&
+      !(c.campaign||'').toLowerCase().includes('safety') &&
+      c.vin
+    );
+    filteredNewCars = allNewCars;
+    populateNewFilters(allNewCars);
+    renderNewGrid(filteredNewCars);
+  } catch(e) {
+    document.getElementById('newCarGrid').innerHTML = `<div class="empty"><h3>Couldn't load new inventory</h3><p>${e.message}</p></div>`;
+  }
+}
+
+function populateNewFilters(cars) {
+  const models = [...new Set(cars.map(c => c.modelName).filter(Boolean))].sort();
+  const sel = document.getElementById('filterNewModel');
+  sel.innerHTML = '<option value="">All Models</option>' + models.map(m => `<option value="${m}">${m}</option>`).join('');
+}
+
+function applyNewFilters() {
+  const model = document.getElementById('filterNewModel').value;
+  const price = document.getElementById('filterNewPrice').value;
+  filteredNewCars = allNewCars.filter(c => {
+    if (model && c.modelName !== model) return false;
+    if (price) {
+      const [min,max] = price.split('-').map(Number);
+      const p = Number(c.advertised) || 0;
+      if (p < min || p > max) return false;
+    }
+    return true;
+  });
+  document.getElementById('newCarCount').textContent = `(${filteredNewCars.length} vehicle${filteredNewCars.length !== 1 ? 's' : ''})`;
+  renderNewGrid(filteredNewCars);
+}
+
+function renderNewGrid(cars) {
+  const grid = document.getElementById('newCarGrid');
+  document.getElementById('newCarCount').textContent = `(${cars.length} vehicle${cars.length !== 1 ? 's' : ''})`;
+  if (!cars.length) { grid.innerHTML = `<div class="empty"><div class="empty-icon">&#128663;</div><h3>No vehicles match</h3><p>Try adjusting your filters.</p></div>`; return; }
+  grid.innerHTML = '<div class="car-grid">' + cars.map(car => {
+    const vin = (car.vin||'').toLowerCase();
+    const photoUrl = vin ? `https://www.dublintoyota.com/inventoryphotos/${DEALER_ID}/${vin}/ip/2.jpg` : '';
+    const price = Number(car.advertised) ? '$' + Number(car.advertised).toLocaleString() : 'Call for Price';
+    const color = extColor(car.extColor);
+    return `<div class="car-card" onclick="openNewCarModal(${JSON.stringify(car).replace(/"/g,'&quot;')})">
+      <div class="car-thumb" style="background:var(--bg2);position:relative;">
+        ${photoUrl ? `<img src="${photoUrl}" style="width:100%;height:100%;object-fit:cover" onerror="this.style.display='none'">` : ''}
+        <div style="position:absolute;top:8px;left:8px;background:rgba(0,0,0,0.6);color:#fff;font-size:11px;font-weight:600;padding:3px 8px;border-radius:4px;">NEW</div>
+      </div>
+      <div class="car-info">
+        <div class="car-title">${car.year||''} ${car.modelName||''}</div>
+        <div class="car-sub">${color ? color + ' · ' : ''}Stock #${car.stock||'—'}</div>
+        <div class="car-price">${price}</div>
+      </div>
+    </div>`;
+  }).join('') + '</div>';
+}
+
+function openNewCarModal(car) {
+  const price = Number(car.advertised) ? '$' + Number(car.advertised).toLocaleString() : 'Call for Price';
+  const color = extColor(car.extColor);
+  const vin = (car.vin||'').toLowerCase();
+  const photoUrl = vin ? `https://www.dublintoyota.com/inventoryphotos/${DEALER_ID}/${vin}/ip/2.jpg` : '';
+  document.getElementById('modalTitle').textContent = `${car.year||''} ${car.modelName||''}`;
+  document.getElementById('modalPrice').textContent = price;
+  document.getElementById('modalSub').textContent = [color, car.stock ? `Stock #${car.stock}` : '', car.vin].filter(Boolean).join(' · ');
+  const carousel = document.getElementById('carousel');
+  carousel.innerHTML = photoUrl
+    ? `<img src="${photoUrl}" style="width:100%;height:100%;object-fit:contain" onerror="this.parentElement.innerHTML='<div style=width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:#9ca3af;font-size:14px>No photo available</div>'">`
+    : `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:#9ca3af;font-size:14px">No photo available</div>`;
+  document.getElementById('fVehicle').value = `${car.year||''} ${car.modelName||''}`.trim();
+  document.getElementById('fFirstName').value = '';
+  document.getElementById('fLastName').value = '';
+  document.getElementById('fPhone').value = '';
+  document.getElementById('overlay').classList.add('open');
+  document.getElementById('modal').classList.add('open');
 }
 
 function handleSearch(val) {

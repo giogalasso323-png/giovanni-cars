@@ -1,9 +1,17 @@
 // ============================================================
-//  DUBLIN TOYOTA INVENTORY — Google Apps Script Backend v5
-//  Added: submitLead, getLeads actions + Leads sheet
+//  DUBLIN TOYOTA INVENTORY — Google Apps Script Backend v6
+//  Added: New Inventory sheet support
 // ============================================================
 
 const SHEET_NAME = 'Inventory';
+const NEW_INV_SHEET = 'New Inventory';
+
+const NEW_INV_COLUMNS = [
+  'vin','year','modelName','modelCode','stock','category',
+  'extColor','intColor','accessories','dis','totalSrp','advertised',
+  'onlineStatus','promotable','campaign','presold','reserved',
+  'comments','rdr','addedDate','notes'
+];
 
 const COLUMNS = [
   'vin','year','make','model','trim','color','mileage','price',
@@ -40,7 +48,10 @@ function handleRequest(e) {
       case 'submitLead':     result = submitLead(body);                            break;
       case 'getLeads':       result = getLeads();                                  break;
       case 'updateLead':     result = updateLead(body.rowIndex, body.field, body.value); break;
-      case 'deleteLead':     result = deleteLead(body.rowIndex);                   break;
+      case 'deleteLead':       result = deleteLead(body.rowIndex);                      break;
+      case 'getNewInventory':  result = getNewInventory();                             break;
+      case 'importNewCars':    result = importNewCars(body.cars);                      break;
+      case 'updateNewCar':     result = updateNewCar(body.vin, body.field, body.value); break;
       case 'ping':           result = { ok: true };                                break;
       default:               result = { error: 'Unknown action: ' + action };
     }
@@ -607,4 +618,60 @@ function deletePhotoFolder(vin) {
   } catch(e) {
     return { error: e.message };
   }
+}
+
+// ============================================================
+//  NEW INVENTORY
+// ============================================================
+
+function getNewInventory() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sh = ss.getSheetByName(NEW_INV_SHEET);
+  if (!sh) return { cars: [] };
+  var last = sh.getLastRow();
+  if (last < 2) return { cars: [] };
+  var data = sh.getRange(2, 1, last - 1, NEW_INV_COLUMNS.length).getValues();
+  var cars = data.map(function(row) {
+    var obj = {};
+    NEW_INV_COLUMNS.forEach(function(col, i) { obj[col] = row[i] !== undefined ? String(row[i]) : ''; });
+    return obj;
+  }).filter(function(c) { return c.vin; });
+  return { cars: cars };
+}
+
+function importNewCars(cars) {
+  if (!cars || !cars.length) return { imported: 0 };
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sh = ss.getSheetByName(NEW_INV_SHEET);
+  if (!sh) {
+    sh = ss.insertSheet(NEW_INV_SHEET);
+    sh.getRange(1, 1, 1, NEW_INV_COLUMNS.length).setValues([NEW_INV_COLUMNS]);
+    sh.setFrozenRows(1);
+  }
+  var last = sh.getLastRow();
+  if (last > 1) sh.getRange(2, 1, last - 1, NEW_INV_COLUMNS.length).clearContent();
+  var rows = cars.map(function(car) {
+    return NEW_INV_COLUMNS.map(function(col) { return car[col] !== undefined ? car[col] : ''; });
+  });
+  if (rows.length > 0) sh.getRange(2, 1, rows.length, NEW_INV_COLUMNS.length).setValues(rows);
+  return { imported: rows.length };
+}
+
+function updateNewCar(vin, field, value) {
+  if (!vin || !field) return { error: 'Missing vin or field' };
+  var col = NEW_INV_COLUMNS.indexOf(field);
+  if (col < 0) return { error: 'Unknown field: ' + field };
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sh = ss.getSheetByName(NEW_INV_SHEET);
+  if (!sh) return { error: 'Sheet not found' };
+  var last = sh.getLastRow();
+  if (last < 2) return { error: 'No data' };
+  var vins = sh.getRange(2, 1, last - 1, 1).getValues();
+  for (var i = 0; i < vins.length; i++) {
+    if (String(vins[i][0]).toUpperCase() === String(vin).toUpperCase()) {
+      sh.getRange(i + 2, col + 1).setValue(value);
+      return { ok: true };
+    }
+  }
+  return { error: 'VIN not found' };
 }
