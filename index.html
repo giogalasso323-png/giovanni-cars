@@ -772,23 +772,51 @@ function renderNewGrid(cars) {
 function openNewCarModal(car) {
   const price = Number(car.advertised) ? '$' + Number(car.advertised).toLocaleString() : 'Call for Price';
   const color = extColor(car.extColor);
-  const vin = (car.vin||'').toLowerCase();
-  const real  = vin ? `https://www.dublintoyota.com/inventoryphotos/${NEW_DEALER_ID}/${vin}/ip/1.jpg` : '';
-  const stock = vin ? `https://www.dublintoyota.com/inventoryphotos/${NEW_DEALER_ID}/${vin}/sp/1.png` : '';
   document.getElementById('modalTitle').textContent = `${car.year||''} ${car.modelName||''}`;
   document.getElementById('modalPrice').textContent = price;
   document.getElementById('modalSub').textContent = [color, car.stock ? `Stock #${car.stock}` : '', car.vin].filter(Boolean).join(' · ');
-  const carousel = document.getElementById('carousel');
-  carousel.innerHTML = real
-    ? `<img src="${real}" style="width:100%;height:100%;object-fit:contain"
-        onerror="this.src='${stock}';this.onerror=function(){this.parentElement.innerHTML='<div style=\\'width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:#9ca3af;font-size:14px\\'>No photo available</div>'}">`
-    : `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:#9ca3af;font-size:14px">No photo available</div>`;
   document.getElementById('fVehicle').value = `${car.year||''} ${car.modelName||''}`.trim();
   document.getElementById('fFirstName').value = '';
   document.getElementById('fLastName').value = '';
   document.getElementById('fPhone').value = '';
   document.getElementById('overlay').classList.add('open');
   document.getElementById('modal').classList.add('open');
+  loadNewPhotos(car.vin);
+}
+
+async function loadNewPhotos(vin) {
+  if (!vin) { showNoPhoto(); return; }
+  const v = vin.toLowerCase();
+  const img = document.getElementById('carouselImg');
+  const placeholder = document.getElementById('carouselPlaceholder');
+  img.style.display = 'none';
+  placeholder.style.display = 'flex';
+  placeholder.textContent = 'Loading photos...';
+  photos = [];
+
+  // Try dealership photos first (2-8, skip 5)
+  for (let i = 2; i <= 8; i++) {
+    if (i === 5) continue;
+    const url = `https://www.dublintoyota.com/inventoryphotos/${NEW_DEALER_ID}/${v}/ip/${i}.jpg`;
+    const ok = await checkImage(url);
+    if (!ok) break;
+    photos.push(url);
+  }
+
+  // If no dealership photos, load all stock photos
+  if (!photos.length) {
+    for (let i = 1; i <= 20; i++) {
+      const url = `https://www.dublintoyota.com/inventoryphotos/${NEW_DEALER_ID}/${v}/sp/${i}.png`;
+      const ok = await checkImage(url);
+      if (!ok) break;
+      photos.push(url);
+    }
+  }
+
+  if (!photos.length) { showNoPhoto(); return; }
+  photoIndex = 0;
+  showPhoto(0);
+  renderDots();
 }
 
 function handleSearch(val) {
