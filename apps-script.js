@@ -50,7 +50,7 @@ function handleRequest(e) {
       case 'updateLead':     result = updateLead(body.rowIndex, body.field, body.value); break;
       case 'deleteLead':       result = deleteLead(body.rowIndex);                      break;
       case 'getNewInventory':  result = getNewInventory();                             break;
-      case 'importNewCars':    result = importNewCars(body.cars);                      break;
+      case 'importNewCars':    result = importNewCars(body.cars, body.replace);         break;
       case 'updateNewCar':     result = updateNewCar(body.vin, body.field, body.value); break;
       case 'ping':           result = { ok: true };                                break;
       default:               result = { error: 'Unknown action: ' + action };
@@ -639,7 +639,7 @@ function getNewInventory() {
   return { cars: cars };
 }
 
-function importNewCars(cars) {
+function importNewCars(cars, replace) {
   if (!cars || !cars.length) return { imported: 0 };
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sh = ss.getSheetByName(NEW_INV_SHEET);
@@ -648,12 +648,17 @@ function importNewCars(cars) {
     sh.getRange(1, 1, 1, NEW_INV_COLUMNS.length).setValues([NEW_INV_COLUMNS]);
     sh.setFrozenRows(1);
   }
-  var last = sh.getLastRow();
-  if (last > 1) sh.getRange(2, 1, last - 1, NEW_INV_COLUMNS.length).clearContent();
+  // Only clear on first batch (replace=true)
+  if (replace !== false) {
+    var last = sh.getLastRow();
+    if (last > 1) sh.getRange(2, 1, last - 1, NEW_INV_COLUMNS.length).clearContent();
+  }
   var rows = cars.map(function(car) {
     return NEW_INV_COLUMNS.map(function(col) { return car[col] !== undefined ? car[col] : ''; });
   });
-  if (rows.length > 0) sh.getRange(2, 1, rows.length, NEW_INV_COLUMNS.length).setValues(rows);
+  // Append after existing data
+  var nextRow = sh.getLastRow() + 1;
+  if (rows.length > 0) sh.getRange(nextRow, 1, rows.length, NEW_INV_COLUMNS.length).setValues(rows);
   return { imported: rows.length };
 }
 
