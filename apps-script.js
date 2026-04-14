@@ -11,7 +11,8 @@ const NEW_INV_COLUMNS = [
   'extColor','intColor','accessories','dis','totalSrp','advertised',
   'onlineStatus','promotable','campaign','presold','reserved',
   'comments','rdr','addedDate','notes',
-  'fbStatus','fbDescription','fbPostedPrice','fbPostedDate','currentFbPrice'
+  'fbStatus','fbDescription','fbPostedPrice','fbPostedDate','currentFbPrice',
+  'websiteUrl','websiteStatus','websitePrice','lastChecked'
 ];
 
 const COLUMNS = [
@@ -50,9 +51,10 @@ function handleRequest(e) {
       case 'getLeads':       result = getLeads();                                  break;
       case 'updateLead':     result = updateLead(body.rowIndex, body.field, body.value); break;
       case 'deleteLead':       result = deleteLead(body.rowIndex);                      break;
-      case 'getNewInventory':  result = getNewInventory();                             break;
-      case 'importNewCars':    result = importNewCars(body.cars, body.replace);         break;
-      case 'updateNewCar':     result = updateNewCar(body.vin, body.field, body.value); break;
+      case 'getNewInventory':    result = getNewInventory();                               break;
+      case 'importNewCars':      result = importNewCars(body.cars, body.replace);         break;
+      case 'updateNewCar':       result = updateNewCar(body.vin, body.field, body.value); break;
+      case 'scrapeNewVehicles':  result = scrapeNewVehicles(body.vins);                   break;
       case 'ping':           result = { ok: true };                                break;
       default:               result = { error: 'Unknown action: ' + action };
     }
@@ -624,6 +626,76 @@ function deletePhotoFolder(vin) {
 // ============================================================
 //  NEW INVENTORY
 // ============================================================
+
+function scrapeNewVehicles(vins) {
+  if (!vins || !vins.length) return { results: [] };
+
+  var sitemapHtml = fetchWithRetry('https://www.dublintoyota.com/sitemap.aspx', 2);
+  if (!sitemapHtml) return { error: 'Sitemap fetch failed' };
+
+  var decodedSitemap = decodeHtmlEntities(sitemapHtml);
+  var results = [];
+
+  vins.forEach(function(vin) {
+    vin = norm(vin);
+    if (!vin) return;
+
+    // Same sitemap lookup as used cars
+    var vehicleUrl = '';
+    var locMatch  = decodedSitemap.match(new RegExp('<loc>([^<]*' + vin + '[^<]*)<\/loc>', 'i'));
+    var hrefMatch = decodedSitemap.match(new RegExp('href="([^"]*' + vin + '[^"]*)"', 'i'));
+    if (locMatch && locMatch[1]) {
+      vehicleUrl = decodeHtmlEntities(locMatch[1]).trim();
+    } else if (hrefMatch && hrefMatch[1]) {
+      var u = decodeHtmlEntities(hrefMatch[1]).trim();
+      vehicleUrl = u.indexOf('http') === 0 ? u : 'https://www.dublintoyota.com' + u;
+    }
+
+    if (!vehicleUrl) {
+      results.push({ vin: vin, websiteStatus: 'Not on Website', websiteUrl: '', websitePrice: 0 });
+      return;
+    }
+
+    var html = fetchWithRetry(vehicleUrl, 1);
+    if (!html) {
+      results.push({ vin: vin, websiteStatus: 'Fetch Error', websiteUrl: vehicleUrl, websitePrice: 0 });
+      return;
+    }
+
+    var parsed = parseNewVehiclePage(html, vehicleUrl);
+    parsed.vin = vin;
+    results.push(parsed);
+  });
+
+  return { results: results };
+}
+
+function parseNewVehiclePage(html, vehicleUrl) {
+  var lo = html.toLowerCase();
+
+  if (lo.indexOf('this vehicle is no longer available') >= 0 ||
+      lo.indexOf('this vehicle has been sold') >= 0) {
+    return { websiteStatus: 'Sold', websiteUrl: vehicleUrl, websitePrice: 0 };
+  }
+  if (lo.indexOf('page not found') >= 0 || lo.indexOf('error 404') >= 0) {
+    return { websiteStatus: 'Not Found', websiteUrl: vehicleUrl, websitePrice: 0 };
+  }
+
+  // New car pages may label price differently than used car pages
+  var price = 0;
+  var pm = html.match(/Internet\s*Price[\s\S]{0,300}?\$\s*([0-9]{1,3}(?:,[0-9]{3})+)/i)
+        || html.match(/Dealer\s*Price[\s\S]{0,300}?\$\s*([0-9]{1,3}(?:,[0-9]{3})+)/i)
+        || html.match(/Our\s*Price[\s\S]{0,300}?\$\s*([0-9]{1,3}(?:,[0-9]{3})+)/i)
+        || html.match(/"price"\s*:\s*"?([0-9]{4,6})"?/i)
+        || html.match(/"dealerPrice"\s*:\s*"?([0-9]{4,6})"?/i);
+  if (pm && pm[1]) price = parseInt(pm[1].replace(/,/g, ''), 10);
+
+  return {
+    websiteStatus: 'Live',
+    websiteUrl:    vehicleUrl,
+    websitePrice:  price
+  };
+}
 
 function getNewInventory() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();

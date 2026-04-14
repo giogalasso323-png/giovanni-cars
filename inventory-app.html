@@ -408,6 +408,19 @@
   </div>
 </div>
 
+<!-- NEW CARS SCRAPE MODAL -->
+<div class="modal-overlay" id="new-scrape-modal">
+  <div class="modal" style="width:520px">
+    <h2>Refresh New Car Web Data</h2>
+    <p>Looks up each new car VIN on DublinToyota.com, finds the listing URL, and confirms whether it's live on the site. Online/Stop Sale cars only.</p>
+    <div id="new-scrape-log" style="max-height:280px;overflow-y:auto;border:1px solid var(--border);border-radius:var(--radius);padding:10px;background:var(--bg3);display:none;font-size:12px;line-height:1.8"></div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeNewScrapeModal()">Close</button>
+      <button class="btn btn-primary" id="new-scrape-btn" onclick="startNewScrape()">Start Refresh</button>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <!-- VEHICLE SEARCH MODAL -->
@@ -2059,6 +2072,7 @@ function renderNewCarsView() {
     const isOnline  = (c.onlineStatus||'').toLowerCase()==='online' && !isStopped;
     const stBadge   = isStopped ? '<span class="badge badge-sold">Stop Sale</span>' : isOnline ? '<span class="badge badge-live">Online</span>' : '<span class="badge badge-notfound">Offline</span>';
     const fbBadge   = c.fbStatus==='posted' ? '<span class="badge badge-posted">Posted</span>' : '<span class="badge badge-unposted">—</span>';
+    const webBadge  = c.websiteUrl ? '<span class="badge badge-live" style="font-size:10px">Live</span>' : c.websiteStatus && c.websiteStatus!=='Live' ? `<span class="badge badge-notfound" style="font-size:10px">${c.websiteStatus}</span>` : '';
     const price     = c.advertised ? '$'+Number(c.advertised).toLocaleString() : '—';
     const dis       = Number(c.dis)||0;
     const disColor  = dis>60?'var(--red)':dis>30?'var(--amber)':'var(--text3)';
@@ -2069,7 +2083,7 @@ function renderNewCarsView() {
       <td>${decodeColor(c.extColor)}</td>
       <td style="font-weight:600">${price}</td>
       <td style="color:${disColor}">${dis||'—'}d</td>
-      <td>${stBadge}</td>
+      <td>${stBadge} ${webBadge}</td>
       <td>${fbBadge}</td>
     </tr>`;
   }).join('');
@@ -2089,6 +2103,7 @@ function renderNewCarsView() {
         <div style="font-size:16px;font-weight:700">New Cars <span style="font-size:13px;font-weight:400;color:var(--text3)">(${total})</span></div>
         <div style="display:flex;gap:8px">
           <button class="btn" onclick="loadNewInventory()"><svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M4 4v5h5"/><path d="M20 20v-5h-5"/><path d="M4 9a9 9 0 0115.47-3.47"/><path d="M20 15a9 9 0 01-15.47 3.47"/></svg> Refresh</button>
+          <button class="btn" onclick="openNewScrapeModal()"><svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M4 4v5h5"/><path d="M20 20v-5h-5"/><path d="M4 9a9 9 0 0115.47-3.47"/><path d="M20 15a9 9 0 01-15.47 3.47"/></svg> Refresh Web Data</button>
           <button class="btn btn-primary" onclick="openNewCarsImport()"><svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg> Import CSV</button>
         </div>
       </div>
@@ -2242,15 +2257,32 @@ function renderNewCarDrawer(c, isLeadContext) {
       <button class="mini-copy-btn" onclick="copyText('${c.accessories.replace(/'/g,"\\'")}',this)" style="flex-shrink:0;margin-top:2px">Copy</button>
     </div></div>`;
 
+  // Website link (if scraped)
+  if (c.websiteUrl || c.websiteStatus) {
+    h += `<div style="display:flex;gap:10px;flex-wrap:wrap;margin:0 0 16px 0">`;
+    if (c.websiteUrl) h += `<a href="${c.websiteUrl}" class="carfax-link" target="_blank" style="background:var(--blue-bg);color:var(--blue)"><svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>View on DublinToyota.com</a>`;
+    else h += `<span style="font-size:12px;color:var(--amber);background:var(--amber-bg);padding:5px 10px;border-radius:5px">${c.websiteStatus}</span>`;
+    h += `</div>`;
+  }
+
   // Pricing
   h += `<div class="section-title">Pricing</div>`;
-  if (srpP) h += `<div class="field-group"><div class="field-label">Total SRP</div>
+  if (srpP) h += `<div class="field-group"><div class="field-label">Total SRP (MSRP)</div>
     <div class="field-value" style="font-family:'DM Mono',monospace;color:var(--text3)">$${srpP.toLocaleString()}</div></div>`;
   h += `<div class="field-group"><div class="field-label">Advertised Price <span style="font-size:10px;color:var(--text3);font-weight:400">(what we show)</span></div>
     <div style="display:flex;align-items:center;gap:8px">
       <div class="field-value" style="font-size:18px;font-weight:600;font-family:'DM Mono',monospace;flex:1">${advP?'$'+advP.toLocaleString():'—'}</div>
       ${advP?`<button class="mini-copy-btn" id="new-adv-price-copy" onclick="copyNewAdvPrice(${advP},this)">Copy</button>`:''}
     </div></div>`;
+  // Website price comparison (only if scraped and different)
+  if (c.websitePrice && c.websitePrice !== advP) {
+    const priceDiff = c.websitePrice - advP;
+    const diffLabel = priceDiff > 0 ? `+$${priceDiff.toLocaleString()} above advertised` : `-$${Math.abs(priceDiff).toLocaleString()} below advertised`;
+    const diffColor = priceDiff > 0 ? 'var(--amber)' : 'var(--green)';
+    h += `<div class="field-group"><div class="field-label">Live Website Price</div>
+      <div class="field-value" style="font-family:'DM Mono',monospace;color:${diffColor}">$${Number(c.websitePrice).toLocaleString()} <span style="font-size:11px">(${diffLabel})</span></div></div>`;
+  }
+  if (c.lastChecked) h += `<div style="font-size:11px;color:var(--text3);margin-bottom:12px">Last refreshed: ${new Date(c.lastChecked).toLocaleString()}</div>`;
 
   // FB price control
   const fpClass = !currentFbP ? 'fb-price-input' : (hasMismatch ? 'fb-price-input mismatch' : 'fb-price-input match');
@@ -2377,6 +2409,88 @@ function copyNewFB() {
     btn.textContent='Copied!'; btn.classList.add('copied');
     setTimeout(() => { btn.textContent='Copy'; btn.classList.remove('copied'); }, 2000);
   });
+}
+
+// ── NEW CAR WEB SCRAPER ────────────────────────────────────
+let newScrapeRunning = false;
+
+function openNewScrapeModal() {
+  newScrapeRunning = false;
+  document.getElementById('new-scrape-modal').classList.add('open');
+  document.getElementById('new-scrape-log').style.display = 'none';
+  document.getElementById('new-scrape-btn').disabled = false;
+  document.getElementById('new-scrape-btn').textContent = 'Start Refresh';
+}
+
+function closeNewScrapeModal() {
+  newScrapeRunning = false;
+  document.getElementById('new-scrape-modal').classList.remove('open');
+}
+
+async function startNewScrape() {
+  const btn = document.getElementById('new-scrape-btn');
+  const log = document.getElementById('new-scrape-log');
+  btn.disabled = true; btn.textContent = 'Running…';
+  log.style.display = 'block'; log.innerHTML = '';
+  newScrapeRunning = true;
+
+  // Scrape online cars + stop-sale cars (skip already-offline-confirmed)
+  const toScrape = newInventory.filter(c => {
+    const isStopped = (c.campaign||'').toLowerCase().includes('safety');
+    const isOnline  = (c.onlineStatus||'').toLowerCase() === 'online';
+    return isOnline || isStopped;
+  });
+
+  if (!toScrape.length) {
+    log.innerHTML = '<div style="color:var(--text3)">No online vehicles to refresh.</div>';
+    btn.disabled = false; btn.textContent = 'Done'; return;
+  }
+
+  log.innerHTML = `<div style="color:var(--text3)">Checking ${toScrape.length} vehicles on DublinToyota.com…</div>`;
+
+  const BATCH = 4;
+  let checked = 0;
+  for (let i = 0; i < toScrape.length; i += BATCH) {
+    if (!newScrapeRunning) break;
+    const batch = toScrape.slice(i, i + BATCH);
+    btn.textContent = `Checking… ${Math.min(i + BATCH, toScrape.length)}/${toScrape.length}`;
+    try {
+      const res = await apiPost('scrapeNewVehicles', { vins: batch.map(c => c.vin) });
+      if (res.error) throw new Error(res.error);
+      const now = new Date().toISOString();
+      const updates = [];
+      (res.results || []).forEach(result => {
+        const car = newInventory.find(c => c.vin === result.vin);
+        if (!car) return;
+        car.websiteUrl    = result.websiteUrl || '';
+        car.websiteStatus = result.websiteStatus || '';
+        car.websitePrice  = result.websitePrice || 0;
+        car.lastChecked   = now;
+        updates.push(car);
+        const icon  = result.websiteStatus === 'Live' ? '<span style="color:var(--green)">✓</span>' : '<span style="color:var(--amber)">!</span>';
+        const label = result.websiteStatus === 'Live' ? `<span style="color:var(--green)">${result.websiteStatus}${result.websitePrice?' — $'+Number(result.websitePrice).toLocaleString():''}</span>`
+                                                      : `<span style="color:var(--amber)">${result.websiteStatus||'Not found'}</span>`;
+        log.innerHTML += `<div>${icon} <span style="font-family:'DM Mono',monospace;color:var(--text3);font-size:11px">${car.vin}</span> ${car.year} ${car.modelName} — ${label}</div>`;
+        log.scrollTop = log.scrollHeight;
+        checked++;
+      });
+      // Save batch to sheet
+      for (const car of updates) {
+        await apiPost('updateNewCar', { vin: car.vin, field: 'websiteUrl',    value: car.websiteUrl });
+        await apiPost('updateNewCar', { vin: car.vin, field: 'websiteStatus', value: car.websiteStatus });
+        await apiPost('updateNewCar', { vin: car.vin, field: 'websitePrice',  value: car.websitePrice });
+        await apiPost('updateNewCar', { vin: car.vin, field: 'lastChecked',   value: car.lastChecked });
+      }
+    } catch(err) {
+      log.innerHTML += `<div style="color:var(--red)">✗ Batch error: ${err.message}</div>`;
+    }
+    await new Promise(r => setTimeout(r, 400));
+  }
+
+  newScrapeRunning = false;
+  btn.disabled = false; btn.textContent = 'Done ✓';
+  renderNewCarsView();
+  showToast(`Checked ${checked} vehicles`);
 }
 
 function openNewCarsImport() {
