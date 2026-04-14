@@ -514,6 +514,10 @@ let currentView = 'table', activeFilter = 'all', sortKey = 'date-desc';
 let selectedVins = new Set(), pendingCsvData = null, currentVin = null, lastOpenedVin = null;
 let pendingPhotos = [];
 let currentLeadRowIndex = null;
+// New cars state
+let currentNewVin = null, lastOpenedNewVin = null;
+let newCarsFilter = 'all', newCarsSearch = '', newCarsSort = 'model';
+let newCarsFiltered = [];
 
 // ── SETUP ──────────────────────────────────────────────────
 function init() {
@@ -1040,12 +1044,20 @@ function openDrawerFromLead(rowIndex){
   const lead=leadsData.find(l=>l.rowIndex===rowIndex); if(!lead) return;
   currentLeadRowIndex=rowIndex;
   const car=lead.vin?inventory.find(c=>c.vin===lead.vin):null;
+  const newCar=!car&&lead.vin?newInventory.find(c=>c.vin===lead.vin):null;
   if(car){
-    currentVin=car.vin;
+    currentVin=car.vin; currentNewVin=null;
     lastOpenedVin=car.vin;
     document.getElementById('drawer-title').textContent=getTitle(car);
     document.getElementById('drawer-vin').textContent=car.vin;
     renderDrawer(car);
+  } else if(newCar) {
+    currentNewVin=newCar.vin; currentVin=null;
+    document.getElementById('drawer-title').textContent=(newCar.year||'')+' Toyota '+(newCar.modelName||'');
+    document.getElementById('drawer-vin').textContent=newCar.vin;
+    renderNewCarDrawer(newCar, true);
+    document.getElementById('drawer-overlay').classList.add('open');
+    return;
   } else {
     currentVin=null;
     document.getElementById('drawer-title').textContent=(lead.firstName||'')+' '+(lead.lastName||'');
@@ -1540,7 +1552,7 @@ async function clearPriceAlert(){
   await apiPost('updateField',{vin:c.vin,field:'priceDropped',value:false});
   setSyncInfo('ok'); showToast('Price alert cleared');
 }
-function closeDrawer(){ pendingPhotos=[]; document.getElementById('drawer-overlay').classList.remove('open'); currentVin=null; }
+function closeDrawer(){ pendingPhotos=[]; document.getElementById('drawer-overlay').classList.remove('open'); currentVin=null; currentNewVin=null; }
 function closeDrawerOverlay(e){ if(e.target===document.getElementById('drawer-overlay')) closeDrawer(); }
 
 function openBulkVinModal(){
@@ -1964,7 +1976,7 @@ const TOYOTA_EXT_COLORS = {
   '04V8':'Blueprint','04Z2':'Black','06X1':'Solar Octane','06X2':'Solar Octane',
   '06X3':'Stratosphere','07ZX':'Nori Green','08Q4':'Supersonic Red',
   '08X0':'Midnight Black','08X8':'Calcite','0D10':'Ice Cap','0D11':'Ice Cap',
-  '0M04':'Oxygen','01J6':'Ice Cap','0090':'Black'
+  '0M04':'Oxygen','01J6':'Ice Cap'
 };
 const decodeColor = code => TOYOTA_EXT_COLORS[code] || code || '—';
 
@@ -1985,86 +1997,386 @@ function hideNewCarsView() {
 
 async function loadNewInventory() {
   const view = document.getElementById('new-cars-view');
-  view.innerHTML = renderNewCarsShell('loading');
+  view.innerHTML = '<div style="text-align:center;padding:60px;color:var(--text3)"><span class="saving-dot"></span> Loading…</div>';
   try {
     const res = await apiGet('getNewInventory');
     if (res.error) throw new Error(res.error);
     newInventory = res.cars || [];
     document.getElementById('cnt-new').textContent = newInventory.length;
-    renderNewCarsTable(newInventory);
+    renderNewCarsView();
   } catch(e) {
-    view.innerHTML = renderNewCarsShell('error', e.message);
+    view.innerHTML = `<div style="text-align:center;padding:60px;color:var(--red)">Error: ${e.message}</div>`;
   }
 }
 
-function renderNewCarsShell(state, msg) {
-  return `
-    <div class="leads-toolbar">
-      <h2>New Cars <span style="font-size:13px;font-weight:400;color:var(--text3)">${state === 'loading' ? '' : newInventory.length + ' vehicles'}</span></h2>
-      <div class="leads-toolbar-right">
-        <button class="btn" onclick="loadNewInventory()"><svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M4 4v5h5"/><path d="M20 20v-5h-5"/><path d="M4 9a9 9 0 0115.47-3.47"/><path d="M20 15a9 9 0 01-15.47 3.47"/></svg> Refresh</button>
-        <button class="btn btn-primary" onclick="openNewCarsImport()">Import CSV</button>
-      </div>
-    </div>
-    <div class="main" id="new-cars-content">
-      ${state === 'loading' ? '<div style="text-align:center;padding:40px;color:var(--text3)"><span class="saving-dot"></span> Loading…</div>' : ''}
-      ${state === 'error' ? `<div style="text-align:center;padding:40px;color:var(--red)">${msg}</div>` : ''}
-    </div>`;
+function applyNewCarsFilters() {
+  const q = newCarsSearch.toLowerCase();
+  newCarsFiltered = newInventory.filter(c => {
+    if (q) {
+      const hay = [c.modelName,c.vin,c.stock,decodeColor(c.extColor),c.intColor,c.year,c.category].join(' ').toLowerCase();
+      if (!hay.includes(q)) return false;
+    }
+    const isStopped = (c.campaign||'').toLowerCase().includes('safety');
+    const isOnline = (c.onlineStatus||'').toLowerCase() === 'online' && !isStopped;
+    const isOffline = !isOnline && !isStopped;
+    if (newCarsFilter === 'online') return isOnline;
+    if (newCarsFilter === 'stop-sale') return isStopped;
+    if (newCarsFilter === 'offline') return isOffline;
+    if (newCarsFilter === 'posted') return c.fbStatus === 'posted';
+    if (newCarsFilter === 'not-posted') return c.fbStatus !== 'posted';
+    return true;
+  });
+  newCarsFiltered.sort((a,b) => {
+    if (newCarsSort === 'model') return (a.modelName||'').localeCompare(b.modelName||'');
+    if (newCarsSort === 'price-asc') return (Number(a.advertised)||0) - (Number(b.advertised)||0);
+    if (newCarsSort === 'price-desc') return (Number(b.advertised)||0) - (Number(a.advertised)||0);
+    if (newCarsSort === 'dis') return (Number(a.dis)||0) - (Number(b.dis)||0);
+    if (newCarsSort === 'dis-desc') return (Number(b.dis)||0) - (Number(a.dis)||0);
+    if (newCarsSort === 'year') return (b.year||'').localeCompare(a.year||'');
+    return 0;
+  });
 }
 
-function renderNewCarsTable(cars) {
+function renderNewCarsView() {
+  applyNewCarsFilters();
   const view = document.getElementById('new-cars-view');
-  const online = cars.filter(c => (c.onlineStatus||'').toLowerCase() === 'online' && !(c.campaign||'').toLowerCase().includes('safety'));
-  const stopped = cars.filter(c => (c.campaign||'').toLowerCase().includes('safety'));
-  const offline = cars.filter(c => (c.onlineStatus||'').toLowerCase() !== 'online' && !(c.campaign||'').toLowerCase().includes('safety'));
+  const total = newInventory.length;
+  const cntOnline  = newInventory.filter(c => (c.onlineStatus||'').toLowerCase()==='online' && !(c.campaign||'').toLowerCase().includes('safety')).length;
+  const cntStopped = newInventory.filter(c => (c.campaign||'').toLowerCase().includes('safety')).length;
+  const cntOffline = newInventory.filter(c => (c.onlineStatus||'').toLowerCase()!=='online' && !(c.campaign||'').toLowerCase().includes('safety')).length;
+  const cntPosted  = newInventory.filter(c => c.fbStatus==='posted').length;
+  const cntNot     = newInventory.filter(c => c.fbStatus!=='posted').length;
+
+  const tabDefs = [
+    {id:'all',label:'All',count:total},{id:'online',label:'Online',count:cntOnline},
+    {id:'stop-sale',label:'Stop Sale',count:cntStopped},{id:'offline',label:'Offline',count:cntOffline},
+    {id:'posted',label:'FB Posted',count:cntPosted},{id:'not-posted',label:'Not Posted',count:cntNot}
+  ];
+  const tabs = tabDefs.map(t=>`<button class="filter-tab ${newCarsFilter===t.id?'active':''}" onclick="setNewCarsFilter('${t.id}')">${t.label} <span class="tab-count">${t.count}</span></button>`).join('');
+
+  const rows = newCarsFiltered.map(c => {
+    const isStopped = (c.campaign||'').toLowerCase().includes('safety');
+    const isOnline  = (c.onlineStatus||'').toLowerCase()==='online' && !isStopped;
+    const stBadge   = isStopped ? '<span class="badge badge-sold">Stop Sale</span>' : isOnline ? '<span class="badge badge-live">Online</span>' : '<span class="badge badge-notfound">Offline</span>';
+    const fbBadge   = c.fbStatus==='posted' ? '<span class="badge badge-posted">Posted</span>' : '<span class="badge badge-unposted">—</span>';
+    const price     = c.advertised ? '$'+Number(c.advertised).toLocaleString() : '—';
+    const dis       = Number(c.dis)||0;
+    const disColor  = dis>60?'var(--red)':dis>30?'var(--amber)':'var(--text3)';
+    const isActive  = c.vin === lastOpenedNewVin;
+    return `<tr onclick="openNewCarDrawer('${c.vin}')" class="${isActive?'row-active':''}">
+      <td><div class="td-main">${c.year||''} ${c.modelName||'—'}</div><div class="td-vin">${c.vin}</div></td>
+      <td style="color:var(--text3)">${c.stock||'—'}</td>
+      <td>${decodeColor(c.extColor)}</td>
+      <td style="font-weight:600">${price}</td>
+      <td style="color:${disColor}">${dis||'—'}d</td>
+      <td>${stBadge}</td>
+      <td>${fbBadge}</td>
+    </tr>`;
+  }).join('');
+
+  const sortSel = `<select onchange="setNewCarsSort(this.value)" style="background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:8px 28px 8px 12px;border-radius:var(--radius);font-family:'Syne',sans-serif;font-size:13px;outline:none;cursor:pointer;appearance:none;background-image:url('data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%2710%27 height=%276%27 fill=%27none%27%3E%3Cpath d=%27M1 1l4 4 4-4%27 stroke=%27%239a9994%27 stroke-width=%271.5%27 stroke-linecap=%27round%27 stroke-linejoin=%27round%27/%3E%3C/svg%3E');background-repeat:no-repeat;background-position:right 10px center">
+    <option value="model" ${newCarsSort==='model'?'selected':''}>Model A–Z</option>
+    <option value="price-asc" ${newCarsSort==='price-asc'?'selected':''}>Price Low–High</option>
+    <option value="price-desc" ${newCarsSort==='price-desc'?'selected':''}>Price High–Low</option>
+    <option value="dis" ${newCarsSort==='dis'?'selected':''}>DIS Low–High</option>
+    <option value="dis-desc" ${newCarsSort==='dis-desc'?'selected':''}>DIS High–Low</option>
+    <option value="year" ${newCarsSort==='year'?'selected':''}>Year (Newest)</option>
+  </select>`;
 
   view.innerHTML = `
-    <div class="leads-toolbar">
-      <h2>New Cars <span style="font-size:13px;font-weight:400;color:var(--text3)">${cars.length} vehicles</span></h2>
-      <div class="leads-toolbar-right">
-        <button class="btn" onclick="loadNewInventory()"><svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M4 4v5h5"/><path d="M20 20v-5h-5"/><path d="M4 9a9 9 0 0115.47-3.47"/><path d="M20 15a9 9 0 01-15.47 3.47"/></svg> Refresh</button>
-        <button class="btn btn-primary" onclick="openNewCarsImport()">Import CSV</button>
+    <div style="background:var(--bg2);border-bottom:1px solid var(--border)">
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 20px">
+        <div style="font-size:16px;font-weight:700">New Cars <span style="font-size:13px;font-weight:400;color:var(--text3)">(${total})</span></div>
+        <div style="display:flex;gap:8px">
+          <button class="btn" onclick="loadNewInventory()"><svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M4 4v5h5"/><path d="M20 20v-5h-5"/><path d="M4 9a9 9 0 0115.47-3.47"/><path d="M20 15a9 9 0 01-15.47 3.47"/></svg> Refresh</button>
+          <button class="btn btn-primary" onclick="openNewCarsImport()"><svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg> Import CSV</button>
+        </div>
       </div>
+      <div style="display:flex;align-items:center;gap:10px;padding:8px 20px;border-top:1px solid var(--border)">
+        <div class="search-wrap" style="max-width:280px">
+          <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" style="position:absolute;left:10px;top:50%;transform:translateY(-50%);opacity:0.4;pointer-events:none"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+          <input type="search" placeholder="Search model, VIN, color…" value="${newCarsSearch.replace(/"/g,'&quot;')}" oninput="setNewCarsSearch(this.value)" style="width:100%">
+        </div>
+        ${sortSel}
+      </div>
+      <div class="filter-tabs" style="padding:0 20px">${tabs}</div>
     </div>
-    <div style="display:flex;gap:12px;padding:12px 20px;border-bottom:1px solid var(--border);background:var(--bg2);">
-      <span style="font-size:13px;color:var(--green)">● Online: <strong>${online.length}</strong></span>
-      <span style="font-size:13px;color:var(--text3)">● Offline: <strong>${offline.length}</strong></span>
-      <span style="font-size:13px;color:var(--red)">● Stop Sale: <strong>${stopped.length}</strong></span>
-    </div>
-    <div class="main" id="new-cars-content">
+    <div style="padding:0 20px 20px">
       <div class="table-wrap">
         <table>
           <thead><tr>
-            <th>Model</th><th>Year</th><th>Stock #</th><th>VIN</th><th>Color</th>
-            <th>Price</th><th>DIS</th><th>Status</th><th>Notes</th>
+            <th onclick="setNewCarsSort('model')">Model / VIN</th>
+            <th>Stock #</th>
+            <th>Color</th>
+            <th onclick="setNewCarsSort('price-asc')">Price</th>
+            <th onclick="setNewCarsSort('dis')">DIS</th>
+            <th>Status</th>
+            <th>Facebook</th>
           </tr></thead>
-          <tbody>
-            ${cars.map(c => {
-              const isStopped = (c.campaign||'').toLowerCase().includes('safety');
-              const isOffline = (c.onlineStatus||'').toLowerCase() !== 'online';
-              const rowStyle = isStopped ? 'background:rgba(200,16,46,0.04)' : '';
-              const statusBadge = isStopped
-                ? '<span class="badge badge-sold">Stop Sale</span>'
-                : isOffline
-                  ? '<span class="badge" style="background:var(--bg3);color:var(--text3)">Offline</span>'
-                  : '<span class="badge badge-live">Online</span>';
-              const price = c.advertised ? '$' + Number(c.advertised).toLocaleString() : '—';
-              return `<tr style="${rowStyle}">
-                <td><strong>${c.modelName||'—'}</strong></td>
-                <td>${c.year||'—'}</td>
-                <td style="font-family:monospace;font-size:12px">${c.stock||'—'}</td>
-                <td style="font-family:monospace;font-size:11px;color:var(--text3)">${c.vin||'—'}</td>
-                <td>${decodeColor(c.extColor)}</td>
-                <td><strong>${price}</strong></td>
-                <td style="color:${Number(c.dis)>60?'var(--red)':Number(c.dis)>30?'#f59e0b':'var(--text3)'}">${c.dis||'—'}</td>
-                <td>${statusBadge}</td>
-                <td style="max-width:180px;font-size:12px;color:var(--text2)">${c.comments||''}</td>
-              </tr>`;
-            }).join('')}
-          </tbody>
+          <tbody>${newCarsFiltered.length ? rows : '<tr><td colspan="7" style="text-align:center;padding:40px;color:var(--text3)">No vehicles match</td></tr>'}</tbody>
         </table>
       </div>
     </div>`;
+}
+
+function setNewCarsFilter(f){ newCarsFilter=f; renderNewCarsView(); }
+function setNewCarsSearch(q){ newCarsSearch=q; renderNewCarsView(); }
+function setNewCarsSort(s){ newCarsSort=s; renderNewCarsView(); }
+
+// ── NEW CAR DRAWER ─────────────────────────────────────────
+function openNewCarDrawer(vin) {
+  currentVin = null; currentNewVin = vin; lastOpenedNewVin = vin; currentLeadRowIndex = null;
+  const c = newInventory.find(x => x.vin === vin); if (!c) return;
+  document.getElementById('drawer-title').textContent = (c.year||'') + ' Toyota ' + (c.modelName||'');
+  document.getElementById('drawer-vin').textContent = c.vin;
+  renderNewCarDrawer(c, false);
+  document.getElementById('drawer-overlay').classList.add('open');
+  document.querySelectorAll('tbody tr').forEach(tr => tr.classList.remove('row-active'));
+  document.querySelectorAll('tbody tr').forEach(tr => { if(tr.onclick&&tr.onclick.toString().includes(vin)) tr.classList.add('row-active'); });
+}
+
+function buildNewFBDesc(car) {
+  const lines = [];
+  if (car.stock) lines.push('Stock #: ' + car.stock);
+  lines.push('New ' + (car.year||'') + ' Toyota ' + (car.modelName||''));
+  lines.push('VIN: ' + car.vin);
+  lines.push('');
+  lines.push('Vehicle Details:');
+  lines.push('Exterior Color: ' + decodeColor(car.extColor));
+  if (car.intColor) lines.push('Interior Color: ' + car.intColor);
+  if (car.modelCode) lines.push('Model Code: ' + car.modelCode);
+  if (car.accessories) lines.push('Accessories: ' + car.accessories);
+  if (car.advertised) { lines.push(''); lines.push('Price: $' + Number(car.advertised).toLocaleString()); }
+  return lines.join('\n');
+}
+
+function renderNewCarDrawer(c, isLeadContext) {
+  const daysPosted = c.fbPostedDate ? Math.floor((Date.now()-new Date(c.fbPostedDate))/86400000) : 0;
+  const advP = Number(c.advertised)||0;
+  const srpP = Number(c.totalSrp)||0;
+  const currentFbP = Number(c.currentFbPrice)||0;
+  const hasMismatch = c.fbStatus==='posted' && currentFbP && advP && currentFbP !== advP;
+  const isStopped = (c.campaign||'').toLowerCase().includes('safety');
+  const isOnline = (c.onlineStatus||'').toLowerCase()==='online' && !isStopped;
+  const fb = c.fbDescription || buildNewFBDesc(c);
+  let h = '';
+
+  // Lead section at top when opened from leads tab
+  if (isLeadContext && currentLeadRowIndex !== null) {
+    const lead = leadsData.find(l => l.rowIndex === currentLeadRowIndex);
+    if (lead) {
+      const tfopts = ['ASAP','Within 2 weeks','Within a month','1-3 months','Just browsing'].map(t=>`<option value="${t}"${t===lead.timeframe?' selected':''}>${t}</option>`).join('');
+      const stopts = LEAD_STATUSES.map(s=>`<option value="${s}"${s===(lead.status||'New')?' selected':''}>${s}</option>`).join('');
+      h += `<div style="background:rgba(74,158,255,0.07);border:1px solid rgba(74,158,255,0.2);border-radius:var(--radius);padding:14px 16px;margin-bottom:16px">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:12px">
+          <div>
+            <div style="font-size:15px;font-weight:700;color:var(--text)">${lead.firstName||''} ${lead.lastName||''}</div>
+            <div style="display:flex;align-items:center;gap:8px;margin-top:2px">
+              <span style="font-size:13px;font-family:'DM Mono',monospace;color:var(--text2)">${lead.phone||''}</span>
+              ${lead.phone?`<button class="mini-copy-btn" onclick="copyText('${lead.phone}',this)">Copy</button>`:''}
+            </div>
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+          <div><div class="field-label">Timeframe</div>
+            <select style="width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:6px;font-family:'Syne',sans-serif;font-size:13px;outline:none" onchange="updateLeadFieldFromDrawer('timeframe',this.value)">
+              <option value="">Select…</option>${tfopts}
+            </select>
+          </div>
+          <div><div class="field-label">Status</div>
+            <select style="width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:6px;font-family:'Syne',sans-serif;font-size:13px;outline:none" onchange="updateLeadFieldFromDrawer('status',this.value)">
+              ${stopts}
+            </select>
+          </div>
+        </div>
+        <div><div class="field-label">Notes</div>
+          <input type="text" style="width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:6px;font-family:'Syne',sans-serif;font-size:13px;outline:none" value="${(lead.notes||'').replace(/"/g,'&quot;')}" placeholder="Add note…" onblur="updateLeadFieldFromDrawer('notes',this.value)" onkeydown="if(event.key==='Enter')this.blur()">
+        </div>
+      </div>`;
+    }
+  }
+
+  // Stop sale alert
+  if (isStopped) h += `<div style="background:var(--red-bg);border:1px solid var(--red);border-radius:var(--radius);padding:12px 14px;margin-bottom:16px;font-size:13px;color:var(--red)"><strong>! Stop Sale</strong> &mdash; ${c.campaign}. Do not sell or post to Facebook.</div>`;
+
+  // Vehicle details
+  h += `<div class="section-title">Vehicle Details</div>`;
+  h += `<div class="field-row">
+    <div class="field-group"><div class="field-label">Year</div><div class="field-value">${c.year||'—'}</div></div>
+    <div class="field-group"><div class="field-label">Category</div><div class="field-value">${c.category||'—'}</div></div>
+  </div>`;
+  h += `<div class="field-group"><div class="field-label">Model</div>
+    <div style="display:flex;align-items:center;gap:8px">
+      <div class="field-value" style="flex:1">${c.modelName||'—'}</div>
+      <button class="mini-copy-btn" onclick="copyText('${((c.year||'')+' Toyota '+(c.modelName||'')).replace(/'/g,"\\'")}',this)">Copy</button>
+    </div></div>`;
+  h += `<div class="field-row">
+    <div class="field-group"><div class="field-label">Stock #</div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <div class="field-value">${c.stock||'—'}</div>
+        ${c.stock?`<button class="mini-copy-btn" onclick="copyText('${c.stock}',this)">Copy</button>`:''}
+      </div>
+    </div>
+    <div class="field-group"><div class="field-label">Model Code</div><div class="field-value" style="font-family:'DM Mono',monospace;font-size:12px">${c.modelCode||'—'}</div></div>
+  </div>`;
+  h += `<div class="field-group"><div class="field-label">VIN</div>
+    <div style="display:flex;align-items:center;gap:8px">
+      <div class="field-value" style="font-family:'DM Mono',monospace;font-size:12px;letter-spacing:0.5px;flex:1">${c.vin}</div>
+      <button class="mini-copy-btn" onclick="copyText('${c.vin}',this)">Copy</button>
+    </div></div>`;
+  h += `<div class="field-row">
+    <div class="field-group"><div class="field-label">Exterior Color</div><div class="field-value">${decodeColor(c.extColor)}</div></div>
+    <div class="field-group"><div class="field-label">Interior Color</div><div class="field-value">${c.intColor||'—'}</div></div>
+  </div>`;
+  h += `<div class="field-row">
+    <div class="field-group"><div class="field-label">DIS <span style="font-size:10px;color:var(--text3);font-weight:400">(days in stock)</span></div>
+      <div class="field-value" style="color:${Number(c.dis)>60?'var(--red)':Number(c.dis)>30?'var(--amber)':'var(--text)'}">${c.dis||'0'} days</div>
+    </div>
+    <div class="field-group"><div class="field-label">Online Status</div>
+      <div class="field-value">${isStopped?'<span class="badge badge-sold">Stop Sale</span>':isOnline?'<span class="badge badge-live">Online</span>':'<span class="badge badge-notfound">Offline</span>'}</div>
+    </div>
+  </div>`;
+  if (c.accessories) h += `<div class="field-group"><div class="field-label">Accessories</div>
+    <div style="display:flex;align-items:flex-start;gap:8px">
+      <div class="field-value" style="flex:1;font-family:'DM Mono',monospace;font-size:12px;line-height:1.6">${c.accessories}</div>
+      <button class="mini-copy-btn" onclick="copyText('${c.accessories.replace(/'/g,"\\'")}',this)" style="flex-shrink:0;margin-top:2px">Copy</button>
+    </div></div>`;
+
+  // Pricing
+  h += `<div class="section-title">Pricing</div>`;
+  if (srpP) h += `<div class="field-group"><div class="field-label">Total SRP</div>
+    <div class="field-value" style="font-family:'DM Mono',monospace;color:var(--text3)">$${srpP.toLocaleString()}</div></div>`;
+  h += `<div class="field-group"><div class="field-label">Advertised Price <span style="font-size:10px;color:var(--text3);font-weight:400">(what we show)</span></div>
+    <div style="display:flex;align-items:center;gap:8px">
+      <div class="field-value" style="font-size:18px;font-weight:600;font-family:'DM Mono',monospace;flex:1">${advP?'$'+advP.toLocaleString():'—'}</div>
+      ${advP?`<button class="mini-copy-btn" id="new-adv-price-copy" onclick="copyNewAdvPrice(${advP},this)">Copy</button>`:''}
+    </div></div>`;
+
+  // FB price control
+  const fpClass = !currentFbP ? 'fb-price-input' : (hasMismatch ? 'fb-price-input mismatch' : 'fb-price-input match');
+  const fpVal   = currentFbP ? '$'+Number(currentFbP).toLocaleString() : '';
+  h += `<div class="field-group">
+    <div class="field-label">Current FB Price <span style="font-size:10px;color:var(--text3);font-weight:400">(what you posted)</span>
+      ${hasMismatch?'<span style="color:var(--red);font-size:11px;margin-left:6px">⚠ Mismatch — update FB post</span>':''}
+      ${!hasMismatch&&currentFbP?'<span style="color:var(--green);font-size:11px;margin-left:6px">✓ Matches</span>':''}
+    </div>
+    <div style="display:flex;align-items:center;gap:8px">
+      <input type="text" id="new-fb-price-field" class="${fpClass}" value="${fpVal}" placeholder="${currentFbP?'':'Locked — copy advertised price first'}" readonly
+        oninput="checkNewFbPriceMatch(this,${advP})"
+        onkeydown="if(event.key==='Enter'){confirmNewFbPrice();}else if((event.key==='Delete'||event.key==='Backspace')&&!this.hasAttribute('readonly')){this.value='';checkNewFbPriceMatch(this,${advP});}">
+      <button class="mini-copy-btn" id="new-fb-price-confirm" onclick="confirmNewFbPrice()" style="display:none;background:var(--green-bg);color:var(--green);border-color:var(--green);font-size:13px;padding:5px 14px">✓ Confirm</button>
+    </div>
+    <div style="font-size:11px;color:var(--text3);margin-top:4px" id="new-fb-price-hint">Copy Advertised Price above to unlock this field</div>
+  </div>`;
+
+  // Notes
+  h += `<div class="section-title">Notes</div>
+  <div class="field-group">
+    <input type="text" id="new-car-notes" style="width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:8px 10px;border-radius:var(--radius);font-family:'Syne',sans-serif;font-size:13px;outline:none" value="${(c.notes||'').replace(/"/g,'&quot;')}" placeholder="Add a note…" onblur="saveNewCarNote(this.value)" onkeydown="if(event.key==='Enter')this.blur()">
+  </div>`;
+
+  // FB Description
+  h += `<div class="section-title">Facebook Description</div>
+  <div class="field-group">
+    <div class="fb-box" style="padding-top:38px">
+      <button class="copy-btn" id="new-copy-btn" onclick="copyNewFB()">Copy</button>${fb||'<span style="color:var(--text3)">—</span>'}
+    </div>
+  </div>`;
+
+  // FB Status
+  h += `<div class="section-title">Facebook Status</div>
+  <div class="field-group">
+    <div class="status-control">
+      <button class="status-btn ${c.fbStatus==='posted'?'s-posted':''}" onclick="setNewFbStatus('posted')">Posted</button>
+      <button class="status-btn ${!c.fbStatus||c.fbStatus==='unposted'?'s-unposted':''}" onclick="setNewFbStatus('unposted')">Not Posted</button>
+      <button class="status-btn ${c.fbStatus==='sold'?'s-sold':''}" onclick="setNewFbStatus('sold')">Sold</button>
+    </div>
+    ${c.fbPostedDate?`<div style="font-size:11px;color:var(--text3);margin-top:6px">Posted ${new Date(c.fbPostedDate).toLocaleDateString()} &mdash; ${daysPosted}d ago</div>`:''}
+  </div>`;
+
+  // Comments from CSV (read-only)
+  if (c.comments) h += `<div class="section-title">Comments</div>
+  <div class="field-group"><div class="field-value" style="font-size:13px;color:var(--text2);line-height:1.6">${c.comments}</div></div>`;
+
+  document.getElementById('drawer-body').innerHTML = h;
+}
+
+function copyNewAdvPrice(price, btn) {
+  if (!price) return;
+  navigator.clipboard.writeText(String(price)).then(() => {
+    const orig = btn.textContent; btn.textContent='✓'; btn.classList.add('copied');
+    setTimeout(() => { btn.textContent=orig; btn.classList.remove('copied'); }, 1500);
+  });
+  const field = document.getElementById('new-fb-price-field');
+  const confirm = document.getElementById('new-fb-price-confirm');
+  const hint = document.getElementById('new-fb-price-hint');
+  if (field) { field.removeAttribute('readonly'); field.classList.remove('fb-price-input','match','mismatch'); field.classList.add('fb-price-input','unlocked'); field.value=''; field.focus(); }
+  if (confirm) confirm.style.display = '';
+  if (hint) hint.textContent = 'Paste the price you entered on Facebook, then hit Enter or Confirm';
+}
+
+function checkNewFbPriceMatch(input, advPrice) {
+  const val = parseInt(String(input.value).replace(/[$,]/g,'').trim())||0;
+  input.classList.remove('match','mismatch','unlocked');
+  if (!val) { input.classList.add('unlocked'); return; }
+  input.classList.add(val === advPrice ? 'match' : 'mismatch');
+}
+
+function confirmNewFbPrice() {
+  const input = document.getElementById('new-fb-price-field');
+  if (input) saveNewFbPrice(input);
+}
+
+async function saveNewFbPrice(input) {
+  const c = newInventory.find(x => x.vin === currentNewVin); if (!c) return;
+  const val = parseInt(String(input.value).replace(/[$,]/g,'').trim())||0;
+  const confirm = document.getElementById('new-fb-price-confirm');
+  const hint = document.getElementById('new-fb-price-hint');
+  input.setAttribute('readonly',''); input.classList.remove('unlocked','match','mismatch');
+  if (confirm) confirm.style.display='none';
+  if (!val) {
+    input.classList.add('fb-price-input'); c.currentFbPrice=0;
+    if (hint) hint.textContent='Copy Advertised Price above to unlock this field';
+    try { await apiPost('updateNewCar',{vin:c.vin,field:'currentFbPrice',value:''}); showToast('FB price cleared'); } catch(e) { showToast('Save failed'); }
+    return;
+  }
+  c.currentFbPrice = val;
+  const mismatch = val !== Number(c.advertised);
+  input.classList.add(mismatch ? 'mismatch' : 'match');
+  input.value = '$' + Number(val).toLocaleString();
+  if (hint) hint.textContent = mismatch ? '⚠ Does not match advertised price — check your FB post' : '✓ Matches advertised price';
+  try { await apiPost('updateNewCar',{vin:c.vin,field:'currentFbPrice',value:val}); showToast(mismatch?'⚠ Price mismatch':'✓ Price saved'); } catch(e) { showToast('Save failed'); }
+}
+
+async function setNewFbStatus(status) {
+  const c = newInventory.find(x => x.vin === currentNewVin); if (!c) return;
+  c.fbStatus = status;
+  if (status==='posted' && !c.fbPostedDate) c.fbPostedDate = new Date().toISOString();
+  c.fbDescription = buildNewFBDesc(c);
+  renderNewCarDrawer(c, currentLeadRowIndex !== null);
+  renderNewCarsView();
+  try {
+    await apiPost('updateNewCar',{vin:c.vin,field:'fbStatus',value:status});
+    if (status==='posted') await apiPost('updateNewCar',{vin:c.vin,field:'fbPostedDate',value:c.fbPostedDate});
+    showToast('Status saved');
+  } catch(e) { showToast('Save failed: '+e.message); }
+}
+
+async function saveNewCarNote(value) {
+  const c = newInventory.find(x => x.vin === currentNewVin); if (!c) return;
+  if (c.notes === value) return;
+  c.notes = value;
+  try { await apiPost('updateNewCar',{vin:c.vin,field:'notes',value}); } catch(e) { showToast('Note save failed'); }
+}
+
+function copyNewFB() {
+  const c = newInventory.find(x => x.vin === currentNewVin); if (!c) return;
+  const text = c.fbDescription || buildNewFBDesc(c);
+  navigator.clipboard.writeText(text).then(() => {
+    const btn = document.getElementById('new-copy-btn');
+    btn.textContent='Copied!'; btn.classList.add('copied');
+    setTimeout(() => { btn.textContent='Copy'; btn.classList.remove('copied'); }, 2000);
+  });
 }
 
 function openNewCarsImport() {

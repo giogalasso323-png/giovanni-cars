@@ -742,7 +742,7 @@ function applyNewFilters() {
 function newCarPhotoHtml(vin) {
   if (!vin) return '';
   const v = vin.toLowerCase();
-  const real  = `https://www.dublintoyota.com/inventoryphotos/${NEW_DEALER_ID}/${v}/ip/1.jpg`;
+  const real  = `https://www.dublintoyota.com/inventoryphotos/${NEW_DEALER_ID}/${v}/ip/2.jpg`;
   const stock = `https://www.dublintoyota.com/inventoryphotos/${NEW_DEALER_ID}/${v}/sp/1.png`;
   return `<img src="${real}" style="width:100%;height:100%;object-fit:cover"
     onerror="this.src='${stock}';this.onerror=function(){this.style.display='none'}">`;

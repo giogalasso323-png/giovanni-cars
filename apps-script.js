@@ -10,7 +10,8 @@ const NEW_INV_COLUMNS = [
   'vin','year','modelName','modelCode','stock','category',
   'extColor','intColor','accessories','dis','totalSrp','advertised',
   'onlineStatus','promotable','campaign','presold','reserved',
-  'comments','rdr','addedDate','notes'
+  'comments','rdr','addedDate','notes',
+  'fbStatus','fbDescription','fbPostedPrice','fbPostedDate','currentFbPrice'
 ];
 
 const COLUMNS = [
@@ -630,10 +631,20 @@ function getNewInventory() {
   if (!sh) return { cars: [] };
   var last = sh.getLastRow();
   if (last < 2) return { cars: [] };
-  var data = sh.getRange(2, 1, last - 1, NEW_INV_COLUMNS.length).getValues();
+  var numCols = Math.max(sh.getLastColumn(), NEW_INV_COLUMNS.length);
+  // Read header to build column map (handles sheets with missing new columns)
+  var headers = sh.getRange(1, 1, 1, numCols).getValues()[0].map(String);
+  var colMap = {};
+  NEW_INV_COLUMNS.forEach(function(col) { colMap[col] = headers.indexOf(col); });
+  var data = sh.getRange(2, 1, last - 1, numCols).getValues();
   var cars = data.map(function(row) {
     var obj = {};
-    NEW_INV_COLUMNS.forEach(function(col, i) { obj[col] = row[i] !== undefined ? String(row[i]) : ''; });
+    NEW_INV_COLUMNS.forEach(function(col) {
+      var idx = colMap[col];
+      var val = idx >= 0 ? row[idx] : '';
+      if (val instanceof Date) val = val.toISOString();
+      obj[col] = (val === null || val === undefined) ? '' : String(val);
+    });
     return obj;
   }).filter(function(c) { return c.vin; });
   return { cars: cars };
@@ -646,18 +657,22 @@ function importNewCars(cars, replace) {
   if (!sh) {
     sh = ss.insertSheet(NEW_INV_SHEET);
     sh.getRange(1, 1, 1, NEW_INV_COLUMNS.length).setValues([NEW_INV_COLUMNS]);
+    sh.getRange(1, 1, 1, NEW_INV_COLUMNS.length).setFontWeight('bold');
     sh.setFrozenRows(1);
   }
-  // Only clear on first batch (replace=true)
+  // On first batch: clear data rows and rewrite header (ensures new FB columns are added)
   if (replace !== false) {
     var last = sh.getLastRow();
-    if (last > 1) sh.getRange(2, 1, last - 1, NEW_INV_COLUMNS.length).clearContent();
+    var existingCols = sh.getLastColumn();
+    if (last > 1) sh.getRange(2, 1, last - 1, Math.max(existingCols, NEW_INV_COLUMNS.length)).clearContent();
+    sh.getRange(1, 1, 1, NEW_INV_COLUMNS.length).setValues([NEW_INV_COLUMNS]);
+    sh.getRange(1, 1, 1, NEW_INV_COLUMNS.length).setFontWeight('bold');
   }
   var rows = cars.map(function(car) {
     return NEW_INV_COLUMNS.map(function(col) { return car[col] !== undefined ? car[col] : ''; });
   });
-  // Append after existing data
   var nextRow = sh.getLastRow() + 1;
+  if (nextRow < 2) nextRow = 2;
   if (rows.length > 0) sh.getRange(nextRow, 1, rows.length, NEW_INV_COLUMNS.length).setValues(rows);
   return { imported: rows.length };
 }
