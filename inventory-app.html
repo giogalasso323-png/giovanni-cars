@@ -1322,13 +1322,26 @@ async function setFbStatus(status){
   currentVin=vin;
   renderDrawer(c);
   render();
+
+  // Lock drawer during save
+  isSaving=true;
+  const closeBtn=document.querySelector('#drawer-overlay .close-btn');
+  if(closeBtn){ closeBtn.style.opacity='0.3'; closeBtn.style.pointerEvents='none'; closeBtn.title='Saving…'; }
   setSyncInfo('saving');
+
   try {
     await apiPost('updateField',{vin:c.vin,field:'fbStatus',value:status});
     if((c.websiteStatus||'')==='') await apiPost('updateField',{vin:c.vin,field:'websiteStatus',value:''});
     if(status==='posted') await apiPost('updateField',{vin:c.vin,field:'fbPostedDate',value:c.fbPostedDate});
-    setSyncInfo('ok'); showToast('Status saved');
-  } catch(e) { setSyncInfo('error'); showToast('Save failed: '+e.message); }
+    setSyncInfo('ok');
+    showToast('✓ Saved — safe to move on');
+  } catch(e) {
+    setSyncInfo('error');
+    showToast('✗ Save failed — try again');
+  } finally {
+    isSaving=false;
+    if(closeBtn){ closeBtn.style.opacity=''; closeBtn.style.pointerEvents=''; closeBtn.title=''; }
+  }
 
   // If marking sold and has Drive photos, prompt to delete
   if(status==='sold' && c.drivePhotoFolder){
@@ -1406,43 +1419,58 @@ function confirmFbPrice(){
   if(input) saveFbPrice(input);
 }
 
+let isSaving = false;
+
 async function saveFbPrice(input){
   const c=inventory.find(x=>x.vin===currentVin); if(!c) return;
   const raw=String(input.value).replace(/[$,]/g,'').trim();
   const val=parseInt(raw)||0;
-  const confirm=document.getElementById('fb-price-confirm');
+  const confirmBtn=document.getElementById('fb-price-confirm');
   const hint=document.getElementById('fb-price-hint');
+  const closeBtn=document.querySelector('#drawer-overlay .close-btn');
+
   // Lock field back
   input.setAttribute('readonly','');
   input.classList.remove('unlocked','match','mismatch');
-  if(confirm) confirm.style.display='none';
+  if(confirmBtn) confirmBtn.style.display='none';
+
   if(!val){
     input.classList.add('fb-price-input');
-    c.currentFbPrice=0;
-    c.priceDropped=false;
+    c.currentFbPrice=0; c.priceDropped=false;
     if(hint) hint.textContent='Copy Website Price above to unlock this field';
     render(); setSyncInfo('saving');
     try{
       await apiPost('updateField',{vin:c.vin,field:'currentFbPrice',value:''});
       await apiPost('updateField',{vin:c.vin,field:'priceDropped',value:false});
       setSyncInfo('ok'); showToast('FB price cleared');
-    } catch(e){ setSyncInfo('error'); }
+    } catch(e){ setSyncInfo('error'); showToast('⚠ Save failed — try again'); }
     return;
   }
+
+  // Lock drawer while saving
+  isSaving=true;
+  if(closeBtn){ closeBtn.style.opacity='0.3'; closeBtn.style.pointerEvents='none'; closeBtn.title='Saving…'; }
+  if(hint) hint.innerHTML='<span class="saving-dot"></span> Saving to sheet…';
+
   c.currentFbPrice=val;
   c.priceDropped = !!(c.websitePrice && val && val !== c.websitePrice);
   input.classList.add(c.priceDropped?'mismatch':'match');
-  // Format display as $XX,XXX
   input.value='$'+Number(val).toLocaleString();
-  if(hint) hint.textContent = c.priceDropped
-    ? '⚠ Does not match website price of '+fmtPrice(c.websitePrice)+' — check your FB post'
-    : '✓ Matches website price';
-  render(); setSyncInfo('saving');
+  render();
+
   try{
     await apiPost('updateField',{vin:c.vin,field:'currentFbPrice',value:val});
     await apiPost('updateField',{vin:c.vin,field:'priceDropped',value:c.priceDropped});
-    setSyncInfo('ok'); showToast(c.priceDropped?'⚠ Price mismatch — update your FB post':'✓ Price saved and confirmed');
-  } catch(e){ setSyncInfo('error'); }
+    // Show clear confirmed state before unlocking
+    if(hint) hint.innerHTML='<span style="color:var(--green);font-weight:600;font-size:13px">✓ Saved to sheet — safe to move on</span>';
+    setSyncInfo('ok');
+  } catch(e){
+    if(hint) hint.innerHTML='<span style="color:var(--red);font-weight:600">✗ Save failed — do not move on, try again</span>';
+    setSyncInfo('error');
+  } finally {
+    isSaving=false;
+    if(closeBtn){ closeBtn.style.opacity=''; closeBtn.style.pointerEvents=''; closeBtn.title=''; }
+  }
 }
 
 function fileToBase64(file){
@@ -1565,7 +1593,10 @@ async function clearPriceAlert(){
   await apiPost('updateField',{vin:c.vin,field:'priceDropped',value:false});
   setSyncInfo('ok'); showToast('Price alert cleared');
 }
-function closeDrawer(){ pendingPhotos=[]; document.getElementById('drawer-overlay').classList.remove('open'); currentVin=null; currentNewVin=null; }
+function closeDrawer(){
+  if(isSaving){ showToast('⚠ Still saving — wait for confirmation before moving on'); return; }
+  pendingPhotos=[]; document.getElementById('drawer-overlay').classList.remove('open'); currentVin=null; currentNewVin=null;
+}
 function closeDrawerOverlay(e){ if(e.target===document.getElementById('drawer-overlay')) closeDrawer(); }
 
 function openBulkVinModal(){
@@ -2362,22 +2393,36 @@ function confirmNewFbPrice() {
 async function saveNewFbPrice(input) {
   const c = newInventory.find(x => x.vin === currentNewVin); if (!c) return;
   const val = parseInt(String(input.value).replace(/[$,]/g,'').trim())||0;
-  const confirm = document.getElementById('new-fb-price-confirm');
+  const confirmBtn = document.getElementById('new-fb-price-confirm');
   const hint = document.getElementById('new-fb-price-hint');
+  const closeBtn = document.querySelector('#drawer-overlay .close-btn');
   input.setAttribute('readonly',''); input.classList.remove('unlocked','match','mismatch');
-  if (confirm) confirm.style.display='none';
+  if (confirmBtn) confirmBtn.style.display='none';
   if (!val) {
     input.classList.add('fb-price-input'); c.currentFbPrice=0;
     if (hint) hint.textContent='Copy Advertised Price above to unlock this field';
     try { await apiPost('updateNewCar',{vin:c.vin,field:'currentFbPrice',value:''}); showToast('FB price cleared'); } catch(e) { showToast('Save failed'); }
     return;
   }
+  // Lock drawer while saving
+  isSaving=true;
+  if(closeBtn){ closeBtn.style.opacity='0.3'; closeBtn.style.pointerEvents='none'; closeBtn.title='Saving…'; }
+  if(hint) hint.innerHTML='<span class="saving-dot"></span> Saving to sheet…';
+
   c.currentFbPrice = val;
   const mismatch = val !== Number(c.advertised);
   input.classList.add(mismatch ? 'mismatch' : 'match');
   input.value = '$' + Number(val).toLocaleString();
-  if (hint) hint.textContent = mismatch ? '⚠ Does not match advertised price — check your FB post' : '✓ Matches advertised price';
-  try { await apiPost('updateNewCar',{vin:c.vin,field:'currentFbPrice',value:val}); showToast(mismatch?'⚠ Price mismatch':'✓ Price saved'); } catch(e) { showToast('Save failed'); }
+  try {
+    await apiPost('updateNewCar',{vin:c.vin,field:'currentFbPrice',value:val});
+    if(hint) hint.innerHTML='<span style="color:var(--green);font-weight:600;font-size:13px">✓ Saved to sheet — safe to move on</span>';
+  } catch(e) {
+    if(hint) hint.innerHTML='<span style="color:var(--red);font-weight:600">✗ Save failed — do not move on, try again</span>';
+    showToast('Save failed');
+  } finally {
+    isSaving=false;
+    if(closeBtn){ closeBtn.style.opacity=''; closeBtn.style.pointerEvents=''; closeBtn.title=''; }
+  }
 }
 
 async function setNewFbStatus(status) {
@@ -2387,11 +2432,22 @@ async function setNewFbStatus(status) {
   c.fbDescription = buildNewFBDesc(c);
   renderNewCarDrawer(c, currentLeadRowIndex !== null);
   renderNewCarsView();
+
+  // Lock drawer during save
+  isSaving=true;
+  const closeBtn=document.querySelector('#drawer-overlay .close-btn');
+  if(closeBtn){ closeBtn.style.opacity='0.3'; closeBtn.style.pointerEvents='none'; closeBtn.title='Saving…'; }
+
   try {
     await apiPost('updateNewCar',{vin:c.vin,field:'fbStatus',value:status});
     if (status==='posted') await apiPost('updateNewCar',{vin:c.vin,field:'fbPostedDate',value:c.fbPostedDate});
-    showToast('Status saved');
-  } catch(e) { showToast('Save failed: '+e.message); }
+    showToast('✓ Saved — safe to move on');
+  } catch(e) {
+    showToast('✗ Save failed — try again');
+  } finally {
+    isSaving=false;
+    if(closeBtn){ closeBtn.style.opacity=''; closeBtn.style.pointerEvents=''; closeBtn.title=''; }
+  }
 }
 
 async function saveNewCarNote(value) {
