@@ -212,6 +212,22 @@
 </head>
 <body>
 
+<!-- PASSWORD SCREEN -->
+<div id="auth-screen" class="setup-screen" style="display:none">
+  <div class="setup-card" style="width:380px">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:20px">
+      <span class="logo-badge">DT</span>
+      <span style="font-size:18px;font-weight:700">Inventory Manager</span>
+    </div>
+    <p class="setup-sub" style="margin-bottom:20px">Enter your password to continue.</p>
+    <div class="url-row">
+      <input type="password" id="auth-input" placeholder="Password" style="font-size:15px" onkeydown="if(event.key==='Enter')checkPassword()">
+      <button class="btn btn-primary" onclick="checkPassword()">Enter</button>
+    </div>
+    <div id="auth-error" style="font-size:12px;color:var(--red);margin-top:8px;min-height:16px"></div>
+  </div>
+</div>
+
 <!-- SETUP SCREEN -->
 <div id="setup-screen" class="setup-screen">
   <div class="setup-card">
@@ -521,6 +537,36 @@
 </div>
 
 <script>
+// ── AUTH ───────────────────────────────────────────────────
+const AUTH_KEY  = 'dt_auth_v1';
+const PW_HASH   = '61dedac87f2b2d7fa27d67f0bfb6949219294caaa3152e5931d4c97fce84f011';
+const AUTH_DAYS = 30;
+
+async function hashPassword(pw) {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(pw));
+  return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
+}
+
+function isAuthed() {
+  try {
+    const stored = JSON.parse(localStorage.getItem(AUTH_KEY)||'{}');
+    return stored.hash === PW_HASH && stored.exp > Date.now();
+  } catch(e) { return false; }
+}
+
+async function checkPassword() {
+  const pw = document.getElementById('auth-input').value;
+  const err = document.getElementById('auth-error');
+  if (!pw) { err.textContent = 'Please enter your password.'; return; }
+  const hash = await hashPassword(pw);
+  if (hash !== PW_HASH) { err.textContent = 'Incorrect password.'; document.getElementById('auth-input').value=''; document.getElementById('auth-input').focus(); return; }
+  const exp = Date.now() + AUTH_DAYS * 24 * 60 * 60 * 1000;
+  localStorage.setItem(AUTH_KEY, JSON.stringify({ hash, exp }));
+  document.getElementById('auth-screen').style.display = 'none';
+  bootApp();
+}
+
+// ── APP BOOT ───────────────────────────────────────────────
 const URL_KEY = 'dt_api_url_v1';
 let API_URL = '', inventory = [], filtered = [];
 let currentView = 'table', activeFilter = 'all', sortKey = 'date-desc';
@@ -534,6 +580,15 @@ let newCarsFiltered = [];
 
 // ── SETUP ──────────────────────────────────────────────────
 function init() {
+  if (isAuthed()) {
+    bootApp();
+  } else {
+    document.getElementById('auth-screen').style.display = 'flex';
+    setTimeout(() => document.getElementById('auth-input').focus(), 100);
+  }
+}
+
+function bootApp() {
   const saved = localStorage.getItem(URL_KEY);
   if (saved) { API_URL = saved; showApp(); loadFromSheet(); }
   else { document.getElementById('setup-screen').style.display = 'flex'; }
