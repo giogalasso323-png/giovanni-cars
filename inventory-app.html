@@ -1340,14 +1340,6 @@ function renderDrawer(c){
 
   h+=`</div>`;
 
-  // ── DESCRIPTION ───────────────────────────────────────────
-  h+=`<div class="section-title">Description</div>
-  <div class="field-group">
-    <div class="fb-box" style="padding-top:38px">
-      <button class="copy-btn" id="copy-btn" onclick="copyFB()">Copy</button>${fb||'<span style="color:var(--text3)">Run web refresh to generate</span>'}
-    </div>
-  </div>`;
-
   // ── FB STATUS ─────────────────────────────────────────────
   h+=`<div class="section-title">Facebook Status</div>
   <div class="field-group">
@@ -1357,7 +1349,15 @@ function renderDrawer(c){
       <button class="status-btn ${c.fbStatus==='sold'?'s-sold':''}" onclick="setFbStatus('sold')">Sold</button>
     </div>
     ${c.fbPostedDate?`<div style="font-size:11px;color:var(--text3);margin-top:6px">Posted ${new Date(c.fbPostedDate).toLocaleDateString()} &mdash; ${daysPosted}d ago</div>`:''}
-  </div>
+  </div>`;
+
+  // ── DESCRIPTION ───────────────────────────────────────────
+  h+=`<div class="section-title">Description</div>
+  <div class="field-group">
+    <div class="fb-box" style="padding-top:38px">
+      <button class="copy-btn" id="copy-btn" onclick="copyFB()">Copy</button>${fb||'<span style="color:var(--text3)">Run web refresh to generate</span>'}
+    </div>
+  </div>`;
   ${c.lastChecked?'<div style="font-size:11px;color:var(--text3);padding-bottom:24px">Last refreshed: '+new Date(c.lastChecked).toLocaleString()+'</div>':''}`;
 
   document.getElementById('drawer-body').innerHTML=h;
@@ -2393,14 +2393,6 @@ function renderNewCarDrawer(c, isLeadContext) {
     <input type="text" id="new-car-notes" style="width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:8px 10px;border-radius:var(--radius);font-family:'Syne',sans-serif;font-size:13px;outline:none" value="${(c.notes||'').replace(/"/g,'&quot;')}" placeholder="Add a note…" onblur="saveNewCarNote(this.value)" onkeydown="if(event.key==='Enter')this.blur()">
   </div>`;
 
-  // FB Description
-  h += `<div class="section-title">Facebook Description</div>
-  <div class="field-group">
-    <div class="fb-box" style="padding-top:38px">
-      <button class="copy-btn" id="new-copy-btn" onclick="copyNewFB()">Copy</button>${fb||'<span style="color:var(--text3)">—</span>'}
-    </div>
-  </div>`;
-
   // FB Status
   h += `<div class="section-title">Facebook Status</div>
   <div class="field-group">
@@ -2410,6 +2402,14 @@ function renderNewCarDrawer(c, isLeadContext) {
       <button class="status-btn ${c.fbStatus==='sold'?'s-sold':''}" onclick="setNewFbStatus('sold')">Sold</button>
     </div>
     ${c.fbPostedDate?`<div style="font-size:11px;color:var(--text3);margin-top:6px">Posted ${new Date(c.fbPostedDate).toLocaleDateString()} &mdash; ${daysPosted}d ago</div>`:''}
+  </div>`;
+
+  // FB Description
+  h += `<div class="section-title">Facebook Description</div>
+  <div class="field-group">
+    <div class="fb-box" style="padding-top:38px">
+      <button class="copy-btn" id="new-copy-btn" onclick="copyNewFB()">Copy</button>${fb||'<span style="color:var(--text3)">—</span>'}
+    </div>
   </div>`;
 
   // Comments from CSV (read-only)
