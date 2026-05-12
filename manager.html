@@ -537,7 +537,6 @@
 </div>
 
 <script>
-document.addEventListener('DOMContentLoaded', () => { document.getElementById('auth-error').textContent = 'Ready — enter password'; });
 // ── AUTH ───────────────────────────────────────────────────
 const AUTH_KEY  = 'dt_auth_v1';
 const PW_HASH   = '192c33caac3d89ed647f6dc54419161c2bbf4b57d12bb8c546e41d6448597571';
@@ -1358,7 +1357,7 @@ function renderDrawer(c){
       <button class="copy-btn" id="copy-btn" onclick="copyFB()">Copy</button>${fb||'<span style="color:var(--text3)">Run web refresh to generate</span>'}
     </div>
   </div>`;
-  ${c.lastChecked?'<div style="font-size:11px;color:var(--text3);padding-bottom:24px">Last refreshed: '+new Date(c.lastChecked).toLocaleString()+'</div>':''}`;
+  if(c.lastChecked) h+=`<div style="font-size:11px;color:var(--text3);padding-bottom:24px">Last refreshed: ${new Date(c.lastChecked).toLocaleString()}</div>`;
 
   document.getElementById('drawer-body').innerHTML=h;
 }
