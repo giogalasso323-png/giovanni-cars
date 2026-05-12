@@ -558,12 +558,14 @@ async function checkPassword() {
   const pw = document.getElementById('auth-input').value;
   const err = document.getElementById('auth-error');
   if (!pw) { err.textContent = 'Please enter your password.'; return; }
-  const hash = await hashPassword(pw);
-  if (hash !== PW_HASH) { err.textContent = 'Incorrect password.'; document.getElementById('auth-input').value=''; document.getElementById('auth-input').focus(); return; }
-  const exp = Date.now() + AUTH_DAYS * 24 * 60 * 60 * 1000;
-  localStorage.setItem(AUTH_KEY, JSON.stringify({ hash, exp }));
-  document.getElementById('auth-screen').style.display = 'none';
-  bootApp();
+  try {
+    const hash = await hashPassword(pw);
+    if (hash !== PW_HASH) { err.textContent = 'Incorrect password.'; document.getElementById('auth-input').value=''; document.getElementById('auth-input').focus(); return; }
+    const exp = Date.now() + AUTH_DAYS * 24 * 60 * 60 * 1000;
+    localStorage.setItem(AUTH_KEY, JSON.stringify({ hash, exp }));
+    document.getElementById('auth-screen').style.display = 'none';
+    bootApp();
+  } catch(e) { err.textContent = 'Error: ' + e.message; }
 }
 
 // ── APP BOOT ───────────────────────────────────────────────
