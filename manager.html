@@ -785,14 +785,14 @@ function applyFilters() {
   const dpCol = document.getElementById('th-daysposted');
   if(dpCol) dpCol.style.display = activeFilter==='posted' ? '' : 'none';
   filtered.sort((a,b)=>{
-    // FB Posted tab: oldest posted at top (most days posted first)
-    if(activeFilter==='posted'){
+    // FB Posted tab default: oldest posted at top — only when no column sort active
+    if(activeFilter==='posted' && sortKey==='date-desc'){
       const da = a.fbPostedDate ? new Date(a.fbPostedDate).getTime() : 0;
       const db = b.fbPostedDate ? new Date(b.fbPostedDate).getTime() : 0;
-      if(da && db) return da - db; // oldest date first
-      if(da) return -1; // a has date, b doesn't — a goes first
-      if(db) return 1;  // b has date, a doesn't — b goes first
-      return daysOnLot(b) - daysOnLot(a); // fallback: most days on lot first
+      if(da && db) return da - db;
+      if(da) return -1;
+      if(db) return 1;
+      return daysOnLot(b) - daysOnLot(a);
     }
     if(sortKey==='date-desc') return new Date(b.addedDate)-new Date(a.addedDate);
     if(sortKey==='date-asc') return new Date(a.addedDate)-new Date(b.addedDate);
