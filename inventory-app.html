@@ -568,6 +568,7 @@ async function checkPassword() {
 
 // ── APP BOOT ───────────────────────────────────────────────
 const URL_KEY = 'dt_api_url_v1';
+const DEFAULT_API_URL = 'https://script.google.com/macros/s/AKfycbwKodPA7tuxeblfpakHxSd0XFu5MkCguo7rIjBltynkiDEQZky3qCck6_C0sftzgF9Qhg/exec';
 let API_URL = '', inventory = [], filtered = [];
 let currentView = 'table', activeFilter = 'all', sortKey = 'date-desc';
 let selectedVins = new Set(), pendingCsvData = null, currentVin = null, lastOpenedVin = null;
@@ -589,9 +590,11 @@ function init() {
 }
 
 function bootApp() {
-  const saved = localStorage.getItem(URL_KEY);
-  if (saved) { API_URL = saved; showApp(); loadFromSheet(); }
-  else { document.getElementById('setup-screen').style.display = 'flex'; }
+  const saved = localStorage.getItem(URL_KEY) || DEFAULT_API_URL;
+  API_URL = saved;
+  localStorage.setItem(URL_KEY, saved);
+  showApp();
+  loadFromSheet();
 }
 
 async function testAndSaveUrl() {
