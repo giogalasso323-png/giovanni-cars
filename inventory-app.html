@@ -598,22 +598,9 @@ async function testAndSaveUrl() {
   const val = document.getElementById('api-url-input').value.trim();
   const st = document.getElementById('connect-status');
   if (!val.includes('script.google.com')) { st.className='connect-status err'; st.textContent='That doesn\'t look like a valid Apps Script URL.'; return; }
-  st.className='connect-status loading'; st.textContent='Connecting…';
-  try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 10000);
-    const r = await fetch(`${val}?action=ping`, { redirect: 'follow', signal: controller.signal });
-    clearTimeout(timeout);
-    const res = await r.json();
-    if (res && res.ok) {
-      localStorage.setItem(URL_KEY, val); API_URL = val;
-      st.className='connect-status ok'; st.textContent='✓ Connected!';
-      setTimeout(() => { showApp(); loadFromSheet(); }, 500);
-    } else throw new Error(res.error || 'Bad response');
-  } catch(e) {
-    const msg = e.name === 'AbortError' ? 'Connection timed out — check your URL and try again' : (e.message || 'Check URL and try again');
-    st.className='connect-status err'; st.textContent='✗ ' + msg;
-  }
+  localStorage.setItem(URL_KEY, val); API_URL = val;
+  st.className='connect-status ok'; st.textContent='✓ Saved! Loading your inventory…';
+  setTimeout(() => { showApp(); loadFromSheet(); }, 500);
 }
 
 function showApp() { document.getElementById('setup-screen').style.display='none'; document.getElementById('app').style.display='block'; }
