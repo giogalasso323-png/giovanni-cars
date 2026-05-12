@@ -296,6 +296,10 @@
       <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
       <input type="search" id="search" placeholder="Search VIN, make, model…">
     </div>
+    <div class="search-wrap" style="max-width:180px">
+      <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+      <input type="search" id="stock-search" placeholder="Stock #…">
+    </div>
     <button class="btn" onclick="openBulkVinModal()" title="Paste multiple VINs to find and select them">
       <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><line x1="9" y1="12" x2="15" y2="12"/><line x1="9" y1="16" x2="13" y2="16"/></svg>
       Bulk Select
@@ -764,11 +768,13 @@ function mergeImport(rows) {
 // ── RENDER ─────────────────────────────────────────────────
 function applyFilters() {
   const q=document.getElementById('search').value.toLowerCase();
+  const sq=document.getElementById('stock-search').value.toLowerCase();
   filtered=inventory.filter(c=>{
     const t=getTitle(c).toLowerCase();
     const sf=[t,c.vin,(c.stock||''),(c.color||''),(c.make||''),(c.year||''),(c.certification||'')].map(s=>String(s).toLowerCase());
     const ok=!q||sf.some(f=>f.includes(q));
     if(!ok) return false;
+    if(sq && !String(c.stock||'').toLowerCase().startsWith(sq)) return false;
     if(activeFilter==='live') return (c.websiteStatus||'').toLowerCase().includes('live');
     if(activeFilter==='posted') return c.fbStatus==='posted';
     if(activeFilter==='unposted') return c.fbStatus!=='posted'&&!(c.websiteStatus||'').toLowerCase().includes('sold');
@@ -793,7 +799,15 @@ function applyFilters() {
     if(sortKey==='price-desc') return (b.websitePrice||b.price||0)-(a.websitePrice||a.price||0);
     if(sortKey==='price-asc') return (a.websitePrice||a.price||0)-(b.websitePrice||b.price||0);
     if(sortKey==='days-desc') return daysOnLot(b)-daysOnLot(a);
+    if(sortKey==='days-asc') return daysOnLot(a)-daysOnLot(b);
     if(sortKey==='alpha') return getTitle(a).localeCompare(getTitle(b));
+    if(sortKey==='alpha-desc') return getTitle(b).localeCompare(getTitle(a));
+    if(sortKey==='mileage-asc') return (Number(a.mileage)||0)-(Number(b.mileage)||0);
+    if(sortKey==='mileage-desc') return (Number(b.mileage)||0)-(Number(a.mileage)||0);
+    if(sortKey==='status-asc') return (a.websiteStatus||'').localeCompare(b.websiteStatus||'');
+    if(sortKey==='status-desc') return (b.websiteStatus||'').localeCompare(a.websiteStatus||'');
+    if(sortKey==='fb-asc') return (a.fbStatus||'').localeCompare(b.fbStatus||'');
+    if(sortKey==='fb-desc') return (b.fbStatus||'').localeCompare(a.fbStatus||'');
     // Live tab default: fewest days on lot first (newest cars at top)
     if(activeFilter==='live') return daysOnLot(a) - daysOnLot(b);
     return 0;
@@ -802,7 +816,7 @@ function applyFilters() {
 
 function render() {
   if(activeFilter==='leads') return;
-  applyFilters(); updateCounts(); updateHeaderStats();
+  applyFilters(); updateCounts(); updateHeaderStats(); updateSortHeaders();
   const has=inventory.length>0;
   document.getElementById('empty-state').style.display=has?'none':'flex';
   if(!has){ document.getElementById('table-view').style.display='none'; document.getElementById('card-view').style.display='none'; return; }
@@ -889,7 +903,43 @@ function setView(v) {
   document.getElementById('btn-cards').classList.toggle('active',v==='cards');
   render();
 }
-function sortBy(k){ sortKey=k; render(); }
+const SORT_TOGGLE = {
+  'title':    ['alpha','alpha-desc'],
+  'price':    ['price-desc','price-asc'],
+  'mileage':  ['mileage-asc','mileage-desc'],
+  'status':   ['status-asc','status-desc'],
+  'fbStatus': ['fb-asc','fb-desc'],
+  'days':     ['days-desc','days-asc'],
+};
+const SORT_COL_LABELS = {
+  'alpha':'Vehicle','alpha-desc':'Vehicle',
+  'price-desc':'Price','price-asc':'Price',
+  'mileage-asc':'Miles','mileage-desc':'Miles',
+  'status-asc':'Website','status-desc':'Website',
+  'fb-asc':'Facebook','fb-desc':'Facebook',
+  'days-desc':'Days on Lot','days-asc':'Days on Lot',
+};
+function sortBy(col){
+  const [k1,k2]=SORT_TOGGLE[col];
+  sortKey = (sortKey===k1)?k2:k1;
+  updateSortHeaders();
+  render();
+}
+function updateSortHeaders(){
+  const colMap = {'alpha':'title','alpha-desc':'title','price-desc':'price','price-asc':'price','mileage-asc':'mileage','mileage-desc':'mileage','status-asc':'status','status-desc':'status','fb-asc':'fbStatus','fb-desc':'fbStatus','days-desc':'days','days-asc':'days'};
+  const labels = {'title':'Vehicle','price':'Price','mileage':'Miles','status':'Website','fbStatus':'Facebook','days':'Days on Lot'};
+  document.querySelectorAll('#table-head-row th[onclick]').forEach(th=>{
+    const col=th.getAttribute('onclick').replace("sortBy('","").replace("')","");
+    const label=labels[col]||col;
+    const activeCol=colMap[sortKey];
+    if(col===activeCol){
+      const isDesc=['alpha-desc','price-desc','mileage-desc','status-desc','fb-desc','days-desc'].includes(sortKey);
+      th.textContent=label+(isDesc?' ↓':' ↑');
+    } else {
+      th.textContent=label;
+    }
+  });
+}
 
 // ── SELECTION ──────────────────────────────────────────────
 function toggleSelect(vin,el){ if(el.checked)selectedVins.add(vin);else selectedVins.delete(vin); updateActionBar(); }
@@ -924,6 +974,7 @@ document.querySelectorAll('.filter-tab').forEach(t=>t.addEventListener('click',(
   else { hideLeadsView(); hideNewCarsView(); render(); }
 }));
 document.getElementById('search').addEventListener('input',()=>render());
+document.getElementById('stock-search').addEventListener('input',()=>render());
 document.getElementById('sort-select').addEventListener('change',function(){sortKey=this.value;render();});
 
 // ── UPLOAD ─────────────────────────────────────────────────
@@ -1101,6 +1152,7 @@ function openDrawer(vin){
   document.getElementById('drawer-vin').textContent=c.vin;
   renderDrawer(c);
   document.getElementById('drawer-overlay').classList.add('open');
+  document.querySelector('.drawer').scrollTop=0;
   document.querySelectorAll('tbody tr').forEach(tr=>tr.classList.remove('row-active'));
   document.querySelectorAll('tbody tr').forEach(tr=>{
     if(tr.onclick&&tr.onclick.toString().includes(vin)) tr.classList.add('row-active');
