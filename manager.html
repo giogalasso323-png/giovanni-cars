@@ -213,7 +213,7 @@
 <body>
 
 <!-- PASSWORD SCREEN -->
-<div id="auth-screen" class="setup-screen" style="display:none">
+<div id="auth-screen" class="setup-screen">
   <div class="setup-card" style="width:380px">
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:20px">
       <span class="logo-badge">DT</span>
@@ -271,7 +271,7 @@
 </div>
 
 <!-- MAIN APP -->
-<div id="app">
+<div id="app" style="display:none">
   <header class="header">
     <div class="logo"><span class="logo-badge">DT</span> Inventory Manager</div>
     <div class="header-right">
@@ -582,9 +582,9 @@ let newCarsFiltered = [];
 // ── SETUP ──────────────────────────────────────────────────
 function init() {
   if (isAuthed()) {
+    document.getElementById('auth-screen').style.display = 'none';
     bootApp();
   } else {
-    document.getElementById('auth-screen').style.display = 'flex';
     setTimeout(() => document.getElementById('auth-input').focus(), 100);
   }
 }
