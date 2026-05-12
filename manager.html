@@ -352,7 +352,7 @@
           <th onclick="sortBy('status')">Website</th>
           <th onclick="sortBy('fbStatus')">Facebook</th>
           <th onclick="sortBy('days')">Days on Lot</th>
-          <th id="th-daysposted" style="display:none">Days Posted</th>
+          <th id="th-daysposted" style="display:none" onclick="sortBy('daysposted')">Days Posted</th>
           <th>Stock #</th>
         </tr></thead>
         <tbody id="table-body"></tbody>
@@ -808,6 +808,8 @@ function applyFilters() {
     if(sortKey==='status-desc') return (b.websiteStatus||'').localeCompare(a.websiteStatus||'');
     if(sortKey==='fb-asc') return (a.fbStatus||'').localeCompare(b.fbStatus||'');
     if(sortKey==='fb-desc') return (b.fbStatus||'').localeCompare(a.fbStatus||'');
+    if(sortKey==='daysposted-desc') { const da=a.fbPostedDate?Math.floor((Date.now()-new Date(a.fbPostedDate))/86400000):0; const db=b.fbPostedDate?Math.floor((Date.now()-new Date(b.fbPostedDate))/86400000):0; return db-da; }
+    if(sortKey==='daysposted-asc') { const da=a.fbPostedDate?Math.floor((Date.now()-new Date(a.fbPostedDate))/86400000):0; const db=b.fbPostedDate?Math.floor((Date.now()-new Date(b.fbPostedDate))/86400000):0; return da-db; }
     // Live tab default: fewest days on lot first (newest cars at top)
     if(activeFilter==='live') return daysOnLot(a) - daysOnLot(b);
     return 0;
@@ -910,6 +912,7 @@ const SORT_TOGGLE = {
   'status':   ['status-asc','status-desc'],
   'fbStatus': ['fb-asc','fb-desc'],
   'days':     ['days-desc','days-asc'],
+  'daysposted': ['daysposted-desc','daysposted-asc'],
 };
 const SORT_COL_LABELS = {
   'alpha':'Vehicle','alpha-desc':'Vehicle',
@@ -926,8 +929,8 @@ function sortBy(col){
   render();
 }
 function updateSortHeaders(){
-  const colMap = {'alpha':'title','alpha-desc':'title','price-desc':'price','price-asc':'price','mileage-asc':'mileage','mileage-desc':'mileage','status-asc':'status','status-desc':'status','fb-asc':'fbStatus','fb-desc':'fbStatus','days-desc':'days','days-asc':'days'};
-  const labels = {'title':'Vehicle','price':'Price','mileage':'Miles','status':'Website','fbStatus':'Facebook','days':'Days on Lot'};
+  const colMap = {'alpha':'title','alpha-desc':'title','price-desc':'price','price-asc':'price','mileage-asc':'mileage','mileage-desc':'mileage','status-asc':'status','status-desc':'status','fb-asc':'fbStatus','fb-desc':'fbStatus','days-desc':'days','days-asc':'days','daysposted-desc':'daysposted','daysposted-asc':'daysposted'};
+  const labels = {'title':'Vehicle','price':'Price','mileage':'Miles','status':'Website','fbStatus':'Facebook','days':'Days on Lot','daysposted':'Days Posted'};
   document.querySelectorAll('#table-head-row th[onclick]').forEach(th=>{
     const col=th.getAttribute('onclick').replace("sortBy('","").replace("')","");
     const label=labels[col]||col;
