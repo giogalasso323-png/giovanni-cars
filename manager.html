@@ -208,6 +208,34 @@
   .icon-btn { background: none; border: none; color: var(--text3); cursor: pointer; padding: 4px 6px; border-radius: 4px; display: inline-flex; align-items: center; transition: all 0.15s; }
   .icon-btn:hover { background: var(--bg3); color: var(--red); }
   .lead-vehicle-match { display: inline-flex; align-items: center; gap: 5px; }
+
+  /* MATCH BANNER */
+  .match-banner { display: none; align-items: center; gap: 12px; padding: 10px 28px; background: rgba(63,185,80,0.10); border-bottom: 1px solid rgba(63,185,80,0.25); font-size: 13px; color: var(--green); }
+  .match-banner.show { display: flex; }
+  .match-banner-msg { flex: 1; font-weight: 500; }
+  .match-banner .btn-view-matches { background: var(--green-bg); border-color: var(--green); color: var(--green); padding: 5px 12px; font-size: 12px; }
+  .match-banner .btn-view-matches:hover { background: rgba(63,185,80,0.2); }
+  .match-banner-dismiss { background: none; border: none; color: var(--green); cursor: pointer; padding: 2px 4px; font-size: 16px; line-height: 1; opacity: 0.7; }
+  .match-banner-dismiss:hover { opacity: 1; }
+
+  /* CHIP SELECTS */
+  .chip-group { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+  .chip { display: inline-flex; align-items: center; padding: 4px 10px; border-radius: 20px; font-size: 12px; font-family: 'Syne', sans-serif; cursor: pointer; border: 1px solid var(--border2); background: var(--bg3); color: var(--text2); transition: all 0.15s; user-select: none; }
+  .chip:hover { border-color: var(--blue); color: var(--blue); }
+  .chip.selected { background: var(--blue-bg); border-color: var(--blue); color: var(--blue); font-weight: 600; }
+
+  /* MATCH BADGE in lead table */
+  .match-badge { display: inline-flex; align-items: center; gap: 3px; padding: 2px 7px; border-radius: 4px; font-size: 10px; font-weight: 700; background: var(--green-bg); color: var(--green); margin-left: 5px; vertical-align: middle; }
+
+  /* MATCHING VEHICLES section in drawer */
+  .match-card { background: var(--bg3); border: 1px solid var(--border); border-radius: var(--radius); padding: 10px 12px; margin-bottom: 8px; cursor: pointer; transition: all 0.15s; display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+  .match-card:hover { border-color: var(--border2); background: var(--bg4); }
+  .match-card-info { flex: 1; min-width: 0; }
+  .match-card-title { font-size: 13px; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .match-card-sub { font-size: 11px; color: var(--text2); font-family: 'DM Mono', monospace; margin-top: 2px; }
+  .match-score-pill { font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 4px; white-space: nowrap; flex-shrink: 0; }
+  .match-score-high { background: var(--green-bg); color: var(--green); }
+  .match-score-med  { background: var(--amber-bg); color: var(--amber); }
 </style>
 </head>
 <body>
@@ -289,6 +317,13 @@
     <button class="filter-tab" data-filter="sold">Sold <span class="tab-count" id="cnt-sold">0</span></button>
     <button class="filter-tab" data-filter="leads">Leads <span class="tab-count" id="cnt-leads">0</span></button>
     <button class="filter-tab" data-filter="new-cars">New Cars <span class="tab-count" id="cnt-new">0</span></button>
+  </div>
+
+  <!-- MATCH BANNER (shown after CSV import if leads have matches) -->
+  <div class="match-banner" id="match-banner">
+    <span class="match-banner-msg" id="match-banner-msg"></span>
+    <button class="btn btn-view-matches" onclick="viewMatchedLeads()">View Matched Leads</button>
+    <button class="match-banner-dismiss" onclick="dismissMatchBanner()" title="Dismiss">✕</button>
   </div>
 
   <div class="toolbar">
@@ -460,14 +495,16 @@
 </div>
 
 <!-- ADD LEAD MODAL -->
-<div class="modal-overlay" id="add-lead-modal">
-  <div class="modal" style="width:500px">
+<div class="modal-overlay" id="add-lead-modal" onclick="if(event.target===this)closeAddLeadModal()">
+  <div class="modal" style="width:560px;max-height:90vh;overflow-y:auto">
     <h2>Add Lead</h2>
     <p>Manually add a lead to track a conversation you're already having.</p>
+
+    <!-- Basic Info -->
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
       <div>
         <div style="font-size:11px;font-weight:600;color:var(--text3);margin-bottom:5px;text-transform:uppercase;letter-spacing:0.5px">First Name *</div>
-        <input type="text" id="al-firstname" class="url-row" style="width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:8px 10px;border-radius:var(--radius);font-family:'Syne',sans-serif;font-size:13px;outline:none" placeholder="Jane">
+        <input type="text" id="al-firstname" style="width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:8px 10px;border-radius:var(--radius);font-family:'Syne',sans-serif;font-size:13px;outline:none" placeholder="Jane">
       </div>
       <div>
         <div style="font-size:11px;font-weight:600;color:var(--text3);margin-bottom:5px;text-transform:uppercase;letter-spacing:0.5px">Last Name *</div>
@@ -478,8 +515,10 @@
       <div style="font-size:11px;font-weight:600;color:var(--text3);margin-bottom:5px;text-transform:uppercase;letter-spacing:0.5px">Phone *</div>
       <input type="tel" id="al-phone" style="width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:8px 10px;border-radius:var(--radius);font-family:'Syne',sans-serif;font-size:13px;outline:none" placeholder="(555) 000-0000">
     </div>
+
+    <!-- Specific Vehicle -->
     <div style="margin-bottom:10px">
-      <div style="font-size:11px;font-weight:600;color:var(--text3);margin-bottom:5px;text-transform:uppercase;letter-spacing:0.5px">Vehicle Interested In</div>
+      <div style="font-size:11px;font-weight:600;color:var(--text3);margin-bottom:5px;text-transform:uppercase;letter-spacing:0.5px">Specific Vehicle Interested In</div>
       <div style="position:relative">
         <svg style="position:absolute;left:10px;top:50%;transform:translateY(-50%);opacity:0.4;pointer-events:none" width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
         <input type="text" id="al-vehicle-search" placeholder="Search year, make, model, color…" autocomplete="off"
@@ -489,6 +528,51 @@
       <div id="al-vehicle-results" style="display:none;border:1px solid var(--border);border-top:none;border-radius:0 0 var(--radius) var(--radius);background:var(--bg2);max-height:200px;overflow-y:auto"></div>
       <div id="al-vehicle-selected" style="display:none;margin-top:6px;font-size:12px;color:var(--green);font-weight:600"></div>
     </div>
+
+    <!-- Vehicle Preferences for Matching -->
+    <div style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);padding:14px;margin-bottom:10px">
+      <div style="font-size:11px;font-weight:700;color:var(--text3);margin-bottom:12px;text-transform:uppercase;letter-spacing:0.6px">Vehicle Preferences (for matching)</div>
+      <div style="margin-bottom:10px">
+        <div style="font-size:11px;font-weight:600;color:var(--text3);margin-bottom:5px;text-transform:uppercase;letter-spacing:0.5px">Model</div>
+        <select id="al-pref-model" style="width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:8px 10px;border-radius:var(--radius);font-family:'Syne',sans-serif;font-size:13px;outline:none;appearance:none">
+          <option value="">Any model…</option>
+        </select>
+      </div>
+      <div style="margin-bottom:10px">
+        <div style="font-size:11px;font-weight:600;color:var(--text3);margin-bottom:5px;text-transform:uppercase;letter-spacing:0.5px">Trim Preferences</div>
+        <div class="chip-group" id="al-pref-trims"></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+        <div>
+          <div style="font-size:11px;font-weight:600;color:var(--text3);margin-bottom:5px;text-transform:uppercase;letter-spacing:0.5px">Price Min</div>
+          <input type="number" id="al-pref-price-min" placeholder="e.g. 20000" min="0" style="width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:8px 10px;border-radius:var(--radius);font-family:'Syne',sans-serif;font-size:13px;outline:none">
+        </div>
+        <div>
+          <div style="font-size:11px;font-weight:600;color:var(--text3);margin-bottom:5px;text-transform:uppercase;letter-spacing:0.5px">Price Max</div>
+          <input type="number" id="al-pref-price-max" placeholder="e.g. 35000" min="0" style="width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:8px 10px;border-radius:var(--radius);font-family:'Syne',sans-serif;font-size:13px;outline:none">
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+        <div>
+          <div style="font-size:11px;font-weight:600;color:var(--text3);margin-bottom:5px;text-transform:uppercase;letter-spacing:0.5px">Mileage Min</div>
+          <input type="number" id="al-pref-mil-min" placeholder="e.g. 0" min="0" style="width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:8px 10px;border-radius:var(--radius);font-family:'Syne',sans-serif;font-size:13px;outline:none">
+        </div>
+        <div>
+          <div style="font-size:11px;font-weight:600;color:var(--text3);margin-bottom:5px;text-transform:uppercase;letter-spacing:0.5px">Mileage Max</div>
+          <input type="number" id="al-pref-mil-max" placeholder="e.g. 50000" min="0" style="width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:8px 10px;border-radius:var(--radius);font-family:'Syne',sans-serif;font-size:13px;outline:none">
+        </div>
+      </div>
+      <div style="margin-bottom:10px">
+        <div style="font-size:11px;font-weight:600;color:var(--text3);margin-bottom:5px;text-transform:uppercase;letter-spacing:0.5px">Exterior Color</div>
+        <div class="chip-group" id="al-pref-ext-colors"></div>
+      </div>
+      <div>
+        <div style="font-size:11px;font-weight:600;color:var(--text3);margin-bottom:5px;text-transform:uppercase;letter-spacing:0.5px">Interior Color</div>
+        <input type="text" id="al-pref-int-color" placeholder="e.g. Black, Tan…" style="width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:8px 10px;border-radius:var(--radius);font-family:'Syne',sans-serif;font-size:13px;outline:none">
+      </div>
+    </div>
+
+    <!-- Timeframe / Status -->
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
       <div>
         <div style="font-size:11px;font-weight:600;color:var(--text3);margin-bottom:5px;text-transform:uppercase;letter-spacing:0.5px">Timeframe</div>
@@ -514,6 +598,22 @@
         </select>
       </div>
     </div>
+
+    <!-- Turned To / In Focus -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+      <div>
+        <div style="font-size:11px;font-weight:600;color:var(--text3);margin-bottom:5px;text-transform:uppercase;letter-spacing:0.5px">Turned To</div>
+        <input type="text" id="al-turned-to" placeholder="Salesperson name…" style="width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:8px 10px;border-radius:var(--radius);font-family:'Syne',sans-serif;font-size:13px;outline:none">
+      </div>
+      <div style="display:flex;flex-direction:column;justify-content:flex-end">
+        <label style="display:flex;align-items:center;gap:8px;padding-bottom:2px;cursor:pointer">
+          <input type="checkbox" id="al-in-focus" style="width:16px;height:16px;accent-color:var(--accent)">
+          <span style="font-size:13px;font-weight:500">In Focus</span>
+          <span style="font-size:11px;color:var(--text3)">(logged in CRM)</span>
+        </label>
+      </div>
+    </div>
+
     <div style="margin-bottom:10px">
       <div style="font-size:11px;font-weight:600;color:var(--text3);margin-bottom:5px;text-transform:uppercase;letter-spacing:0.5px">Notes</div>
       <input type="text" id="al-notes" style="width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:8px 10px;border-radius:var(--radius);font-family:'Syne',sans-serif;font-size:13px;outline:none" placeholder="Optional note…">
@@ -1015,6 +1115,14 @@ async function doImport(){
   }
   setSyncInfo('ok'); closeUploadModal();
   showToast(`Done — ${added} added, ${updated} updated`);
+
+  // After import: run matching against all open leads and show banner if matches found
+  if (leadsData.length) {
+    const matchedCount = runMatchingForAllLeads();
+    if (matchedCount > 0) {
+      showMatchBanner(matchedCount);
+    }
+  }
 }
 
 // ── SCRAPE ─────────────────────────────────────────────────
@@ -1216,6 +1324,12 @@ function buildLeadSectionHtml(lead, car){
     car?siteUrl:''
   ].filter(Boolean).join('\n');
 
+  const inFocusChecked = lead.inFocus ? 'checked' : '';
+  const turnedToVal = (lead.turnedTo||'').replace(/"/g,'&quot;');
+
+  // Matching section
+  const matchingHtml = buildMatchingSectionHtml(lead);
+
   return `<div style="background:rgba(74,158,255,0.07);border:1px solid rgba(74,158,255,0.2);border-radius:var(--radius);padding:14px 16px;margin-bottom:16px">
     <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:12px;gap:10px">
       <div>
@@ -1244,12 +1358,26 @@ function buildLeadSectionHtml(lead, car){
         </select>
       </div>
     </div>
-    <div>
+    <div style="margin-bottom:10px">
       <div class="field-label">Notes</div>
       <input type="text" style="width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:6px;font-family:'Syne',sans-serif;font-size:13px;outline:none" value="${(lead.notes||'').replace(/"/g,'&quot;')}" placeholder="Add note…" onblur="updateLeadFieldFromDrawer('notes',this.value)" onkeydown="if(event.key==='Enter')this.blur()">
     </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+      <div>
+        <div class="field-label">Turned To</div>
+        <input type="text" style="width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:6px;font-family:'Syne',sans-serif;font-size:13px;outline:none" value="${turnedToVal}" placeholder="Salesperson name…" onblur="updateLeadFieldFromDrawer('turnedTo',this.value)" onkeydown="if(event.key==='Enter')this.blur()">
+      </div>
+      <div style="display:flex;flex-direction:column;justify-content:flex-end;padding-bottom:2px">
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+          <input type="checkbox" ${inFocusChecked} style="width:15px;height:15px;accent-color:var(--accent)" onchange="updateLeadFieldFromDrawer('inFocus',this.checked)">
+          <span style="font-size:13px;font-weight:500">In Focus</span>
+          <span style="font-size:11px;color:var(--text3)">(logged in CRM)</span>
+        </label>
+      </div>
+    </div>
     <div id="lead-copy-snippet" style="display:none;white-space:pre">${snippet.replace(/</g,'&lt;')}</div>
-  </div>`;
+  </div>
+  ${matchingHtml}`;
 }
 
 function renderDrawer(c){
@@ -1763,6 +1891,174 @@ function applyBulkVinSelect(){
   setTimeout(()=>closeBulkVinModal(), 1500);
 }
 
+// ── VEHICLE MATCHING ───────────────────────────────────────
+/**
+ * Score a single inventory vehicle against a lead's preferences.
+ * Returns a score 0-100, or -1 if it fails a hard filter.
+ */
+function scoreVehicleForLead(car, lead) {
+  // Build list of filled prefs with their max weights
+  const prefs = [];
+  const model      = (lead.prefModel || '').trim();
+  const trimPrefs  = Array.isArray(lead.trimPrefs) ? lead.trimPrefs : parsePrefArray(lead.trimPrefs);
+  const priceMin   = Number(lead.priceMin) || 0;
+  const priceMax   = Number(lead.priceMax) || 0;
+  const milMin     = Number(lead.mileageMin) || 0;
+  const milMax     = Number(lead.mileageMax) || 0;
+  const extColors  = Array.isArray(lead.extColors) ? lead.extColors : parsePrefArray(lead.extColors);
+  const intColors  = Array.isArray(lead.intColors) ? lead.intColors : parsePrefArray(lead.intColors);
+
+  // Hard filter: model (if set, vehicle model must contain lead model)
+  if (model) {
+    const carModel = ((car.model || '') + ' ' + (car.make || '')).toLowerCase();
+    if (!carModel.includes(model.toLowerCase())) return -1;
+    prefs.push({ weight: 40, earned: 40 });
+  }
+
+  // Soft filters (only added if lead has that pref set)
+  if (priceMax) {
+    const carPrice = Number(car.websitePrice) || Number(car.price) || 0;
+    const earned = carPrice > 0 && carPrice <= priceMax * 1.1 ? 20 : 0;
+    // Also check priceMin if set
+    if (priceMin && carPrice > 0 && carPrice < priceMin * 0.9) return -1;
+    prefs.push({ weight: 20, earned });
+  }
+
+  if (milMax) {
+    const carMil = Number(car.mileage) || 0;
+    const earned = carMil >= 0 && carMil <= milMax * 1.1 ? 20 : 0;
+    if (milMin && carMil > 0 && carMil < milMin * 0.9) return -1;
+    prefs.push({ weight: 20, earned });
+  }
+
+  if (trimPrefs.length) {
+    const carTrim = (car.trim || car.model || '').toLowerCase();
+    const earned = trimPrefs.some(t => carTrim.includes(t.toLowerCase())) ? 10 : 0;
+    prefs.push({ weight: 10, earned });
+  }
+
+  if (extColors.length) {
+    const carColor = (car.color || '').toLowerCase();
+    const earned = extColors.some(c => carColor.includes(c.toLowerCase())) ? 5 : 0;
+    prefs.push({ weight: 5, earned });
+  }
+
+  if (intColors.length) {
+    // inventory doesn't reliably have interior color — treat as 0 points
+    prefs.push({ weight: 5, earned: 0 });
+  }
+
+  if (!prefs.length) return 0; // No prefs set — no score
+
+  // Redistribute weight across filled fields to sum to 100
+  const totalWeight = prefs.reduce((s, p) => s + p.weight, 0);
+  const totalEarned = prefs.reduce((s, p) => s + p.earned, 0);
+  return Math.round((totalEarned / totalWeight) * 100);
+}
+
+function parsePrefArray(val) {
+  if (!val) return [];
+  if (Array.isArray(val)) return val.filter(Boolean);
+  try { const p = JSON.parse(val); if (Array.isArray(p)) return p.filter(Boolean); } catch(e) {}
+  return String(val).split(',').map(s=>s.trim()).filter(Boolean);
+}
+
+/**
+ * Find top matching vehicles for a lead. Returns array of {car, score}.
+ */
+function findMatchesForLead(lead, topN=5) {
+  const results = [];
+  for (const car of inventory) {
+    // Skip sold cars
+    if ((car.websiteStatus||'').toLowerCase().includes('sold') || car.fbStatus==='sold') continue;
+    const score = scoreVehicleForLead(car, lead);
+    if (score >= 60) results.push({ car, score });
+  }
+  results.sort((a,b) => b.score - a.score);
+  return results.slice(0, topN);
+}
+
+/**
+ * Run matching for ALL open leads. Returns count of leads with matches.
+ */
+function runMatchingForAllLeads() {
+  let matchedLeadCount = 0;
+  for (const lead of leadsData) {
+    if (lead.status === 'Sold' || lead.status === 'Lost') continue;
+    const matches = findMatchesForLead(lead);
+    lead._matches = matches; // cache on lead object
+    if (matches.length) matchedLeadCount++;
+  }
+  return matchedLeadCount;
+}
+
+function showMatchBanner(count) {
+  const banner = document.getElementById('match-banner');
+  const msg = document.getElementById('match-banner-msg');
+  if (!banner || !msg) return;
+  msg.textContent = count + ' lead' + (count!==1?'s have':' has') + ' matching vehicles in current inventory';
+  banner.classList.add('show');
+}
+
+function dismissMatchBanner() {
+  const banner = document.getElementById('match-banner');
+  if (banner) banner.classList.remove('show');
+}
+
+function viewMatchedLeads() {
+  dismissMatchBanner();
+  // Switch to leads tab and filter to show only leads with matches
+  document.querySelectorAll('.filter-tab').forEach(t => t.classList.remove('active'));
+  document.querySelector('[data-filter="leads"]').classList.add('active');
+  activeFilter = 'leads';
+  hideNewCarsView();
+  showLeadsViewFiltered('matched');
+}
+
+let leadsFilter = 'all'; // 'all' | 'matched'
+
+function showLeadsViewFiltered(filter) {
+  leadsFilter = filter || 'all';
+  document.getElementById('leads-view').style.display = 'block';
+  document.getElementById('empty-state').style.display = 'none';
+  document.getElementById('table-view').style.display = 'none';
+  document.getElementById('card-view').style.display = 'none';
+  document.getElementById('action-bar').classList.remove('show');
+  document.querySelector('.toolbar').style.visibility = 'hidden';
+  selectedLeads.clear();
+  loadLeads();
+}
+
+/** Build the "Matching Vehicles" section HTML for a lead drawer */
+function buildMatchingSectionHtml(lead) {
+  const matches = lead._matches || findMatchesForLead(lead);
+  lead._matches = matches; // cache
+
+  if (!matches.length) {
+    return `<div class="section-title">Matching Vehicles</div>
+    <div style="font-size:13px;color:var(--text3);padding:10px 0">No inventory matches yet.</div>`;
+  }
+
+  const cards = matches.map(({car, score}) => {
+    const scoreClass = score >= 80 ? 'match-score-high' : 'match-score-med';
+    const price = car.websitePrice || car.price;
+    const sub = [
+      fmtMiles(car.mileage),
+      price ? fmtPrice(price) : '',
+      car.color || ''
+    ].filter(Boolean).join(' · ');
+    return `<div class="match-card" onclick="openDrawer('${car.vin}')">
+      <div class="match-card-info">
+        <div class="match-card-title">${getTitle(car)}</div>
+        <div class="match-card-sub">${sub}</div>
+      </div>
+      <span class="match-score-pill ${scoreClass}">${score}%</span>
+    </div>`;
+  }).join('');
+
+  return `<div class="section-title">Matching Vehicles</div>${cards}`;
+}
+
 // ── LEADS ──────────────────────────────────────────────────
 let leadsData = [];
 let selectedLeads = new Set();
@@ -1773,6 +2069,7 @@ const LEAD_STATUS_COLORS = {
 };
 
 function showLeadsView(){
+  leadsFilter = 'all';
   document.getElementById('leads-view').style.display='block';
   document.getElementById('empty-state').style.display='none';
   document.getElementById('table-view').style.display='none';
@@ -1794,6 +2091,7 @@ async function loadLeads(){
     <div class="leads-toolbar">
       <h2>Leads <span id="leads-subtitle" style="font-size:13px;font-weight:400;color:var(--text3)"></span></h2>
       <div class="leads-toolbar-right">
+        <button class="btn ${leadsFilter==='matched'?'btn-primary':''}" id="btn-filter-matched" onclick="toggleMatchedFilter()" style="font-size:12px"><span style="color:var(--green)">●</span> Matched Only</button>
         <button class="btn" onclick="loadLeads()"><svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M4 4v5h5"/><path d="M20 20v-5h-5"/><path d="M4 9a9 9 0 0115.47-3.47"/><path d="M20 15a9 9 0 01-15.47 3.47"/></svg> Refresh</button>
         <button class="btn btn-primary" onclick="openAddLeadModal()"><svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> Add Lead</button>
       </div>
@@ -1809,10 +2107,19 @@ async function loadLeads(){
     if(res.error) throw new Error(res.error);
     leadsData = (res.leads||[]).reverse();
     document.getElementById('cnt-leads').textContent = leadsData.length;
+    // Run matching on all open leads
+    runMatchingForAllLeads();
     renderLeads();
   } catch(e) {
     document.getElementById('leads-content').innerHTML=`<div style="text-align:center;padding:40px;color:var(--red)">Error loading leads: ${e.message}</div>`;
   }
+}
+
+function toggleMatchedFilter() {
+  leadsFilter = leadsFilter === 'matched' ? 'all' : 'matched';
+  const btn = document.getElementById('btn-filter-matched');
+  if (btn) { btn.className = 'btn' + (leadsFilter==='matched'?' btn-primary':''); }
+  renderLeads();
 }
 
 function renderLeads(){
@@ -1825,12 +2132,23 @@ function renderLeads(){
   }
   updateLeadsSubtitle();
 
-  const rows = leadsData.map(lead=>{
+  // Apply matched filter
+  const visibleLeads = leadsFilter === 'matched'
+    ? leadsData.filter(l => l._matches && l._matches.length > 0)
+    : leadsData;
+
+  if (!visibleLeads.length) {
+    content.innerHTML = `<div style="text-align:center;padding:40px;color:var(--text3)">No matched leads yet. Import inventory CSV to run matching.</div>`;
+    return;
+  }
+
+  const rows = visibleLeads.map(lead=>{
     const date = lead.timestamp ? new Date(lead.timestamp).toLocaleDateString([],{month:'short',day:'numeric',year:'numeric'}) : '—';
     const status = lead.status || 'New';
     const cls = LEAD_STATUS_COLORS[status]||'s-new';
     const statusOpts = LEAD_STATUSES.map(s=>`<option value="${s}"${s===status?' selected':''}>${s}</option>`).join('');
     const isSelected = selectedLeads.has(lead.rowIndex);
+    const hasMatches = lead._matches && lead._matches.length > 0;
 
     // Match to inventory by VIN
     const matchedCar = lead.vin ? inventory.find(c=>c.vin===lead.vin) : null;
@@ -1844,15 +2162,26 @@ function renderLeads(){
          </div>`
       : `<span style="font-size:12px;color:var(--text2)">${lead.vehicle||'—'}</span>`;
 
+    const matchBadge = hasMatches
+      ? `<span class="match-badge">● ${lead._matches.length} Match${lead._matches.length!==1?'es':''}</span>`
+      : '';
+
+    const inFocusBadge = lead.inFocus
+      ? `<span style="font-size:10px;background:rgba(74,158,255,0.12);color:var(--blue);padding:2px 7px;border-radius:4px;font-weight:600;margin-left:4px">CRM</span>`
+      : '';
+    const turnedTo = lead.turnedTo
+      ? `<span style="font-size:10px;color:var(--text3);margin-left:4px">→ ${lead.turnedTo}</span>`
+      : '';
+
     return `<tr class="${isSelected?'lead-selected':''}" onclick="openDrawerFromLead(${lead.rowIndex})" style="cursor:pointer">
       <td onclick="event.stopPropagation()"><input type="checkbox" ${isSelected?'checked':''} onchange="toggleLeadSelect(${lead.rowIndex},this)"></td>
       <td style="color:var(--text3);font-family:'DM Mono',monospace;font-size:11px;white-space:nowrap">${date}</td>
-      <td class="td-main" style="white-space:nowrap">${lead.firstName||''} ${lead.lastName||''}</td>
+      <td class="td-main" style="white-space:nowrap">${lead.firstName||''} ${lead.lastName||''}${inFocusBadge}${turnedTo}</td>
       <td onclick="event.stopPropagation()" style="white-space:nowrap">
         <span style="font-family:'DM Mono',monospace;font-size:12px;color:var(--text2)">${lead.phone||'—'}</span>
         ${lead.phone?`<button class="mini-copy-btn" style="margin-left:6px" onclick="copyText('${lead.phone}',this)">Copy</button>`:''}
       </td>
-      <td>${vehicleCell}</td>
+      <td>${vehicleCell}${matchBadge}</td>
       <td><span style="font-size:11px;background:var(--bg3);padding:2px 8px;border-radius:4px;color:var(--text3);white-space:nowrap">${lead.timeframe||'—'}</span></td>
       <td><select class="lead-status-sel ${cls}" onchange="updateLeadStatus(${lead.rowIndex},this)">${statusOpts}</select></td>
       <td><input class="lead-note-input" type="text" value="${(lead.notes||'').replace(/"/g,'&quot;')}" placeholder="Add note…" onblur="saveLeadNote(${lead.rowIndex},this)" onkeydown="if(event.key==='Enter')this.blur()"></td>
@@ -1985,17 +2314,66 @@ async function doDeleteLead(rowIndex){
 let alSelectedVin = '';
 let alSelectedVehicle = '';
 
+// Track selected chips for Add Lead modal
+let alPrefTrims = new Set();
+let alPrefExtColors = new Set();
+
 function openAddLeadModal(){
   alSelectedVin=''; alSelectedVehicle='';
-  ['al-firstname','al-lastname','al-phone','al-notes'].forEach(id=>document.getElementById(id).value='');
+  alPrefTrims.clear(); alPrefExtColors.clear();
+  ['al-firstname','al-lastname','al-phone','al-notes','al-turned-to','al-pref-int-color','al-pref-price-min','al-pref-price-max','al-pref-mil-min','al-pref-mil-max'].forEach(id=>{
+    const el=document.getElementById(id); if(el) el.value='';
+  });
+  const inFocus = document.getElementById('al-in-focus');
+  if(inFocus) inFocus.checked = false;
   document.getElementById('al-vehicle-search').value='';
   document.getElementById('al-vehicle-results').style.display='none';
   document.getElementById('al-vehicle-selected').style.display='none';
   document.getElementById('al-timeframe').value='';
   document.getElementById('al-status').value='New';
   document.getElementById('al-error').style.display='none';
+
+  // Populate model dropdown from inventory
+  const modelSel = document.getElementById('al-pref-model');
+  if(modelSel){
+    const models = [...new Set(inventory.map(c=>(c.model||'').trim()).filter(Boolean))].sort();
+    modelSel.innerHTML = '<option value="">Any model…</option>' + models.map(m=>`<option value="${m}">${m}</option>`).join('');
+  }
+
+  // Populate trim chips
+  const trimContainer = document.getElementById('al-pref-trims');
+  if(trimContainer){
+    const trims = [...new Set(inventory.map(c=>(c.trim||'').trim()).filter(Boolean))].sort();
+    if(trims.length){
+      trimContainer.innerHTML = trims.map(t=>`<span class="chip" onclick="toggleAlChip(this,'trim','${t.replace(/'/g,"\\'")}')">  ${t}</span>`).join('');
+    } else {
+      trimContainer.innerHTML = '<span style="font-size:12px;color:var(--text3)">No trims in inventory yet</span>';
+    }
+  }
+
+  // Populate ext color chips
+  const colorContainer = document.getElementById('al-pref-ext-colors');
+  if(colorContainer){
+    const colors = [...new Set(inventory.map(c=>(c.color||'').trim()).filter(Boolean))].sort();
+    if(colors.length){
+      colorContainer.innerHTML = colors.map(c=>`<span class="chip" onclick="toggleAlChip(this,'extColor','${c.replace(/'/g,"\\'")}')"> ${c}</span>`).join('');
+    } else {
+      colorContainer.innerHTML = '<span style="font-size:12px;color:var(--text3)">No colors in inventory yet</span>';
+    }
+  }
+
   document.getElementById('add-lead-modal').classList.add('open');
   setTimeout(()=>document.getElementById('al-firstname').focus(),100);
+}
+
+function toggleAlChip(el, type, value) {
+  if(type === 'trim') {
+    if(alPrefTrims.has(value)){ alPrefTrims.delete(value); el.classList.remove('selected'); }
+    else { alPrefTrims.add(value); el.classList.add('selected'); }
+  } else if(type === 'extColor') {
+    if(alPrefExtColors.has(value)){ alPrefExtColors.delete(value); el.classList.remove('selected'); }
+    else { alPrefExtColors.add(value); el.classList.add('selected'); }
+  }
 }
 function closeAddLeadModal(){
   document.getElementById('add-lead-modal').classList.remove('open');
@@ -2033,27 +2411,52 @@ function selectAlVehicle(vin){
 }
 
 async function submitManualLead(){
-  const firstName = document.getElementById('al-firstname').value.trim();
-  const lastName  = document.getElementById('al-lastname').value.trim();
-  const phone     = document.getElementById('al-phone').value.trim();
-  const timeframe = document.getElementById('al-timeframe').value;
-  const status    = document.getElementById('al-status').value;
-  const notes     = document.getElementById('al-notes').value.trim();
+  const firstName  = document.getElementById('al-firstname').value.trim();
+  const lastName   = document.getElementById('al-lastname').value.trim();
+  const phone      = document.getElementById('al-phone').value.trim();
+  const timeframe  = document.getElementById('al-timeframe').value;
+  const status     = document.getElementById('al-status').value;
+  const notes      = document.getElementById('al-notes').value.trim();
+  const turnedTo   = (document.getElementById('al-turned-to')||{}).value?.trim() || '';
+  const inFocus    = !!(document.getElementById('al-in-focus')||{}).checked;
+  const prefModel  = (document.getElementById('al-pref-model')||{}).value || '';
+  const priceMin   = Number((document.getElementById('al-pref-price-min')||{}).value) || 0;
+  const priceMax   = Number((document.getElementById('al-pref-price-max')||{}).value) || 0;
+  const mileageMin = Number((document.getElementById('al-pref-mil-min')||{}).value) || 0;
+  const mileageMax = Number((document.getElementById('al-pref-mil-max')||{}).value) || 0;
+  const intColors  = ((document.getElementById('al-pref-int-color')||{}).value||'').trim();
 
   if(!firstName||!lastName||!phone){ document.getElementById('al-error').style.display='block'; return; }
   document.getElementById('al-error').style.display='none';
 
+  const leadPayload = {
+    firstName, lastName, phone, timeframe,
+    vehicle: alSelectedVehicle,
+    vin: alSelectedVin,
+    status, notes, source:'manual',
+    turnedTo, inFocus,
+    prefModel,
+    trimPrefs: JSON.stringify([...alPrefTrims]),
+    priceMin, priceMax,
+    mileageMin, mileageMax,
+    extColors: JSON.stringify([...alPrefExtColors]),
+    intColors
+  };
+
   try {
-    await apiPost('submitLead',{
-      firstName,lastName,phone,timeframe,
-      vehicle: alSelectedVehicle,
-      vin: alSelectedVin,
-      status,notes,
-      source:'manual'
-    });
+    await apiPost('submitLead', leadPayload);
     closeAddLeadModal();
     showToast('Lead added');
     await loadLeads();
+    // Run matching on the new lead and show result in drawer if matches found
+    const newLead = leadsData[0]; // most recent lead (reversed)
+    if (newLead) {
+      const matches = findMatchesForLead(newLead);
+      newLead._matches = matches;
+      if (matches.length) {
+        showToast('✓ Lead added — ' + matches.length + ' matching vehicle' + (matches.length!==1?'s':'') + ' found!');
+      }
+    }
   } catch(e){ showToast('Failed to add lead: '+e.message); }
 }
 
