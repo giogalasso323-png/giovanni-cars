@@ -3211,6 +3211,10 @@ function getMileageAdder(mil, year) {
   return MILEAGE_AGE_MATRIX[getAgeBracket(year)][getMileageBracket(mil)];
 }
 
+function getMiniFloor(c) {
+  return String(c.stock || '').toUpperCase().startsWith('T') ? 150 : 500;
+}
+
 function calcGrossData(c, productPrice, carDiscount) {
   const sticker = c.websitePrice || c.price || 0;
   const cost = Number(c.appraisedValue) || 0;
@@ -3223,10 +3227,12 @@ function calcGrossData(c, productPrice, carDiscount) {
   const discount = carDiscount || 0;
   const topGross = sticker - cost - fixedCosts + productGross - discount;
   const bottomGross = topGross - mileageAdder;
+  const miniFloor = getMiniFloor(c);
+  const miniGrossThreshold = miniFloor / 0.25;
   return {
-    topGross, bottomGross, mileageAdder,
-    topComm: Math.max(Math.round(topGross * 0.25), 500),
-    bottomComm: Math.max(Math.round(bottomGross * 0.25), 500),
+    topGross, bottomGross, mileageAdder, miniFloor, miniGrossThreshold,
+    topComm: Math.max(Math.round(topGross * 0.25), miniFloor),
+    bottomComm: Math.max(Math.round(bottomGross * 0.25), miniFloor),
     certCost, fixedCosts, cost, sticker
   };
 }
@@ -3238,15 +3244,17 @@ function fmtG(n) {
   return n < 0 ? '(' + str + ')' : str;
 }
 
-function grossStatusInfo(bottomGross, topGross) {
-  if (topGross < 2000) return { label: 'Mini', color: 'var(--red)', bg: 'var(--red-bg)' };
-  if (bottomGross < 2000) return { label: 'Saveable', color: 'var(--amber)', bg: 'var(--amber-bg)' };
+function grossStatusInfo(bottomGross, topGross, miniGrossThreshold) {
+  const thresh = miniGrossThreshold || 2000;
+  if (topGross < thresh) return { label: 'Mini', color: 'var(--red)', bg: 'var(--red-bg)' };
+  if (bottomGross < thresh) return { label: 'Saveable', color: 'var(--amber)', bg: 'var(--amber-bg)' };
   return { label: 'Has Money', color: 'var(--green)', bg: 'var(--green-bg)' };
 }
 
-function buildGrossStatusBadge(bottomGross, topGross) {
-  const si = grossStatusInfo(bottomGross, topGross);
-  return `<span style="display:inline-flex;align-items:center;padding:3px 10px;border-radius:4px;font-size:11px;font-weight:700;background:${si.bg};color:${si.color}">${si.label}</span>`;
+function buildGrossStatusBadge(g) {
+  const si = grossStatusInfo(g.bottomGross, g.topGross, g.miniGrossThreshold);
+  const miniNote = g.miniFloor === 150 ? ' · T-Stock $150 min' : '';
+  return `<span style="display:inline-flex;align-items:center;padding:3px 10px;border-radius:4px;font-size:11px;font-weight:700;background:${si.bg};color:${si.color}">${si.label}${miniNote}</span>`;
 }
 
 function buildGrossSection(c) {
@@ -3254,17 +3262,20 @@ function buildGrossSection(c) {
   if (!g) return '';
   const age = new Date().getFullYear() - parseInt(c.year || '0');
   const mil = Number(c.mileage) || 0;
-  const si = grossStatusInfo(g.bottomGross, g.topGross);
+  const si = grossStatusInfo(g.bottomGross, g.topGross, g.miniGrossThreshold);
+  const bottomColor = g.bottomGross >= g.miniGrossThreshold ? 'var(--green)' : 'var(--text3)';
   return `
   <div class="section-title">Commission Estimate</div>
   <div id="gross-section" style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px;margin-bottom:16px">
-    <div id="gross-badge" style="margin-bottom:10px">${buildGrossStatusBadge(g.bottomGross, g.topGross)}</div>
-    <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:2px">
-      <span id="comm-range" style="font-family:'DM Mono',monospace;font-size:26px;font-weight:700;color:${si.color}">${fmtG(g.bottomComm)} &ndash; ${fmtG(g.topComm)}</span>
-      <span style="font-size:11px;color:var(--text3)">your check</span>
+    <div id="gross-badge" style="margin-bottom:10px">${buildGrossStatusBadge(g)}</div>
+    <div style="display:flex;align-items:baseline;gap:6px;margin-bottom:2px">
+      <span id="comm-top" style="font-family:'DM Mono',monospace;font-size:26px;font-weight:700;color:${si.color}">${fmtG(g.topComm)}</span>
+      <span style="font-size:18px;color:var(--text3);font-family:'DM Mono',monospace">&ndash;</span>
+      <span id="comm-bottom" style="font-family:'DM Mono',monospace;font-size:18px;font-weight:600;color:${bottomColor}">${fmtG(g.bottomComm)}</span>
+      <span style="font-size:11px;color:var(--text3);margin-left:4px">your check</span>
     </div>
     <div style="font-size:12px;color:var(--text3);margin-bottom:4px">
-      Front gross: <span id="gross-range" style="color:var(--text2)">${fmtG(g.bottomGross)} &ndash; ${fmtG(g.topGross)}</span>
+      Front gross: <span id="gross-range" style="color:var(--text2)">${fmtG(g.topGross)} &ndash; ${fmtG(g.bottomGross)}</span>
     </div>
     ${g.mileageAdder > 0 ? `<div style="font-size:11px;color:var(--amber);margin-bottom:10px">&minus;${fmtG(g.mileageAdder)} recon adj &middot; ${(mil/1000).toFixed(0)}K mi &middot; ${age}yr old</div>` : '<div style="margin-bottom:10px"></div>'}
     <div style="font-size:11px;color:var(--text3);margin-bottom:12px">Cost ${fmtG(g.cost)} + Recon $2,000 + Detail $500${g.certCost?' + Cert $'+g.certCost.toLocaleString():''}</div>
@@ -3292,15 +3303,18 @@ function recalcGross() {
   const productPrice = Number(document.getElementById('gross-product-input')?.value) || 0;
   const carDiscount  = Number(document.getElementById('gross-discount-input')?.value) || 0;
   const g = calcGrossData(c, productPrice, carDiscount); if (!g) return;
-  const si = grossStatusInfo(g.bottomGross, g.topGross);
+  const si = grossStatusInfo(g.bottomGross, g.topGross, g.miniGrossThreshold);
+  const bottomColor = g.bottomGross >= g.miniGrossThreshold ? 'var(--green)' : 'var(--text3)';
+  const topEl     = document.getElementById('comm-top');
+  const bottomEl  = document.getElementById('comm-bottom');
   const rangeEl   = document.getElementById('gross-range');
-  const commEl    = document.getElementById('comm-range');
   const badgeEl   = document.getElementById('gross-badge');
   const prodImpEl = document.getElementById('product-impact');
   const discImpEl = document.getElementById('discount-impact');
-  if (commEl)  { commEl.innerHTML = fmtG(g.bottomComm) + ' &ndash; ' + fmtG(g.topComm); commEl.style.color = si.color; }
-  if (rangeEl) rangeEl.innerHTML = fmtG(g.bottomGross) + ' &ndash; ' + fmtG(g.topGross);
-  if (badgeEl) badgeEl.innerHTML = buildGrossStatusBadge(g.bottomGross, g.topGross);
+  if (topEl)    { topEl.textContent = fmtG(g.topComm); topEl.style.color = si.color; }
+  if (bottomEl) { bottomEl.textContent = fmtG(g.bottomComm); bottomEl.style.color = bottomColor; }
+  if (rangeEl)  rangeEl.innerHTML = fmtG(g.topGross) + ' &ndash; ' + fmtG(g.bottomGross);
+  if (badgeEl)  badgeEl.innerHTML = buildGrossStatusBadge(g);
   if (prodImpEl && productPrice > 0) {
     const commLift = Math.round((productPrice - 750) * 0.25);
     prodImpEl.innerHTML = commLift > 0
@@ -3320,10 +3334,11 @@ function recalcGross() {
 function grossTableCell(c) {
   const g = calcGrossData(c, 0, 0);
   if (!g) return '<td style="color:var(--text3);font-size:11px;font-family:\'DM Mono\',monospace">—</td>';
-  const si = grossStatusInfo(g.bottomGross, g.topGross);
+  const si = grossStatusInfo(g.bottomGross, g.topGross, g.miniGrossThreshold);
+  const bottomColor = g.bottomGross >= g.miniGrossThreshold ? 'var(--green)' : 'var(--text3)';
   return `<td style="white-space:nowrap">
-    <span style="font-family:'DM Mono',monospace;font-size:11px;font-weight:700;color:${si.color}">${fmtG(g.bottomComm)}</span>
-    <span style="font-size:10px;color:var(--text3)"> – ${fmtG(g.topComm)}</span>
+    <span style="font-family:'DM Mono',monospace;font-size:11px;font-weight:700;color:${si.color}">${fmtG(g.topComm)}</span>
+    <span style="font-size:10px;font-family:'DM Mono',monospace;color:${bottomColor}"> – ${fmtG(g.bottomComm)}</span>
   </td>`;
 }
 
