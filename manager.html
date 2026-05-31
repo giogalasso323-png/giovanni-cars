@@ -3278,6 +3278,17 @@ function buildGrossSection(c) {
       Front gross: <span id="gross-range" style="color:var(--text2)">${fmtG(g.topGross)} &ndash; ${fmtG(g.bottomGross)}</span>
     </div>
     ${g.mileageAdder > 0 ? `<div style="font-size:11px;color:var(--amber);margin-bottom:10px">&minus;${fmtG(g.mileageAdder)} recon adj &middot; ${(mil/1000).toFixed(0)}K mi &middot; ${age}yr old</div>` : '<div style="margin-bottom:10px"></div>'}
+    <div style="border-top:1px solid var(--border);padding-top:10px;margin-bottom:10px">
+      <div class="field-label" style="margin-bottom:5px">Appraised Value</div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <input type="text" id="appraisal-input" value="${g.cost ? '$'+g.cost.toLocaleString() : ''}" placeholder="Not set"
+          readonly style="width:130px;background:var(--bg4);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:var(--radius);font-family:'DM Mono',monospace;font-size:13px;font-weight:600;outline:none;cursor:not-allowed;opacity:0.7"
+          onkeydown="if(event.key==='Enter')confirmAppraisalValue()">
+        <button class="mini-copy-btn" id="appraisal-edit-btn" onclick="unlockAppraisalField()">Edit</button>
+        <button class="mini-copy-btn" id="appraisal-confirm-btn" onclick="confirmAppraisalValue()" style="display:none;background:var(--green-bg);color:var(--green);border-color:var(--green)">✓ Confirm</button>
+        <span id="appraisal-hint" style="font-size:11px;color:var(--text3)">Used to calculate gross</span>
+      </div>
+    </div>
     <div style="font-size:11px;color:var(--text3);margin-bottom:12px">Cost ${fmtG(g.cost)} + Recon $2,000 + Detail $500${g.certCost?' + Cert $'+g.certCost.toLocaleString():''}</div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
       <div>
@@ -3340,6 +3351,59 @@ function grossTableCell(c) {
     <span style="font-family:'DM Mono',monospace;font-size:11px;font-weight:700;color:${si.color}">${fmtG(g.topComm)}</span>
     <span style="font-size:10px;font-family:'DM Mono',monospace;color:${bottomColor}"> – ${fmtG(g.bottomComm)}</span>
   </td>`;
+}
+
+function unlockAppraisalField() {
+  const input   = document.getElementById('appraisal-input');
+  const editBtn = document.getElementById('appraisal-edit-btn');
+  const confBtn = document.getElementById('appraisal-confirm-btn');
+  const hint    = document.getElementById('appraisal-hint');
+  if (!input) return;
+  const raw = String(input.value).replace(/[$,]/g,'').trim();
+  input.value = raw || '';
+  input.removeAttribute('readonly');
+  input.style.cursor = 'text';
+  input.style.opacity = '1';
+  input.style.borderColor = 'var(--amber)';
+  input.focus(); input.select();
+  if (editBtn) editBtn.style.display = 'none';
+  if (confBtn) confBtn.style.display = '';
+  if (hint) hint.textContent = 'Enter the correct appraised value';
+}
+
+async function confirmAppraisalValue() {
+  const c = inventory.find(x => x.vin === currentVin); if (!c) return;
+  const input   = document.getElementById('appraisal-input');
+  const editBtn = document.getElementById('appraisal-edit-btn');
+  const confBtn = document.getElementById('appraisal-confirm-btn');
+  const hint    = document.getElementById('appraisal-hint');
+  if (!input) return;
+  const val = parseFloat(String(input.value).replace(/[$,]/g,'').trim()) || 0;
+  if (!val) { showToast('Enter a valid appraisal value'); input.focus(); return; }
+  input.value = '$' + val.toLocaleString();
+  input.setAttribute('readonly','');
+  input.style.cursor = 'not-allowed';
+  input.style.opacity = '0.7';
+  input.style.borderColor = '';
+  if (editBtn) editBtn.style.display = '';
+  if (confBtn) confBtn.style.display = 'none';
+  if (hint) hint.textContent = 'Saved — recalculating…';
+  c.appraisedValue = val;
+  recalcGross();
+  const costLine = document.querySelector('#gross-section div[style*="margin-bottom:12px"]');
+  const g = calcGrossData(c, 0, 0);
+  if (costLine && g) costLine.textContent = `Cost ${fmtG(g.cost)} + Recon $2,000 + Detail $500${g.certCost?' + Cert $'+g.certCost.toLocaleString():''}`;
+  setSyncInfo('saving');
+  try {
+    await apiPost('updateField', { vin: c.vin, field: 'appraisedValue', value: val });
+    setSyncInfo('ok');
+    if (hint) hint.textContent = '✓ Saved';
+    showToast('✓ Appraised value updated');
+  } catch(e) {
+    setSyncInfo('error');
+    if (hint) hint.textContent = '✗ Save failed';
+    showToast('Save failed: ' + e.message);
+  }
 }
 
 // ── COST IMPORT ──────────────────────────────────────────────
