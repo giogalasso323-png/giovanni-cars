@@ -3361,6 +3361,11 @@ function recalcGross() {
 function grossTableCell(c) {
   const g = calcGrossData(c, 0, 0);
   if (!g) return '<td style="color:var(--text3);font-size:11px;font-family:\'DM Mono\',monospace">—</td>';
+  if (g.cost > 0 && g.cost < 500) {
+    return `<td style="white-space:nowrap">
+      <span style="font-family:'DM Mono',monospace;font-size:11px;font-weight:700;color:var(--purple)">Check Cost</span>
+    </td>`;
+  }
   return `<td style="white-space:nowrap">
     <span style="font-family:'DM Mono',monospace;font-size:11px;font-weight:700;color:${commColor(g.topComm)}">${fmtG(g.topComm)}</span>
     <span style="font-size:10px;font-family:'DM Mono',monospace;color:${commColor(g.bottomComm)}"> – ${fmtG(g.bottomComm)}</span>
