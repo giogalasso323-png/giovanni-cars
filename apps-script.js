@@ -20,7 +20,8 @@ const COLUMNS = [
   'stock','fbStatus','websiteStatus','websitePrice','fbDescription',
   'carfaxUrl','edmundsLabel','edmundsBelow','vehicleInfo',
   'vehicleHistory','features','certification','addedDate',
-  'lastChecked','fbPostedDate','soldDate','websiteUrl','fbPostedPrice','priceDropped','dis','currentFbPrice','originalPrice','drivePhotoFolder','drivePhotoCount'
+  'lastChecked','fbPostedDate','soldDate','websiteUrl','fbPostedPrice','priceDropped','dis','currentFbPrice','originalPrice','drivePhotoFolder','drivePhotoCount',
+  'appraisedValue','certCost'
 ];
 
 const LEADS_COLUMNS = [
@@ -55,6 +56,7 @@ function handleRequest(e) {
       case 'importNewCars':      result = importNewCars(body.cars, body.replace);         break;
       case 'updateNewCar':       result = updateNewCar(body.vin, body.field, body.value); break;
       case 'scrapeNewVehicles':  result = scrapeNewVehicles(body.vins);                   break;
+      case 'importCostData': result = importCostData(body.records);               break;
       case 'ping':           result = { ok: true };                                break;
       default:               result = { error: 'Unknown action: ' + action };
     }
@@ -747,6 +749,55 @@ function importNewCars(cars, replace) {
   if (nextRow < 2) nextRow = 2;
   if (rows.length > 0) sh.getRange(nextRow, 1, rows.length, NEW_INV_COLUMNS.length).setValues(rows);
   return { imported: rows.length };
+}
+
+// ── Cost Data Import ──────────────────────────────────────────
+function importCostData(records) {
+  if (!records || !records.length) return { updated: 0, notFound: 0 };
+  var sh = getSheet();
+  var map = getHeaderMap(sh);
+  var last = sh.getLastRow();
+  if (last < 2) return { updated: 0, notFound: 0 };
+
+  var apprCol = map['appraisedValue'];
+  var certCol = map['certCost'];
+  if (apprCol === undefined || certCol === undefined) return { error: 'Missing columns — redeploy Apps Script' };
+
+  var numCols = sh.getLastColumn();
+  var data = sh.getRange(2, 1, last - 1, numCols).getValues();
+
+  var stockIdx = {};
+  var vinIdx = {};
+  data.forEach(function(row, i) {
+    var stock = String(row[map['stock']] || '').toUpperCase().replace(/\s/g,'').replace(/^STK/,'');
+    var vin = norm(String(row[map['vin']] || ''));
+    if (stock) stockIdx[stock] = i;
+    if (vin) vinIdx[vin] = i;
+  });
+
+  var updated = 0, notFound = 0;
+  var rowsToWrite = {};
+
+  records.forEach(function(rec) {
+    var vin = norm(String(rec.vin || ''));
+    var stock = String(rec.stock || '').toUpperCase().replace(/\s/g,'').replace(/^STK/,'');
+    var rowIdx = -1;
+    if (vin && vinIdx[vin] !== undefined) rowIdx = vinIdx[vin];
+    else if (stock && stockIdx[stock] !== undefined) rowIdx = stockIdx[stock];
+    if (rowIdx < 0) { notFound++; return; }
+    data[rowIdx][apprCol] = Number(rec.appraisedValue) || 0;
+    data[rowIdx][certCol] = Number(rec.certCost) || 0;
+    rowsToWrite[rowIdx] = true;
+    updated++;
+  });
+
+  Object.keys(rowsToWrite).forEach(function(idxStr) {
+    var i = parseInt(idxStr);
+    sh.getRange(i + 2, apprCol + 1).setValue(data[i][apprCol]);
+    sh.getRange(i + 2, certCol + 1).setValue(data[i][certCol]);
+  });
+
+  return { updated: updated, notFound: notFound };
 }
 
 function updateNewCar(vin, field, value) {

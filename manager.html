@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Dublin Toyota — Inventory Manager</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
   :root {
@@ -345,12 +346,17 @@
       <option value="price-desc">Price High–Low</option>
       <option value="price-asc">Price Low–High</option>
       <option value="days-desc">Most Days on Lot</option>
+      <option value="gross">Gross High–Low</option>
       <option value="alpha">A–Z</option>
     </select>
     <div class="toolbar-right">
       <button class="btn" onclick="openScrapeModal()">
         <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M4 4v5h5"/><path d="M20 20v-5h-5"/><path d="M4 9a9 9 0 0115.47-3.47"/><path d="M20 15a9 9 0 01-15.47 3.47"/></svg>
         Refresh Web Data
+      </button>
+      <button class="btn" onclick="openCostImportModal()">
+        <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>
+        Import Cost Data
       </button>
       <button class="btn btn-primary" onclick="openUploadModal()">
         <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
@@ -388,6 +394,7 @@
           <th onclick="sortBy('fbStatus')">Facebook</th>
           <th onclick="sortBy('days')">Days on Lot</th>
           <th id="th-daysposted" style="display:none" onclick="sortBy('daysposted')">Days Posted</th>
+          <th onclick="sortBy('gross')">Gross</th>
           <th>Stock #</th>
         </tr></thead>
         <tbody id="table-body"></tbody>
@@ -472,6 +479,25 @@
     <div class="modal-footer">
       <button class="btn" onclick="closeNewScrapeModal()">Close</button>
       <button class="btn btn-primary" id="new-scrape-btn" onclick="startNewScrape()">Start Refresh</button>
+    </div>
+  </div>
+</div>
+
+<!-- COST IMPORT MODAL -->
+<div class="modal-overlay" id="cost-import-modal" onclick="if(event.target===this)closeCostImportModal()">
+  <div class="modal" style="width:560px;max-height:90vh;display:flex;flex-direction:column">
+    <h2>Import Cost Data</h2>
+    <p>Drop the GT report XLS here. Matches by VIN first, then Stock #. Updates Appraised Value and Cert Cost for each vehicle.</p>
+    <div class="upload-zone" id="cost-upload-zone" onclick="document.getElementById('cost-file-input').click()" ondragover="event.preventDefault();this.classList.add('drag')" ondragleave="this.classList.remove('drag')" ondrop="handleCostDrop(event)">
+      <svg width="30" height="30" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" style="color:var(--text3);margin-bottom:8px"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>
+      <p style="font-size:14px;font-weight:500;color:var(--text)">Click to browse or drag XLS here</p>
+      <p style="font-size:12px;color:var(--text3);margin-top:4px">GT DMS export (.xls, .xlsx)</p>
+    </div>
+    <input type="file" id="cost-file-input" accept=".xls,.xlsx" style="display:none" onchange="handleCostFileSelect(this)">
+    <div id="cost-preview" style="margin-top:14px;font-size:13px;color:var(--text2);overflow-y:auto;max-height:240px;display:none"></div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeCostImportModal()">Cancel</button>
+      <button class="btn btn-primary" id="cost-import-btn" onclick="doImportCost()" disabled>Import</button>
     </div>
   </div>
 </div>
@@ -741,7 +767,7 @@ async function loadFromSheet() {
   try {
     const res = await apiGet('getAll');
     if (res.error) throw new Error(res.error);
-    inventory = (res.cars||[]).map(c => ({ ...c, mileage: Number(c.mileage)||0, price: Number(c.price)||0, websitePrice: Number(c.websitePrice)||0 }));
+    inventory = (res.cars||[]).map(c => ({ ...c, mileage: Number(c.mileage)||0, price: Number(c.price)||0, websitePrice: Number(c.websitePrice)||0, appraisedValue: Number(c.appraisedValue)||0, certCost: Number(c.certCost)||0 }));
     render(); setSyncInfo('ok');
   } catch(e) { setSyncInfo('error'); showToast('Sheet load error: ' + e.message); }
 }
@@ -910,6 +936,7 @@ function applyFilters() {
     if(sortKey==='fb-desc') return (b.fbStatus||'').localeCompare(a.fbStatus||'');
     if(sortKey==='daysposted-desc') { const da=a.fbPostedDate?Math.floor((Date.now()-new Date(a.fbPostedDate))/86400000):0; const db=b.fbPostedDate?Math.floor((Date.now()-new Date(b.fbPostedDate))/86400000):0; return db-da; }
     if(sortKey==='daysposted-asc') { const da=a.fbPostedDate?Math.floor((Date.now()-new Date(a.fbPostedDate))/86400000):0; const db=b.fbPostedDate?Math.floor((Date.now()-new Date(b.fbPostedDate))/86400000):0; return da-db; }
+    if(sortKey==='gross') { const ga=calcGrossData(a,0,0),gb=calcGrossData(b,0,0); return (gb?gb.topGross:-999999)-(ga?ga.topGross:-999999); }
     // Live tab default: fewest days on lot first (newest cars at top)
     if(activeFilter==='live') return daysOnLot(a) - daysOnLot(b);
     return 0;
@@ -929,7 +956,7 @@ function renderTable() {
   document.getElementById('table-view').style.display='block'; document.getElementById('card-view').style.display='none';
   const tb=document.getElementById('table-body');
   const isPostedTab = activeFilter==='posted';
-  if(!filtered.length){ tb.innerHTML=`<tr><td colspan="${isPostedTab?9:8}" style="text-align:center;padding:40px;color:var(--text3)">No vehicles match</td></tr>`; return; }
+  if(!filtered.length){ tb.innerHTML=`<tr><td colspan="${isPostedTab?10:9}" style="text-align:center;padding:40px;color:var(--text3)">No vehicles match</td></tr>`; return; }
   tb.innerHTML=filtered.map(c=>{
     const d=daysOnLot(c), chk=selectedVins.has(c.vin)?'checked':'';
     const isActive = c.vin===lastOpenedVin;
@@ -961,6 +988,7 @@ function renderTable() {
       <td>${fbBadge(c)}</td>
       <td><span class="days-badge ${daysClass(d)}">${d}d</span></td>
       ${isPostedTab?`<td><span class="days-badge ${daysClass(daysPosted)}">${daysPosted}d posted</span></td>`:''}
+      ${grossTableCell(c)}
       <td style="color:var(--text3)">${c.stock||'—'}</td>
     </tr>`;
   }).join('');
@@ -1013,6 +1041,7 @@ const SORT_TOGGLE = {
   'fbStatus': ['fb-asc','fb-desc'],
   'days':     ['days-desc','days-asc'],
   'daysposted': ['daysposted-desc','daysposted-asc'],
+  'gross':    ['gross','gross'],
 };
 const SORT_COL_LABELS = {
   'alpha':'Vehicle','alpha-desc':'Vehicle',
@@ -1029,8 +1058,8 @@ function sortBy(col){
   render();
 }
 function updateSortHeaders(){
-  const colMap = {'alpha':'title','alpha-desc':'title','price-desc':'price','price-asc':'price','mileage-asc':'mileage','mileage-desc':'mileage','status-asc':'status','status-desc':'status','fb-asc':'fbStatus','fb-desc':'fbStatus','days-desc':'days','days-asc':'days','daysposted-desc':'daysposted','daysposted-asc':'daysposted'};
-  const labels = {'title':'Vehicle','price':'Price','mileage':'Miles','status':'Website','fbStatus':'Facebook','days':'Days on Lot','daysposted':'Days Posted'};
+  const colMap = {'alpha':'title','alpha-desc':'title','price-desc':'price','price-asc':'price','mileage-asc':'mileage','mileage-desc':'mileage','status-asc':'status','status-desc':'status','fb-asc':'fbStatus','fb-desc':'fbStatus','days-desc':'days','days-asc':'days','daysposted-desc':'daysposted','daysposted-asc':'daysposted','gross':'gross'};
+  const labels = {'title':'Vehicle','price':'Price','mileage':'Miles','status':'Website','fbStatus':'Facebook','days':'Days on Lot','daysposted':'Days Posted','gross':'Gross'};
   document.querySelectorAll('#table-head-row th[onclick]').forEach(th=>{
     const col=th.getAttribute('onclick').replace("sortBy('","").replace("')","");
     const label=labels[col]||col;
@@ -1466,6 +1495,9 @@ function renderDrawer(c){
     <div style="font-size:11px;color:var(--text3);margin-top:4px" id="fb-price-hint">Copy Website Price above to unlock this field</div>
     <div style="font-size:11px;color:var(--text3);margin-top:4px">Copy Website Price above to unlock this field</div>
   </div>`;
+
+  // ── GROSS ANALYSIS ────────────────────────────────────────
+  h += buildGrossSection(c);
 
   // ── VIN / STOCK ───────────────────────────────────────────
   h+=`<div class="field-row">
@@ -3146,6 +3178,265 @@ async function doImportNewCars() {
   } catch(e) {
     showToast('Import failed: ' + e.message);
     btn.textContent = 'Import'; btn.disabled = false;
+  }
+}
+
+// ── GROSS CALCULATION ────────────────────────────────────────
+
+const MILEAGE_AGE_MATRIX = [
+  [   0,  300,  750, 1250, 2000],
+  [ 300,  600, 1100, 1700, 2500],
+  [ 600, 1000, 1600, 2200, 2500],
+  [1000, 1500, 2200, 2500, 2500],
+];
+
+function getMileageBracket(mil) {
+  if (mil < 30000) return 0;
+  if (mil < 60000) return 1;
+  if (mil < 90000) return 2;
+  if (mil < 120000) return 3;
+  return 4;
+}
+
+function getAgeBracket(year) {
+  const age = new Date().getFullYear() - parseInt(year);
+  if (age <= 3) return 0;
+  if (age <= 6) return 1;
+  if (age <= 10) return 2;
+  return 3;
+}
+
+function getMileageAdder(mil, year) {
+  if (!mil || !year) return 0;
+  return MILEAGE_AGE_MATRIX[getAgeBracket(year)][getMileageBracket(mil)];
+}
+
+function calcGrossData(c, productPrice, carDiscount) {
+  const sticker = c.websitePrice || c.price || 0;
+  const cost = Number(c.appraisedValue) || 0;
+  if (!cost || !sticker) return null;
+  const certCost = Number(c.certCost) > 0 ? Number(c.certCost) :
+    (c.certification && c.certification.includes('Toyota Certified') ? 650 : 0);
+  const fixedCosts = 2000 + 500 + certCost;
+  const mileageAdder = getMileageAdder(Number(c.mileage) || 0, c.year);
+  const productGross = (productPrice || 0) > 0 ? ((productPrice || 0) - 750) : 0;
+  const discount = carDiscount || 0;
+  const topGross = sticker - cost - fixedCosts + productGross - discount;
+  const bottomGross = topGross - mileageAdder;
+  return {
+    topGross, bottomGross, mileageAdder,
+    topComm: Math.max(Math.round(topGross * 0.25), 500),
+    bottomComm: Math.max(Math.round(bottomGross * 0.25), 500),
+    certCost, fixedCosts, cost, sticker
+  };
+}
+
+function fmtG(n) {
+  if (n == null) return '—';
+  const abs = Math.abs(Math.round(n));
+  const str = '$' + abs.toLocaleString();
+  return n < 0 ? '(' + str + ')' : str;
+}
+
+function grossStatusInfo(bottomGross, topGross) {
+  if (topGross < 2000) return { label: 'Mini', color: 'var(--red)', bg: 'var(--red-bg)' };
+  if (bottomGross < 2000) return { label: 'Saveable', color: 'var(--amber)', bg: 'var(--amber-bg)' };
+  return { label: 'Has Money', color: 'var(--green)', bg: 'var(--green-bg)' };
+}
+
+function buildGrossStatusBadge(bottomGross, topGross) {
+  const si = grossStatusInfo(bottomGross, topGross);
+  return `<span style="display:inline-flex;align-items:center;padding:3px 10px;border-radius:4px;font-size:11px;font-weight:700;background:${si.bg};color:${si.color}">${si.label}</span>`;
+}
+
+function buildGrossSection(c) {
+  const g = calcGrossData(c, 0, 0);
+  if (!g) return '';
+  const age = new Date().getFullYear() - parseInt(c.year || '0');
+  const mil = Number(c.mileage) || 0;
+  return `
+  <div class="section-title">Gross Analysis</div>
+  <div id="gross-section" style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px;margin-bottom:16px">
+    <div style="font-size:11px;color:var(--text3);margin-bottom:8px">Cost ${fmtG(g.cost)} + Recon $2,000 + Detail $500${g.certCost?' + Cert $'+g.certCost.toLocaleString():''} = all-in ${fmtG(g.cost + g.fixedCosts)}</div>
+    <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:4px">
+      <span id="gross-range" style="font-family:'DM Mono',monospace;font-size:22px;font-weight:700;color:var(--text)">${fmtG(g.bottomGross)} &ndash; ${fmtG(g.topGross)}</span>
+      <span style="font-size:11px;color:var(--text3)">front gross</span>
+    </div>
+    <div style="font-size:13px;color:var(--text2);margin-bottom:4px">
+      Commission: <span id="comm-range" style="font-weight:600;color:var(--text)">${fmtG(g.bottomComm)} &ndash; ${fmtG(g.topComm)}</span>
+    </div>
+    ${g.mileageAdder > 0 ? `<div style="font-size:11px;color:var(--amber);margin-bottom:8px">&minus;${fmtG(g.mileageAdder)} recon adj &middot; ${(mil/1000).toFixed(0)}K mi &middot; ${age}yr old</div>` : '<div style="margin-bottom:8px"></div>'}
+    <div id="gross-badge" style="margin-bottom:14px">${buildGrossStatusBadge(g.bottomGross, g.topGross)}</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      <div>
+        <div class="field-label" style="margin-bottom:5px">Protection Product ($)</div>
+        <input type="number" id="gross-product-input" min="0" step="100" placeholder="Selling price…"
+          style="width:100%;background:var(--bg4);border:1px solid var(--border2);color:var(--text);padding:7px 10px;border-radius:var(--radius);font-family:'DM Mono',monospace;font-size:13px;outline:none"
+          oninput="recalcGross()">
+        <div style="font-size:11px;color:var(--text3);margin-top:3px">Dealer cost $750 &mdash; sell at $1,500 &rarr; +$750 gross</div>
+      </div>
+      <div>
+        <div class="field-label" style="margin-bottom:5px">Car Discount ($)</div>
+        <input type="number" id="gross-discount-input" min="0" step="100" placeholder="Discount off sticker…"
+          style="width:100%;background:var(--bg4);border:1px solid var(--border2);color:var(--text);padding:7px 10px;border-radius:var(--radius);font-family:'DM Mono',monospace;font-size:13px;outline:none"
+          oninput="recalcGross()">
+        <div style="font-size:11px;color:var(--text3);margin-top:3px">Reduces gross dollar-for-dollar</div>
+      </div>
+    </div>
+  </div>`;
+}
+
+function recalcGross() {
+  const c = inventory.find(x => x.vin === currentVin); if (!c) return;
+  const productPrice = Number(document.getElementById('gross-product-input')?.value) || 0;
+  const carDiscount  = Number(document.getElementById('gross-discount-input')?.value) || 0;
+  const g = calcGrossData(c, productPrice, carDiscount); if (!g) return;
+  const rangeEl = document.getElementById('gross-range');
+  const commEl  = document.getElementById('comm-range');
+  const badgeEl = document.getElementById('gross-badge');
+  if (rangeEl) rangeEl.innerHTML = fmtG(g.bottomGross) + ' &ndash; ' + fmtG(g.topGross);
+  if (commEl)  commEl.innerHTML  = fmtG(g.bottomComm) + ' &ndash; ' + fmtG(g.topComm);
+  if (badgeEl) badgeEl.innerHTML = buildGrossStatusBadge(g.bottomGross, g.topGross);
+}
+
+function grossTableCell(c) {
+  const g = calcGrossData(c, 0, 0);
+  if (!g) return '<td style="color:var(--text3);font-size:11px;font-family:\'DM Mono\',monospace">—</td>';
+  const si = grossStatusInfo(g.bottomGross, g.topGross);
+  return `<td style="white-space:nowrap">
+    <span style="font-family:'DM Mono',monospace;font-size:11px;font-weight:600;color:${si.color}">${fmtG(g.bottomGross)}</span>
+    <span style="font-size:10px;color:var(--text3)"> – ${fmtG(g.topGross)}</span>
+  </td>`;
+}
+
+// ── COST IMPORT ──────────────────────────────────────────────
+
+let pendingCostRecords = [];
+
+function openCostImportModal() {
+  pendingCostRecords = [];
+  document.getElementById('cost-import-btn').disabled = true;
+  document.getElementById('cost-preview').style.display = 'none';
+  document.getElementById('cost-preview').innerHTML = '';
+  document.getElementById('cost-upload-zone').classList.remove('drag');
+  document.getElementById('cost-import-modal').classList.add('open');
+}
+
+function closeCostImportModal() {
+  document.getElementById('cost-import-modal').classList.remove('open');
+  pendingCostRecords = [];
+}
+
+function handleCostDrop(e) {
+  e.preventDefault();
+  document.getElementById('cost-upload-zone').classList.remove('drag');
+  const file = e.dataTransfer.files[0];
+  if (file) readCostXLS(file);
+}
+
+function handleCostFileSelect(input) {
+  if (input.files[0]) readCostXLS(input.files[0]);
+  input.value = '';
+}
+
+function readCostXLS(file) {
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const data = new Uint8Array(e.target.result);
+      const wb = XLSX.read(data, { type: 'array' });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(ws, { defval: '' });
+      showCostPreview(rows, file.name);
+    } catch(err) {
+      showToast('Could not parse file: ' + err.message);
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function showCostPreview(rows, fileName) {
+  const norm = s => String(s).toLowerCase().replace(/[^a-z0-9]/g, '');
+  const findKey = (row, ...terms) => {
+    const keys = Object.keys(row);
+    for (const t of terms) {
+      const k = keys.find(k => norm(k).includes(norm(t)));
+      if (k !== undefined) return row[k];
+    }
+    return '';
+  };
+
+  pendingCostRecords = rows.map(row => {
+    const rawStock = String(findKey(row, 'stock') || '').trim();
+    const rawVin   = String(findKey(row, 'vin')   || '').trim();
+    const rawCost  = String(findKey(row, 'appraised', 'appraise') || findKey(row, 'cost') || '').replace(/[^0-9.]/g,'');
+    const rawCert  = String(findKey(row, 'cert') || '').replace(/[^0-9.]/g,'');
+    return {
+      stock: rawStock.replace(/^STK/i,'').trim(),
+      vin:   normVin(rawVin),
+      appraisedValue: parseFloat(rawCost) || 0,
+      certCost:       parseFloat(rawCert) || 0,
+    };
+  }).filter(r => (r.vin || r.stock) && r.appraisedValue > 0);
+
+  const preview = document.getElementById('cost-preview');
+  preview.style.display = 'block';
+
+  if (!pendingCostRecords.length) {
+    preview.innerHTML = `<span style="color:var(--red)">✗ No usable rows found. Check that the file has Stock #, VIN, and Appraised Value columns.</span>`;
+    document.getElementById('cost-import-btn').disabled = true;
+    return;
+  }
+
+  const matched = pendingCostRecords.filter(r =>
+    inventory.find(c => (r.vin && c.vin === r.vin) || (r.stock && c.stock === r.stock))
+  ).length;
+
+  preview.innerHTML = `
+    <div style="margin-bottom:10px">
+      <span style="color:var(--green)">✓</span> Found <strong style="color:var(--text)">${pendingCostRecords.length}</strong> records in <em>${fileName}</em> —
+      <span style="color:var(--text2)">${matched} match current inventory</span>
+    </div>
+    <table style="width:100%;border-collapse:collapse;font-size:12px">
+      <thead><tr>
+        <th style="text-align:left;padding:4px 8px;color:var(--text3);border-bottom:1px solid var(--border)">Stock #</th>
+        <th style="text-align:left;padding:4px 8px;color:var(--text3);border-bottom:1px solid var(--border)">VIN</th>
+        <th style="text-align:right;padding:4px 8px;color:var(--text3);border-bottom:1px solid var(--border)">Appraised</th>
+        <th style="text-align:right;padding:4px 8px;color:var(--text3);border-bottom:1px solid var(--border)">Cert</th>
+        <th style="text-align:center;padding:4px 8px;color:var(--text3);border-bottom:1px solid var(--border)">Match</th>
+      </tr></thead>
+      <tbody>${pendingCostRecords.map(r => {
+        const inv = inventory.find(c => (r.vin && c.vin === r.vin) || (r.stock && c.stock === r.stock));
+        return `<tr>
+          <td style="padding:4px 8px;font-family:'DM Mono',monospace;color:var(--text2)">${r.stock||'—'}</td>
+          <td style="padding:4px 8px;font-family:'DM Mono',monospace;font-size:10px;color:var(--text3)">${r.vin||'—'}</td>
+          <td style="padding:4px 8px;text-align:right;color:var(--text)">${r.appraisedValue?'$'+r.appraisedValue.toLocaleString():'—'}</td>
+          <td style="padding:4px 8px;text-align:right;color:var(--text2)">${r.certCost?'$'+r.certCost.toLocaleString():'—'}</td>
+          <td style="padding:4px 8px;text-align:center">${inv?'<span style="color:var(--green)">✓</span>':'<span style="color:var(--text3)">—</span>'}</td>
+        </tr>`;
+      }).join('')}</tbody>
+    </table>`;
+  document.getElementById('cost-import-btn').disabled = matched === 0;
+}
+
+async function doImportCost() {
+  if (!pendingCostRecords.length) return;
+  const btn = document.getElementById('cost-import-btn');
+  btn.disabled = true; btn.textContent = 'Importing…';
+  try {
+    const res = await apiPost('importCostData', { records: pendingCostRecords });
+    if (res.error) throw new Error(res.error);
+    (res.updated || []).forEach(u => {
+      const c = inventory.find(x => x.vin === u.vin);
+      if (c) { c.appraisedValue = u.appraisedValue; c.certCost = u.certCost; }
+    });
+    const count = (res.updated || []).length;
+    showToast(`✓ Updated ${count} vehicle${count!==1?'s':''}`);
+    closeCostImportModal();
+    render();
+  } catch(e) {
+    showToast('Import failed: ' + e.message);
+    btn.disabled = false; btn.textContent = 'Import';
   }
 }
 
