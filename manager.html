@@ -394,7 +394,7 @@
           <th onclick="sortBy('fbStatus')">Facebook</th>
           <th onclick="sortBy('days')">Days on Lot</th>
           <th id="th-daysposted" style="display:none" onclick="sortBy('daysposted')">Days Posted</th>
-          <th onclick="sortBy('gross')">Gross</th>
+          <th onclick="sortBy('gross')">Commission</th>
           <th>Stock #</th>
         </tr></thead>
         <tbody id="table-body"></tbody>
@@ -3254,33 +3254,34 @@ function buildGrossSection(c) {
   if (!g) return '';
   const age = new Date().getFullYear() - parseInt(c.year || '0');
   const mil = Number(c.mileage) || 0;
+  const si = grossStatusInfo(g.bottomGross, g.topGross);
   return `
-  <div class="section-title">Gross Analysis</div>
+  <div class="section-title">Commission Estimate</div>
   <div id="gross-section" style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px;margin-bottom:16px">
-    <div style="font-size:11px;color:var(--text3);margin-bottom:8px">Cost ${fmtG(g.cost)} + Recon $2,000 + Detail $500${g.certCost?' + Cert $'+g.certCost.toLocaleString():''} = all-in ${fmtG(g.cost + g.fixedCosts)}</div>
-    <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:4px">
-      <span id="gross-range" style="font-family:'DM Mono',monospace;font-size:22px;font-weight:700;color:var(--text)">${fmtG(g.bottomGross)} &ndash; ${fmtG(g.topGross)}</span>
-      <span style="font-size:11px;color:var(--text3)">front gross</span>
+    <div id="gross-badge" style="margin-bottom:10px">${buildGrossStatusBadge(g.bottomGross, g.topGross)}</div>
+    <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:2px">
+      <span id="comm-range" style="font-family:'DM Mono',monospace;font-size:26px;font-weight:700;color:${si.color}">${fmtG(g.bottomComm)} &ndash; ${fmtG(g.topComm)}</span>
+      <span style="font-size:11px;color:var(--text3)">your check</span>
     </div>
-    <div style="font-size:13px;color:var(--text2);margin-bottom:4px">
-      Commission: <span id="comm-range" style="font-weight:600;color:var(--text)">${fmtG(g.bottomComm)} &ndash; ${fmtG(g.topComm)}</span>
+    <div style="font-size:12px;color:var(--text3);margin-bottom:4px">
+      Front gross: <span id="gross-range" style="color:var(--text2)">${fmtG(g.bottomGross)} &ndash; ${fmtG(g.topGross)}</span>
     </div>
-    ${g.mileageAdder > 0 ? `<div style="font-size:11px;color:var(--amber);margin-bottom:8px">&minus;${fmtG(g.mileageAdder)} recon adj &middot; ${(mil/1000).toFixed(0)}K mi &middot; ${age}yr old</div>` : '<div style="margin-bottom:8px"></div>'}
-    <div id="gross-badge" style="margin-bottom:14px">${buildGrossStatusBadge(g.bottomGross, g.topGross)}</div>
+    ${g.mileageAdder > 0 ? `<div style="font-size:11px;color:var(--amber);margin-bottom:10px">&minus;${fmtG(g.mileageAdder)} recon adj &middot; ${(mil/1000).toFixed(0)}K mi &middot; ${age}yr old</div>` : '<div style="margin-bottom:10px"></div>'}
+    <div style="font-size:11px;color:var(--text3);margin-bottom:12px">Cost ${fmtG(g.cost)} + Recon $2,000 + Detail $500${g.certCost?' + Cert $'+g.certCost.toLocaleString():''}</div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
       <div>
-        <div class="field-label" style="margin-bottom:5px">Protection Product ($)</div>
-        <input type="number" id="gross-product-input" min="0" step="100" placeholder="Selling price…"
+        <div class="field-label" style="margin-bottom:5px">Sell Protection Product ($)</div>
+        <input type="number" id="gross-product-input" min="0" step="100" placeholder="Your selling price…"
           style="width:100%;background:var(--bg4);border:1px solid var(--border2);color:var(--text);padding:7px 10px;border-radius:var(--radius);font-family:'DM Mono',monospace;font-size:13px;outline:none"
           oninput="recalcGross()">
-        <div style="font-size:11px;color:var(--text3);margin-top:3px">Dealer cost $750 &mdash; sell at $1,500 &rarr; +$750 gross</div>
+        <div id="product-impact" style="font-size:11px;color:var(--text3);margin-top:3px">Dealer cost $750</div>
       </div>
       <div>
-        <div class="field-label" style="margin-bottom:5px">Car Discount ($)</div>
-        <input type="number" id="gross-discount-input" min="0" step="100" placeholder="Discount off sticker…"
+        <div class="field-label" style="margin-bottom:5px">Discount Car ($)</div>
+        <input type="number" id="gross-discount-input" min="0" step="100" placeholder="Off sticker…"
           style="width:100%;background:var(--bg4);border:1px solid var(--border2);color:var(--text);padding:7px 10px;border-radius:var(--radius);font-family:'DM Mono',monospace;font-size:13px;outline:none"
           oninput="recalcGross()">
-        <div style="font-size:11px;color:var(--text3);margin-top:3px">Reduces gross dollar-for-dollar</div>
+        <div id="discount-impact" style="font-size:11px;color:var(--text3);margin-top:3px">Comes out of your check</div>
       </div>
     </div>
   </div>`;
@@ -3291,12 +3292,29 @@ function recalcGross() {
   const productPrice = Number(document.getElementById('gross-product-input')?.value) || 0;
   const carDiscount  = Number(document.getElementById('gross-discount-input')?.value) || 0;
   const g = calcGrossData(c, productPrice, carDiscount); if (!g) return;
-  const rangeEl = document.getElementById('gross-range');
-  const commEl  = document.getElementById('comm-range');
-  const badgeEl = document.getElementById('gross-badge');
+  const si = grossStatusInfo(g.bottomGross, g.topGross);
+  const rangeEl   = document.getElementById('gross-range');
+  const commEl    = document.getElementById('comm-range');
+  const badgeEl   = document.getElementById('gross-badge');
+  const prodImpEl = document.getElementById('product-impact');
+  const discImpEl = document.getElementById('discount-impact');
+  if (commEl)  { commEl.innerHTML = fmtG(g.bottomComm) + ' &ndash; ' + fmtG(g.topComm); commEl.style.color = si.color; }
   if (rangeEl) rangeEl.innerHTML = fmtG(g.bottomGross) + ' &ndash; ' + fmtG(g.topGross);
-  if (commEl)  commEl.innerHTML  = fmtG(g.bottomComm) + ' &ndash; ' + fmtG(g.topComm);
   if (badgeEl) badgeEl.innerHTML = buildGrossStatusBadge(g.bottomGross, g.topGross);
+  if (prodImpEl && productPrice > 0) {
+    const commLift = Math.round((productPrice - 750) * 0.25);
+    prodImpEl.innerHTML = commLift > 0
+      ? `<span style="color:var(--green)">+${fmtG(commLift)} to your check</span>`
+      : `<span style="color:var(--red)">${fmtG(commLift)} (selling below cost)</span>`;
+  } else if (prodImpEl) {
+    prodImpEl.textContent = 'Dealer cost $750';
+  }
+  if (discImpEl && carDiscount > 0) {
+    const commHit = Math.round(carDiscount * 0.25);
+    discImpEl.innerHTML = `<span style="color:var(--red)">&minus;${fmtG(commHit)} from your check</span>`;
+  } else if (discImpEl) {
+    discImpEl.textContent = 'Comes out of your check';
+  }
 }
 
 function grossTableCell(c) {
@@ -3304,8 +3322,8 @@ function grossTableCell(c) {
   if (!g) return '<td style="color:var(--text3);font-size:11px;font-family:\'DM Mono\',monospace">—</td>';
   const si = grossStatusInfo(g.bottomGross, g.topGross);
   return `<td style="white-space:nowrap">
-    <span style="font-family:'DM Mono',monospace;font-size:11px;font-weight:600;color:${si.color}">${fmtG(g.bottomGross)}</span>
-    <span style="font-size:10px;color:var(--text3)"> – ${fmtG(g.topGross)}</span>
+    <span style="font-family:'DM Mono',monospace;font-size:11px;font-weight:700;color:${si.color}">${fmtG(g.bottomComm)}</span>
+    <span style="font-size:10px;color:var(--text3)"> – ${fmtG(g.topComm)}</span>
   </td>`;
 }
 
