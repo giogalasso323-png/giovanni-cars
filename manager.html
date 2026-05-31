@@ -16,6 +16,7 @@
     --green: #3fb950; --green-bg: rgba(63,185,80,0.12);
     --amber: #f0a030; --amber-bg: rgba(240,160,48,0.12);
     --blue: #4a9eff; --blue-bg: rgba(74,158,255,0.12);
+    --purple: #a78bfa; --purple-bg: rgba(167,139,250,0.12);
     --accent: #e8473f; --radius: 8px; --radius-lg: 12px;
   }
   body { font-family: 'Syne', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; font-size: 14px; }
@@ -3244,7 +3245,8 @@ function fmtG(n) {
   return n < 0 ? '(' + str + ')' : str;
 }
 
-function grossStatusInfo(bottomGross, topGross, miniGrossThreshold) {
+function grossStatusInfo(bottomGross, topGross, miniGrossThreshold, cost) {
+  if (cost > 0 && cost < 500) return { label: 'Check Cost', color: 'var(--purple)', bg: 'var(--purple-bg)' };
   const thresh = miniGrossThreshold || 2000;
   if (topGross < thresh) return { label: 'Mini', color: 'var(--red)', bg: 'var(--red-bg)' };
   if (bottomGross < thresh) return { label: 'Saveable', color: 'var(--amber)', bg: 'var(--amber-bg)' };
@@ -3252,7 +3254,7 @@ function grossStatusInfo(bottomGross, topGross, miniGrossThreshold) {
 }
 
 function buildGrossStatusBadge(g) {
-  const si = grossStatusInfo(g.bottomGross, g.topGross, g.miniGrossThreshold);
+  const si = grossStatusInfo(g.bottomGross, g.topGross, g.miniGrossThreshold, g.cost);
   const miniNote = g.miniFloor === 150 ? ' · T-Stock $150 min' : '';
   return `<span style="display:inline-flex;align-items:center;padding:3px 10px;border-radius:4px;font-size:11px;font-weight:700;background:${si.bg};color:${si.color}">${si.label}${miniNote}</span>`;
 }
@@ -3262,7 +3264,7 @@ function buildGrossSection(c) {
   if (!g) return '';
   const age = new Date().getFullYear() - parseInt(c.year || '0');
   const mil = Number(c.mileage) || 0;
-  const si = grossStatusInfo(g.bottomGross, g.topGross, g.miniGrossThreshold);
+  const si = grossStatusInfo(g.bottomGross, g.topGross, g.miniGrossThreshold, g.cost);
   const bottomColor = g.bottomGross >= g.miniGrossThreshold ? 'var(--green)' : 'var(--text3)';
   return `
   <div class="section-title">Commission Estimate</div>
@@ -3314,7 +3316,7 @@ function recalcGross() {
   const productPrice = Number(document.getElementById('gross-product-input')?.value) || 0;
   const carDiscount  = Number(document.getElementById('gross-discount-input')?.value) || 0;
   const g = calcGrossData(c, productPrice, carDiscount); if (!g) return;
-  const si = grossStatusInfo(g.bottomGross, g.topGross, g.miniGrossThreshold);
+  const si = grossStatusInfo(g.bottomGross, g.topGross, g.miniGrossThreshold, g.cost);
   const bottomColor = g.bottomGross >= g.miniGrossThreshold ? 'var(--green)' : 'var(--text3)';
   const topEl     = document.getElementById('comm-top');
   const bottomEl  = document.getElementById('comm-bottom');
@@ -3345,7 +3347,7 @@ function recalcGross() {
 function grossTableCell(c) {
   const g = calcGrossData(c, 0, 0);
   if (!g) return '<td style="color:var(--text3);font-size:11px;font-family:\'DM Mono\',monospace">—</td>';
-  const si = grossStatusInfo(g.bottomGross, g.topGross, g.miniGrossThreshold);
+  const si = grossStatusInfo(g.bottomGross, g.topGross, g.miniGrossThreshold, g.cost);
   const bottomColor = g.bottomGross >= g.miniGrossThreshold ? 'var(--green)' : 'var(--text3)';
   return `<td style="white-space:nowrap">
     <span style="font-family:'DM Mono',monospace;font-size:11px;font-weight:700;color:${si.color}">${fmtG(g.topComm)}</span>
