@@ -184,8 +184,12 @@
   .toast { position: fixed; bottom: 28px; left: 50%; transform: translateX(-50%); background: var(--bg4); border: 1px solid var(--border2); color: var(--text); padding: 10px 20px; border-radius: var(--radius); font-size: 13px; z-index: 500; opacity: 0; transition: opacity 0.2s; pointer-events: none; white-space: nowrap; }
   .toast.show { opacity: 1; }
   input[type="checkbox"] { width: 15px; height: 15px; accent-color: var(--accent); cursor: pointer; }
-  .gp-value { filter: blur(5px); transition: filter 0.2s; user-select: none; }
-  tbody tr:hover .gp-value { filter: none; }
+  .gp-bar { display: inline-block; height: 7px; border-radius: 2px; vertical-align: middle; opacity: 0.7; }
+  .gp-num { display: none; font-family: 'DM Mono', monospace; }
+  .gp-gap { display: inline-block; width: 5px; }
+  .gp-dash { display: none; font-size: 10px; color: var(--text3); }
+  tbody tr:hover .gp-bar, tbody tr:hover .gp-gap { display: none; }
+  tbody tr:hover .gp-num, tbody tr:hover .gp-dash { display: inline; }
 
   /* LEADS */
   .leads-view { display: none; }
@@ -349,7 +353,7 @@
       <option value="price-desc">Price High–Low</option>
       <option value="price-asc">Price Low–High</option>
       <option value="days-desc">Most Days on Lot</option>
-      <option value="gross">Gross High–Low</option>
+      <option value="gross">GP High–Low</option>
       <option value="alpha">A–Z</option>
     </select>
     <div class="toolbar-right">
@@ -1062,7 +1066,7 @@ function sortBy(col){
 }
 function updateSortHeaders(){
   const colMap = {'alpha':'title','alpha-desc':'title','price-desc':'price','price-asc':'price','mileage-asc':'mileage','mileage-desc':'mileage','status-asc':'status','status-desc':'status','fb-asc':'fbStatus','fb-desc':'fbStatus','days-desc':'days','days-asc':'days','daysposted-desc':'daysposted','daysposted-asc':'daysposted','gross':'gross'};
-  const labels = {'title':'Vehicle','price':'Price','mileage':'Miles','status':'Website','fbStatus':'Facebook','days':'Days on Lot','daysposted':'Days Posted','gross':'Gross'};
+  const labels = {'title':'Vehicle','price':'Price','mileage':'Miles','status':'Website','fbStatus':'Facebook','days':'Days on Lot','daysposted':'Days Posted','gross':'GP'};
   document.querySelectorAll('#table-head-row th[onclick]').forEach(th=>{
     const col=th.getAttribute('onclick').replace("sortBy('","").replace("')","");
     const label=labels[col]||col;
@@ -3365,12 +3369,19 @@ function grossTableCell(c) {
   if (!g) return '<td style="color:var(--text3);font-size:11px;font-family:\'DM Mono\',monospace">—</td>';
   if (g.cost > 0 && g.cost < 500) {
     return `<td style="white-space:nowrap">
-      <span class="gp-value" style="font-family:'DM Mono',monospace;font-size:11px;font-weight:700;color:var(--purple)">Check Cost</span>
+      <span class="gp-bar" style="background:var(--purple);width:46px"></span>
+      <span class="gp-num" style="font-size:11px;font-weight:700;color:var(--purple)">Check Cost</span>
     </td>`;
   }
+  const tc = commColor(g.topComm);
+  const bc = commColor(g.bottomComm);
   return `<td style="white-space:nowrap">
-    <span class="gp-value" style="font-family:'DM Mono',monospace;font-size:11px;font-weight:700;color:${commColor(g.topComm)}">${fmtG(g.topComm)}</span>
-    <span class="gp-value" style="font-size:10px;font-family:'DM Mono',monospace;color:${commColor(g.bottomComm)}"> – ${fmtG(g.bottomComm)}</span>
+    <span class="gp-bar" style="background:${tc};width:26px"></span>
+    <span class="gp-gap"></span>
+    <span class="gp-bar" style="background:${bc};width:20px"></span>
+    <span class="gp-num" style="font-size:11px;font-weight:700;color:${tc}">${fmtG(g.topComm)}</span>
+    <span class="gp-dash"> &ndash; </span>
+    <span class="gp-num" style="font-size:10px;color:${bc}">${fmtG(g.bottomComm)}</span>
   </td>`;
 }
 
