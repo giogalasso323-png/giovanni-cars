@@ -3542,11 +3542,12 @@ async function doImportCost() {
   try {
     const res = await apiPost('importCostData', { records: pendingCostRecords });
     if (res.error) throw new Error(res.error);
-    (res.updated || []).forEach(u => {
-      const c = inventory.find(x => x.vin === u.vin);
-      if (c) { c.appraisedValue = u.appraisedValue; c.certCost = u.certCost; }
+    // Update local inventory from the records we sent (backend returns a count, not an array)
+    pendingCostRecords.forEach(r => {
+      const c = inventory.find(x => (r.vin && x.vin === r.vin) || (r.stock && x.stock === r.stock));
+      if (c) { c.appraisedValue = r.appraisedValue; c.certCost = r.certCost; }
     });
-    const count = (res.updated || []).length;
+    const count = typeof res.updated === 'number' ? res.updated : pendingCostRecords.length;
     showToast(`✓ Updated ${count} vehicle${count!==1?'s':''}`);
     closeCostImportModal();
     render();
