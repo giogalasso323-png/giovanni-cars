@@ -232,6 +232,26 @@
   .chip:hover { border-color: var(--blue); color: var(--blue); }
   .chip.selected { background: var(--blue-bg); border-color: var(--blue); color: var(--blue); font-weight: 600; }
 
+  /* FLOOR VIEW */
+  .floor-view-inner { max-width: 600px; margin: 0 auto; padding: 12px 12px 80px; }
+  .floor-toolbar { display: flex; align-items: center; justify-content: space-between; padding: 10px 16px; border-bottom: 1px solid var(--border); background: var(--bg2); }
+  .floor-toolbar h2 { font-size: 15px; font-weight: 700; }
+  .floor-search { background: var(--bg3); border: 1px solid var(--border); color: var(--text); padding: 7px 12px; border-radius: var(--radius); font-family: 'Syne', sans-serif; font-size: 13px; outline: none; width: 180px; }
+  .floor-card { background: var(--bg2); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; margin-bottom: 10px; cursor: pointer; transition: border-color 0.15s, background 0.15s; display: flex; align-items: center; gap: 14px; }
+  .floor-card:hover { border-color: var(--border2); background: var(--bg3); }
+  .floor-card:active { background: var(--bg4); }
+  .floor-card-left { flex: 1; min-width: 0; }
+  .floor-card-stock { font-family: 'DM Mono', monospace; font-size: 11px; color: var(--text3); margin-bottom: 2px; }
+  .floor-card-title { font-size: 14px; font-weight: 700; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 3px; }
+  .floor-card-sub { font-size: 12px; color: var(--text2); font-family: 'DM Mono', monospace; }
+  .floor-card-right { text-align: right; flex-shrink: 0; }
+  .floor-card-price { font-size: 14px; font-weight: 700; color: var(--text); font-family: 'DM Mono', monospace; }
+  .floor-card-gp { margin-top: 4px; font-size: 12px; font-family: 'DM Mono', monospace; font-weight: 600; }
+  .floor-add-lead-btn { display: flex; align-items: center; gap: 6px; width: 100%; padding: 11px 16px; border-radius: 8px; border: 1px solid var(--border2); background: var(--bg3); color: var(--text); font-family: 'Syne', sans-serif; font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.15s; margin-bottom: 8px; }
+  .floor-add-lead-btn:hover { border-color: var(--accent); background: rgba(74,158,255,0.07); color: var(--accent); }
+  .floor-add-lead-btn.secondary { color: var(--text2); border-color: var(--border); font-size: 13px; font-weight: 500; }
+  .floor-add-lead-btn.secondary:hover { border-color: var(--border2); background: var(--bg4); color: var(--text); }
+
   /* MATCH BADGE in lead table */
   .match-badge { display: inline-flex; align-items: center; gap: 3px; padding: 2px 7px; border-radius: 4px; font-size: 10px; font-weight: 700; background: var(--green-bg); color: var(--green); margin-left: 5px; vertical-align: middle; }
 
@@ -325,6 +345,7 @@
     <button class="filter-tab" data-filter="sold">Sold <span class="tab-count" id="cnt-sold">0</span></button>
     <button class="filter-tab" data-filter="leads">Leads <span class="tab-count" id="cnt-leads">0</span></button>
     <button class="filter-tab" data-filter="new-cars">New Cars <span class="tab-count" id="cnt-new">0</span></button>
+    <button class="filter-tab" data-filter="floor">Floor <span class="tab-count" id="cnt-floor">0</span></button>
   </div>
 
   <!-- MATCH BANNER (shown after CSV import if leads have matches) -->
@@ -410,6 +431,7 @@
     <div class="card-grid" id="card-view" style="display:none"></div>
     <div class="leads-view" id="leads-view"></div>
     <div class="leads-view" id="new-cars-view"></div>
+    <div class="leads-view" id="floor-view"></div>
   </div>
 </div>
 
@@ -562,49 +584,6 @@
       <div id="al-vehicle-selected" style="display:none;margin-top:6px;font-size:12px;color:var(--green);font-weight:600"></div>
     </div>
 
-    <!-- Vehicle Preferences for Matching -->
-    <div style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);padding:14px;margin-bottom:10px">
-      <div style="font-size:11px;font-weight:700;color:var(--text3);margin-bottom:12px;text-transform:uppercase;letter-spacing:0.6px">Vehicle Preferences (for matching)</div>
-      <div style="margin-bottom:10px">
-        <div style="font-size:11px;font-weight:600;color:var(--text3);margin-bottom:5px;text-transform:uppercase;letter-spacing:0.5px">Model</div>
-        <select id="al-pref-model" style="width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:8px 10px;border-radius:var(--radius);font-family:'Syne',sans-serif;font-size:13px;outline:none;appearance:none">
-          <option value="">Any model…</option>
-        </select>
-      </div>
-      <div style="margin-bottom:10px">
-        <div style="font-size:11px;font-weight:600;color:var(--text3);margin-bottom:5px;text-transform:uppercase;letter-spacing:0.5px">Trim Preferences</div>
-        <div class="chip-group" id="al-pref-trims"></div>
-      </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
-        <div>
-          <div style="font-size:11px;font-weight:600;color:var(--text3);margin-bottom:5px;text-transform:uppercase;letter-spacing:0.5px">Price Min</div>
-          <input type="number" id="al-pref-price-min" placeholder="e.g. 20000" min="0" style="width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:8px 10px;border-radius:var(--radius);font-family:'Syne',sans-serif;font-size:13px;outline:none">
-        </div>
-        <div>
-          <div style="font-size:11px;font-weight:600;color:var(--text3);margin-bottom:5px;text-transform:uppercase;letter-spacing:0.5px">Price Max</div>
-          <input type="number" id="al-pref-price-max" placeholder="e.g. 35000" min="0" style="width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:8px 10px;border-radius:var(--radius);font-family:'Syne',sans-serif;font-size:13px;outline:none">
-        </div>
-      </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
-        <div>
-          <div style="font-size:11px;font-weight:600;color:var(--text3);margin-bottom:5px;text-transform:uppercase;letter-spacing:0.5px">Mileage Min</div>
-          <input type="number" id="al-pref-mil-min" placeholder="e.g. 0" min="0" style="width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:8px 10px;border-radius:var(--radius);font-family:'Syne',sans-serif;font-size:13px;outline:none">
-        </div>
-        <div>
-          <div style="font-size:11px;font-weight:600;color:var(--text3);margin-bottom:5px;text-transform:uppercase;letter-spacing:0.5px">Mileage Max</div>
-          <input type="number" id="al-pref-mil-max" placeholder="e.g. 50000" min="0" style="width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:8px 10px;border-radius:var(--radius);font-family:'Syne',sans-serif;font-size:13px;outline:none">
-        </div>
-      </div>
-      <div style="margin-bottom:10px">
-        <div style="font-size:11px;font-weight:600;color:var(--text3);margin-bottom:5px;text-transform:uppercase;letter-spacing:0.5px">Exterior Color</div>
-        <div class="chip-group" id="al-pref-ext-colors"></div>
-      </div>
-      <div>
-        <div style="font-size:11px;font-weight:600;color:var(--text3);margin-bottom:5px;text-transform:uppercase;letter-spacing:0.5px">Interior Color</div>
-        <input type="text" id="al-pref-int-color" placeholder="e.g. Black, Tan…" style="width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:8px 10px;border-radius:var(--radius);font-family:'Syne',sans-serif;font-size:13px;outline:none">
-      </div>
-    </div>
-
     <!-- Timeframe / Status -->
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
       <div>
@@ -632,21 +611,6 @@
       </div>
     </div>
 
-    <!-- Turned To / In Focus -->
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
-      <div>
-        <div style="font-size:11px;font-weight:600;color:var(--text3);margin-bottom:5px;text-transform:uppercase;letter-spacing:0.5px">Turned To</div>
-        <input type="text" id="al-turned-to" placeholder="Salesperson name…" style="width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:8px 10px;border-radius:var(--radius);font-family:'Syne',sans-serif;font-size:13px;outline:none">
-      </div>
-      <div style="display:flex;flex-direction:column;justify-content:flex-end">
-        <label style="display:flex;align-items:center;gap:8px;padding-bottom:2px;cursor:pointer">
-          <input type="checkbox" id="al-in-focus" style="width:16px;height:16px;accent-color:var(--accent)">
-          <span style="font-size:13px;font-weight:500">In Focus</span>
-          <span style="font-size:11px;color:var(--text3)">(logged in CRM)</span>
-        </label>
-      </div>
-    </div>
-
     <div style="margin-bottom:10px">
       <div style="font-size:11px;font-weight:600;color:var(--text3);margin-bottom:5px;text-transform:uppercase;letter-spacing:0.5px">Notes</div>
       <input type="text" id="al-notes" style="width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:8px 10px;border-radius:var(--radius);font-family:'Syne',sans-serif;font-size:13px;outline:none" placeholder="Optional note…">
@@ -655,6 +619,24 @@
     <div class="modal-footer">
       <button class="btn" onclick="closeAddLeadModal()">Cancel</button>
       <button class="btn btn-primary" onclick="submitManualLead()">Add Lead</button>
+    </div>
+  </div>
+</div>
+
+<!-- LEAD PICKER MODAL (Add to Existing Lead) -->
+<div class="modal-overlay" id="lead-picker-modal" onclick="if(event.target===this)closeLeadPicker()">
+  <div class="modal" style="max-width:440px">
+    <h2>Add to Existing Lead</h2>
+    <p id="lp-car-label" style="color:var(--text2);font-size:13px;margin-bottom:14px"></p>
+    <div style="position:relative;margin-bottom:10px">
+      <svg style="position:absolute;left:10px;top:50%;transform:translateY(-50%);opacity:0.4;pointer-events:none" width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+      <input type="text" id="lp-search" placeholder="Search by name or phone…" autocomplete="off"
+        style="width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:8px 10px 8px 32px;border-radius:var(--radius);font-family:'Syne',sans-serif;font-size:13px;outline:none"
+        oninput="renderLeadPickerResults(this.value)">
+    </div>
+    <div id="lp-results" style="max-height:340px;overflow-y:auto;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg2);margin-bottom:14px"></div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeLeadPicker()">Cancel</button>
     </div>
   </div>
 </div>
@@ -951,7 +933,7 @@ function applyFilters() {
 }
 
 function render() {
-  if(activeFilter==='leads') return;
+  if(activeFilter==='leads' || activeFilter==='floor') return;
   applyFilters(); updateCounts(); updateHeaderStats(); updateSortHeaders();
   const has=inventory.length>0;
   document.getElementById('empty-state').style.display=has?'none':'flex';
@@ -1108,9 +1090,10 @@ async function bulkMarkSold() {
 document.querySelectorAll('.filter-tab').forEach(t=>t.addEventListener('click',()=>{
   document.querySelectorAll('.filter-tab').forEach(x=>x.classList.remove('active'));
   t.classList.add('active'); activeFilter=t.dataset.filter;
-  if(activeFilter==='leads'){ hideNewCarsView(); showLeadsView(); }
-  else if(activeFilter==='new-cars'){ hideLeadsView(); showNewCarsView(); }
-  else { hideLeadsView(); hideNewCarsView(); render(); }
+  if(activeFilter==='leads'){ hideNewCarsView(); hideFloorView(); showLeadsView(); }
+  else if(activeFilter==='new-cars'){ hideLeadsView(); hideFloorView(); showNewCarsView(); }
+  else if(activeFilter==='floor'){ hideLeadsView(); hideNewCarsView(); showFloorView(); }
+  else { hideLeadsView(); hideNewCarsView(); hideFloorView(); render(); }
 }));
 document.getElementById('search').addEventListener('input',()=>render());
 document.getElementById('stock-search').addEventListener('input',()=>render());
@@ -2357,14 +2340,11 @@ let alSelectedVehicle = '';
 let alPrefTrims = new Set();
 let alPrefExtColors = new Set();
 
-function openAddLeadModal(){
+function openAddLeadModal(preselectedVin){
   alSelectedVin=''; alSelectedVehicle='';
-  alPrefTrims.clear(); alPrefExtColors.clear();
-  ['al-firstname','al-lastname','al-phone','al-notes','al-turned-to','al-pref-int-color','al-pref-price-min','al-pref-price-max','al-pref-mil-min','al-pref-mil-max'].forEach(id=>{
+  ['al-firstname','al-lastname','al-phone','al-notes'].forEach(id=>{
     const el=document.getElementById(id); if(el) el.value='';
   });
-  const inFocus = document.getElementById('al-in-focus');
-  if(inFocus) inFocus.checked = false;
   document.getElementById('al-vehicle-search').value='';
   document.getElementById('al-vehicle-results').style.display='none';
   document.getElementById('al-vehicle-selected').style.display='none';
@@ -2372,33 +2352,8 @@ function openAddLeadModal(){
   document.getElementById('al-status').value='New';
   document.getElementById('al-error').style.display='none';
 
-  // Populate model dropdown from inventory
-  const modelSel = document.getElementById('al-pref-model');
-  if(modelSel){
-    const models = [...new Set(inventory.map(c=>(c.model||'').trim()).filter(Boolean))].sort();
-    modelSel.innerHTML = '<option value="">Any model…</option>' + models.map(m=>`<option value="${m}">${m}</option>`).join('');
-  }
-
-  // Populate trim chips
-  const trimContainer = document.getElementById('al-pref-trims');
-  if(trimContainer){
-    const trims = [...new Set(inventory.map(c=>(c.trim||'').trim()).filter(Boolean))].sort();
-    if(trims.length){
-      trimContainer.innerHTML = trims.map(t=>`<span class="chip" onclick="toggleAlChip(this,'trim','${t.replace(/'/g,"\\'")}')">  ${t}</span>`).join('');
-    } else {
-      trimContainer.innerHTML = '<span style="font-size:12px;color:var(--text3)">No trims in inventory yet</span>';
-    }
-  }
-
-  // Populate ext color chips
-  const colorContainer = document.getElementById('al-pref-ext-colors');
-  if(colorContainer){
-    const colors = [...new Set(inventory.map(c=>(c.color||'').trim()).filter(Boolean))].sort();
-    if(colors.length){
-      colorContainer.innerHTML = colors.map(c=>`<span class="chip" onclick="toggleAlChip(this,'extColor','${c.replace(/'/g,"\\'")}')"> ${c}</span>`).join('');
-    } else {
-      colorContainer.innerHTML = '<span style="font-size:12px;color:var(--text3)">No colors in inventory yet</span>';
-    }
+  if(preselectedVin){
+    selectAlVehicle(preselectedVin);
   }
 
   document.getElementById('add-lead-modal').classList.add('open');
@@ -2450,20 +2405,12 @@ function selectAlVehicle(vin){
 }
 
 async function submitManualLead(){
-  const firstName  = document.getElementById('al-firstname').value.trim();
-  const lastName   = document.getElementById('al-lastname').value.trim();
-  const phone      = document.getElementById('al-phone').value.trim();
-  const timeframe  = document.getElementById('al-timeframe').value;
-  const status     = document.getElementById('al-status').value;
-  const notes      = document.getElementById('al-notes').value.trim();
-  const turnedTo   = (document.getElementById('al-turned-to')||{}).value?.trim() || '';
-  const inFocus    = !!(document.getElementById('al-in-focus')||{}).checked;
-  const prefModel  = (document.getElementById('al-pref-model')||{}).value || '';
-  const priceMin   = Number((document.getElementById('al-pref-price-min')||{}).value) || 0;
-  const priceMax   = Number((document.getElementById('al-pref-price-max')||{}).value) || 0;
-  const mileageMin = Number((document.getElementById('al-pref-mil-min')||{}).value) || 0;
-  const mileageMax = Number((document.getElementById('al-pref-mil-max')||{}).value) || 0;
-  const intColors  = ((document.getElementById('al-pref-int-color')||{}).value||'').trim();
+  const firstName = document.getElementById('al-firstname').value.trim();
+  const lastName  = document.getElementById('al-lastname').value.trim();
+  const phone     = document.getElementById('al-phone').value.trim();
+  const timeframe = document.getElementById('al-timeframe').value;
+  const status    = document.getElementById('al-status').value;
+  const notes     = document.getElementById('al-notes').value.trim();
 
   if(!firstName||!lastName||!phone){ document.getElementById('al-error').style.display='block'; return; }
   document.getElementById('al-error').style.display='none';
@@ -2472,14 +2419,7 @@ async function submitManualLead(){
     firstName, lastName, phone, timeframe,
     vehicle: alSelectedVehicle,
     vin: alSelectedVin,
-    status, notes, source:'manual',
-    turnedTo, inFocus,
-    prefModel,
-    trimPrefs: JSON.stringify([...alPrefTrims]),
-    priceMin, priceMax,
-    mileageMin, mileageMax,
-    extColors: JSON.stringify([...alPrefExtColors]),
-    intColors
+    status, notes, source:'manual'
   };
 
   try {
@@ -3567,6 +3507,223 @@ async function doImportCost() {
   } catch(e) {
     showToast('Import failed: ' + e.message);
     btn.disabled = false; btn.textContent = 'Import';
+  }
+}
+
+// ── FLOOR VIEW ────────────────────────────────────────────────
+
+let floorSearch = '';
+let floorVinContext = '';
+
+function showFloorView() {
+  document.getElementById('floor-view').style.display = 'block';
+  document.getElementById('empty-state').style.display = 'none';
+  document.getElementById('table-view').style.display = 'none';
+  document.getElementById('card-view').style.display = 'none';
+  document.getElementById('action-bar').classList.remove('show');
+  document.querySelector('.toolbar').style.visibility = 'hidden';
+  floorSearch = '';
+  renderFloorView();
+}
+
+function hideFloorView() {
+  document.getElementById('floor-view').style.display = 'none';
+  document.querySelector('.toolbar').style.visibility = '';
+}
+
+function renderFloorView() {
+  const el = document.getElementById('floor-view');
+  const q = (floorSearch || '').toLowerCase().trim();
+
+  const live = inventory.filter(c => {
+    const ws = (c.websiteStatus || '').toLowerCase();
+    if (ws.includes('sold') || ws.includes('unavailable') || c.soldDate) return false;
+    if (q) {
+      return [c.stock, c.year, c.make, c.model, c.trim, c.color].join(' ').toLowerCase().includes(q);
+    }
+    return true;
+  });
+
+  // Sort by topComm descending (GP high to low); no-cost cars go to bottom
+  live.sort((a, b) => {
+    const ga = calcGrossData(a, 0, 0);
+    const gb = calcGrossData(b, 0, 0);
+    const ta = ga ? ga.topComm : -Infinity;
+    const tb = gb ? gb.topComm : -Infinity;
+    return tb - ta;
+  });
+
+  document.getElementById('cnt-floor').textContent = live.length;
+
+  const cards = live.map(c => {
+    const g = calcGrossData(c, 0, 0);
+    const mil = Number(c.mileage) || 0;
+    const price = c.websitePrice || c.price || 0;
+
+    let gpHtml = '<span style="color:var(--text3)">—</span>';
+    if (g) {
+      if (g.cost > 0 && g.cost < 500) {
+        gpHtml = `<span style="color:var(--purple)">Check Cost</span>`;
+      } else {
+        const tc = commColor(g.topComm);
+        const bc = commColor(g.bottomComm);
+        gpHtml = `<span style="color:${tc}">${fmtG(g.topComm)}</span><span style="color:var(--text3)"> – </span><span style="color:${bc}">${fmtG(g.bottomComm)}</span>`;
+      }
+    }
+
+    return `<div class="floor-card" onclick="openFloorDrawer('${c.vin}')">
+      <div class="floor-card-left">
+        <div class="floor-card-stock">#${c.stock||'—'}</div>
+        <div class="floor-card-title">${getTitle(c)}</div>
+        <div class="floor-card-sub">${mil ? (mil/1000).toFixed(0)+'K mi' : '—'}</div>
+      </div>
+      <div class="floor-card-right">
+        <div class="floor-card-price">${price ? fmtPrice(price) : '—'}</div>
+        <div class="floor-card-gp">${gpHtml}</div>
+      </div>
+    </div>`;
+  }).join('');
+
+  el.innerHTML = `
+    <div class="floor-toolbar">
+      <h2>Floor <span style="font-size:12px;font-weight:400;color:var(--text3)">${live.length} live</span></h2>
+      <input class="floor-search" type="search" placeholder="Search stock, model…" value="${floorSearch.replace(/"/g,'&quot;')}" oninput="floorSearch=this.value;renderFloorView()">
+    </div>
+    <div class="floor-view-inner">${cards || '<div style="text-align:center;padding:40px;color:var(--text3)">No live inventory</div>'}</div>`;
+}
+
+function openFloorDrawer(vin) {
+  const c = inventory.find(x => x.vin === vin); if (!c) return;
+  floorVinContext = vin;
+  currentVin = vin; currentNewVin = null; currentLeadRowIndex = null;
+  document.getElementById('drawer-title').textContent = getTitle(c);
+  document.getElementById('drawer-vin').textContent = c.vin + (c.stock ? ' · #' + c.stock : '');
+  renderFloorDrawer(c);
+  document.getElementById('drawer-overlay').classList.add('open');
+}
+
+function renderFloorDrawer(c) {
+  const g = calcGrossData(c, 0, 0);
+  const price = c.websitePrice || c.price || 0;
+  const mil = Number(c.mileage) || 0;
+
+  let gpDisplay = '—';
+  if (g) {
+    if (g.cost > 0 && g.cost < 500) {
+      gpDisplay = `<span style="color:var(--purple);font-weight:700">Check Cost</span>`;
+    } else {
+      const tc = commColor(g.topComm);
+      const bc = commColor(g.bottomComm);
+      gpDisplay = `<span style="color:${tc};font-weight:700;font-size:20px">${fmtG(g.topComm)}</span> <span style="color:var(--text3)">–</span> <span style="color:${bc};font-weight:600;font-size:16px">${fmtG(g.bottomComm)}</span>`;
+    }
+  }
+
+  document.getElementById('drawer-body').innerHTML = `
+    <div style="padding:16px 16px 8px">
+      <div style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:16px">
+        <div>
+          <div style="font-size:11px;color:var(--text3);margin-bottom:2px">Price</div>
+          <div style="font-family:'DM Mono',monospace;font-size:20px;font-weight:700">${price ? fmtPrice(price) : '—'}</div>
+        </div>
+        <div style="text-align:right">
+          <div style="font-size:11px;color:var(--text3);margin-bottom:2px">Miles</div>
+          <div style="font-family:'DM Mono',monospace;font-size:16px;color:var(--text2)">${mil ? (mil/1000).toFixed(0)+'K' : '—'}</div>
+        </div>
+      </div>
+      <div style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);padding:12px 14px;margin-bottom:16px">
+        <div style="font-size:11px;color:var(--text3);margin-bottom:4px">Commission Estimate</div>
+        <div style="font-family:'DM Mono',monospace">${gpDisplay}</div>
+        ${g && g.mileageAdder > 0 ? `<div style="font-size:11px;color:var(--amber);margin-top:3px">–${fmtG(g.mileageAdder)} recon adj on bottom</div>` : ''}
+      </div>
+      <div style="margin-bottom:8px">
+        <button class="floor-add-lead-btn" onclick="addCarToNewLead('${c.vin}')">
+          <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="16" y1="11" x2="22" y2="11"/></svg>
+          Add to New Lead
+        </button>
+        <button class="floor-add-lead-btn secondary" onclick="openLeadPickerForCar('${c.vin}')">
+          <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>
+          Add to Existing Lead
+        </button>
+      </div>
+      ${c.color ? `<div style="font-size:12px;color:var(--text2);margin-bottom:4px">${c.color}</div>` : ''}
+      ${c.certification ? `<div style="font-size:11px;color:var(--text3)">${c.certification}</div>` : ''}
+    </div>`;
+}
+
+function addCarToNewLead(vin) {
+  closeDrawer();
+  openAddLeadModal(vin);
+}
+
+async function openLeadPickerForCar(vin) {
+  floorVinContext = vin;
+  const car = inventory.find(c => c.vin === vin);
+  const label = document.getElementById('lp-car-label');
+  if (label) label.textContent = car ? 'Linking: ' + getTitle(car) : '';
+  document.getElementById('lp-search').value = '';
+  document.getElementById('lead-picker-modal').classList.add('open');
+  if (!leadsData.length) {
+    document.getElementById('lp-results').innerHTML = '<div style="padding:14px;font-size:13px;color:var(--text3);text-align:center"><span class="saving-dot"></span> Loading leads…</div>';
+    try {
+      const res = await apiGet('getLeads');
+      leadsData = (res.leads || []).reverse();
+      document.getElementById('cnt-leads').textContent = leadsData.length;
+    } catch(e) {
+      document.getElementById('lp-results').innerHTML = '<div style="padding:14px;font-size:13px;color:var(--red);text-align:center">Failed to load leads</div>';
+      return;
+    }
+  }
+  renderLeadPickerResults('');
+}
+
+function closeLeadPicker() {
+  document.getElementById('lead-picker-modal').classList.remove('open');
+}
+
+function renderLeadPickerResults(q) {
+  q = (q || '').toLowerCase().trim();
+  const open = leadsData.filter(l => {
+    const s = l.status || '';
+    if (s === 'Sold' || s === 'Lost') return false;
+    if (!q) return true;
+    return [(l.firstName||''),(l.lastName||''),(l.phone||'')].join(' ').toLowerCase().includes(q);
+  });
+  const el = document.getElementById('lp-results');
+  if (!open.length) {
+    el.innerHTML = '<div style="padding:14px;font-size:13px;color:var(--text3);text-align:center">No open leads found</div>';
+    return;
+  }
+  el.innerHTML = open.map(l => {
+    const name = ((l.firstName||'') + ' ' + (l.lastName||'')).trim() || 'Unknown';
+    const status = l.status || 'New';
+    const colorClass = LEAD_STATUS_COLORS[status] || 's-new';
+    const hasVehicle = l.vehicle || l.vin;
+    return `<div onclick="selectLeadForCar(${l.rowIndex})"
+      style="padding:12px 14px;border-bottom:1px solid var(--border);cursor:pointer;transition:background 0.1s"
+      onmouseover="this.style.background='var(--bg3)'" onmouseout="this.style.background=''">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div style="font-size:14px;font-weight:600;color:var(--text)">${name}</div>
+        <span class="lead-status-sel ${colorClass}" style="cursor:default">${status}</span>
+      </div>
+      <div style="font-size:12px;color:var(--text3);margin-top:2px;font-family:'DM Mono',monospace">${l.phone||''}${hasVehicle?' · '+( l.vehicle||'vehicle linked'):''}</div>
+    </div>`;
+  }).join('');
+}
+
+async function selectLeadForCar(rowIndex) {
+  const lead = leadsData.find(l => l.rowIndex === rowIndex); if (!lead) return;
+  const car = inventory.find(c => c.vin === floorVinContext); if (!car) return;
+  closeLeadPicker();
+  closeDrawer();
+  try {
+    lead.vin = car.vin;
+    lead.vehicle = getTitle(car);
+    await apiPost('updateLead', { rowIndex, field: 'vin', value: car.vin });
+    await apiPost('updateLead', { rowIndex, field: 'vehicle', value: getTitle(car) });
+    const name = ((lead.firstName||'') + ' ' + (lead.lastName||'')).trim();
+    showToast('✓ ' + getTitle(car) + ' linked to ' + name);
+  } catch(e) {
+    showToast('Failed to link: ' + e.message);
   }
 }
 
