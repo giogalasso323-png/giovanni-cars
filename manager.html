@@ -19,7 +19,7 @@
     --purple: #a78bfa; --purple-bg: rgba(167,139,250,0.12);
     --accent: #e8473f; --radius: 8px; --radius-lg: 12px;
   }
-  body { font-family: 'Syne', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; font-size: 14px; }
+  body { font-family: 'Syne', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; font-size: 14px; overflow-x: hidden; }
 
   /* SETUP */
   .setup-screen { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; }
@@ -1396,7 +1396,35 @@ function buildLeadSectionHtml(lead, car){
     </div>
     <div id="lead-copy-snippet" style="display:none;white-space:pre">${snippet.replace(/</g,'&lt;')}</div>
   </div>
+  ${buildVehicleListHtml(lead)}
   ${matchingHtml}`;
+}
+
+function buildVehicleListHtml(lead) {
+  const list = Array.isArray(lead.vehicleList) ? lead.vehicleList : [];
+  if (!list.length) return '';
+  const items = list.map(v => {
+    const stockLabel = v.stock ? '#' + v.stock : v.vin ? v.vin.slice(-6) : '?';
+    const car = inventory.find(c => c.vin === v.vin);
+    const g = car ? calcGrossData(car, 0, 0) : null;
+    let gpTag = '';
+    if (g) {
+      const tc = commColor(g.topComm);
+      gpTag = `<span style="font-family:'DM Mono',monospace;font-size:11px;font-weight:600;color:${tc};margin-left:6px">${fmtG(g.topComm)}</span>`;
+    }
+    return `<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 10px;border-bottom:1px solid var(--border)">
+      <div>
+        <span style="font-family:'DM Mono',monospace;font-size:13px;font-weight:700;color:var(--text)">${stockLabel}</span>
+        ${gpTag}
+        <div style="font-size:11px;color:var(--text3);margin-top:2px">${v.title||''}</div>
+      </div>
+      ${car ? `<button class="mini-copy-btn" onclick="openDrawer('${car.vin}')">View</button>` : ''}
+    </div>`;
+  }).join('');
+  return `<div style="margin-bottom:12px">
+    <div class="field-label" style="margin-bottom:6px">Vehicle Options (${list.length})</div>
+    <div style="border:1px solid var(--border);border-radius:var(--radius);overflow:hidden">${items}</div>
+  </div>`;
 }
 
 function renderDrawer(c){
@@ -2128,6 +2156,10 @@ async function loadLeads(){
     const res = await apiGet('getLeads');
     if(res.error) throw new Error(res.error);
     leadsData = (res.leads||[]).reverse();
+    leadsData.forEach(l => {
+      try { l.vehicleList = l.vehicleList ? JSON.parse(l.vehicleList) : []; }
+      catch(e) { l.vehicleList = []; }
+    });
     document.getElementById('cnt-leads').textContent = leadsData.length;
     // Run matching on all open leads
     runMatchingForAllLeads();
@@ -2335,13 +2367,14 @@ async function doDeleteLead(rowIndex){
 // ── Add Lead Manually ─────────────────────────────────────────
 let alSelectedVin = '';
 let alSelectedVehicle = '';
+let alSelectedCar = null;
 
-// Track selected chips for Add Lead modal
+// Track selected chips for Add Lead modal (legacy, kept for backend compat)
 let alPrefTrims = new Set();
 let alPrefExtColors = new Set();
 
 function openAddLeadModal(preselectedVin){
-  alSelectedVin=''; alSelectedVehicle='';
+  alSelectedVin=''; alSelectedVehicle=''; alSelectedCar=null;
   ['al-firstname','al-lastname','al-phone','al-notes'].forEach(id=>{
     const el=document.getElementById(id); if(el) el.value='';
   });
@@ -2398,6 +2431,7 @@ function selectAlVehicle(vin){
   const car=inventory.find(c=>c.vin===vin); if(!car) return;
   alSelectedVin=vin;
   alSelectedVehicle=getTitle(car);
+  alSelectedCar=car;
   document.getElementById('al-vehicle-search').value=alSelectedVehicle;
   document.getElementById('al-vehicle-results').style.display='none';
   const sel=document.getElementById('al-vehicle-selected');
@@ -2415,11 +2449,15 @@ async function submitManualLead(){
   if(!firstName||!lastName||!phone){ document.getElementById('al-error').style.display='block'; return; }
   document.getElementById('al-error').style.display='none';
 
+  const vListArr = alSelectedCar
+    ? [{ vin: alSelectedCar.vin, stock: alSelectedCar.stock || '', title: getTitle(alSelectedCar) }]
+    : [];
   const leadPayload = {
     firstName, lastName, phone, timeframe,
     vehicle: alSelectedVehicle,
     vin: alSelectedVin,
-    status, notes, source:'manual'
+    status, notes, source:'manual',
+    vehicleList: JSON.stringify(vListArr)
   };
 
   try {
@@ -3516,14 +3554,22 @@ let floorSearch = '';
 let floorVinContext = '';
 
 function showFloorView() {
-  document.getElementById('floor-view').style.display = 'block';
+  const el = document.getElementById('floor-view');
+  el.style.display = 'block';
   document.getElementById('empty-state').style.display = 'none';
   document.getElementById('table-view').style.display = 'none';
   document.getElementById('card-view').style.display = 'none';
   document.getElementById('action-bar').classList.remove('show');
   document.querySelector('.toolbar').style.visibility = 'hidden';
   floorSearch = '';
-  renderFloorView();
+  // Render the toolbar once — it stays; only cards get re-rendered on search
+  el.innerHTML = `
+    <div class="floor-toolbar">
+      <h2>Floor <span id="floor-live-count" style="font-size:12px;font-weight:400;color:var(--text3)">0 live</span></h2>
+      <input class="floor-search" id="floor-search-input" type="search" placeholder="Search stock, model…" oninput="floorSearch=this.value;renderFloorCards()">
+    </div>
+    <div class="floor-view-inner" id="floor-cards"></div>`;
+  renderFloorCards();
 }
 
 function hideFloorView() {
@@ -3531,20 +3577,18 @@ function hideFloorView() {
   document.querySelector('.toolbar').style.visibility = '';
 }
 
-function renderFloorView() {
-  const el = document.getElementById('floor-view');
+function renderFloorCards() {
+  const cardsEl = document.getElementById('floor-cards');
+  if (!cardsEl) return;
   const q = (floorSearch || '').toLowerCase().trim();
 
   const live = inventory.filter(c => {
     const ws = (c.websiteStatus || '').toLowerCase();
     if (ws.includes('sold') || ws.includes('unavailable') || c.soldDate) return false;
-    if (q) {
-      return [c.stock, c.year, c.make, c.model, c.trim, c.color].join(' ').toLowerCase().includes(q);
-    }
+    if (q) return [c.stock, c.year, c.make, c.model, c.trim, c.color].join(' ').toLowerCase().includes(q);
     return true;
   });
 
-  // Sort by topComm descending (GP high to low); no-cost cars go to bottom
   live.sort((a, b) => {
     const ga = calcGrossData(a, 0, 0);
     const gb = calcGrossData(b, 0, 0);
@@ -3554,12 +3598,13 @@ function renderFloorView() {
   });
 
   document.getElementById('cnt-floor').textContent = live.length;
+  const countEl = document.getElementById('floor-live-count');
+  if (countEl) countEl.textContent = live.length + ' live';
 
-  const cards = live.map(c => {
+  cardsEl.innerHTML = live.map(c => {
     const g = calcGrossData(c, 0, 0);
     const mil = Number(c.mileage) || 0;
     const price = c.websitePrice || c.price || 0;
-
     let gpHtml = '<span style="color:var(--text3)">—</span>';
     if (g) {
       if (g.cost > 0 && g.cost < 500) {
@@ -3570,7 +3615,6 @@ function renderFloorView() {
         gpHtml = `<span style="color:${tc}">${fmtG(g.topComm)}</span><span style="color:var(--text3)"> – </span><span style="color:${bc}">${fmtG(g.bottomComm)}</span>`;
       }
     }
-
     return `<div class="floor-card" onclick="openFloorDrawer('${c.vin}')">
       <div class="floor-card-left">
         <div class="floor-card-stock">#${c.stock||'—'}</div>
@@ -3582,14 +3626,7 @@ function renderFloorView() {
         <div class="floor-card-gp">${gpHtml}</div>
       </div>
     </div>`;
-  }).join('');
-
-  el.innerHTML = `
-    <div class="floor-toolbar">
-      <h2>Floor <span style="font-size:12px;font-weight:400;color:var(--text3)">${live.length} live</span></h2>
-      <input class="floor-search" type="search" placeholder="Search stock, model…" value="${floorSearch.replace(/"/g,'&quot;')}" oninput="floorSearch=this.value;renderFloorView()">
-    </div>
-    <div class="floor-view-inner">${cards || '<div style="text-align:center;padding:40px;color:var(--text3)">No live inventory</div>'}</div>`;
+  }).join('') || '<div style="text-align:center;padding:40px;color:var(--text3)">No live inventory</div>';
 }
 
 function openFloorDrawer(vin) {
@@ -3604,50 +3641,104 @@ function openFloorDrawer(vin) {
 
 function renderFloorDrawer(c) {
   const g = calcGrossData(c, 0, 0);
-  const price = c.websitePrice || c.price || 0;
+  const websiteP = c.websitePrice || c.price || 0;
   const mil = Number(c.mileage) || 0;
+  let fuelType = '';
+  if (c.vehicleInfo) { const fm = c.vehicleInfo.match(/Fuel Type:\s*([^\n]+)/i); if (fm) fuelType = fm[1].trim(); }
 
-  let gpDisplay = '—';
-  if (g) {
-    if (g.cost > 0 && g.cost < 500) {
-      gpDisplay = `<span style="color:var(--purple);font-weight:700">Check Cost</span>`;
-    } else {
-      const tc = commColor(g.topComm);
-      const bc = commColor(g.bottomComm);
-      gpDisplay = `<span style="color:${tc};font-weight:700;font-size:20px">${fmtG(g.topComm)}</span> <span style="color:var(--text3)">–</span> <span style="color:${bc};font-weight:600;font-size:16px">${fmtG(g.bottomComm)}</span>`;
-    }
+  let h = '';
+
+  // Lead-linking buttons
+  h += `<div style="padding:16px 16px 4px;display:flex;flex-direction:column;gap:8px">
+    <button class="floor-add-lead-btn" onclick="addCarToNewLead('${c.vin}')">
+      <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="16" y1="11" x2="22" y2="11"/></svg>
+      Add to New Lead
+    </button>
+    <button class="floor-add-lead-btn secondary" onclick="openLeadPickerForCar('${c.vin}')">
+      <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>
+      Add to Existing Lead
+    </button>
+  </div>`;
+
+  // Stock # header
+  h += `<div style="padding:4px 24px 0">
+    <div class="field-label">Stock #</div>
+    <div style="font-family:'DM Mono',monospace;font-size:26px;font-weight:700;color:var(--text);margin-bottom:4px">${c.stock || '—'}</div>
+  </div>`;
+
+  // Vehicle info fields
+  h += `<div style="padding:0 24px">
+    <div class="field-row">
+      <div class="field-group"><div class="field-label">Year</div><div class="field-value">${c.year||'—'}</div></div>
+      <div class="field-group"><div class="field-label">Make</div><div class="field-value">${c.make||'—'}</div></div>
+    </div>
+    <div class="field-group"><div class="field-label">Model</div><div class="field-value">${c.model||'—'} ${c.trim||''}</div></div>
+    <div class="field-row">
+      <div class="field-group"><div class="field-label">Mileage</div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <div class="field-value" style="font-size:18px;font-weight:600;font-family:'DM Mono',monospace">${mil ? mil.toLocaleString() : '—'}</div>
+          ${mil ? `<button class="mini-copy-btn" onclick="copyText('${mil}',this)">Copy</button>` : ''}
+        </div>
+      </div>
+      <div class="field-group"><div class="field-label">Fuel Type</div><div class="field-value">${fuelType||'—'}</div></div>
+    </div>
+    <div class="field-group"><div class="field-label">Color</div><div class="field-value">${c.color||'—'}</div></div>`;
+
+  // Website price (no FB price field)
+  h += `<div class="field-group"><div class="field-label">Website Price</div>
+    <div style="font-size:20px;font-weight:700;font-family:'DM Mono',monospace">${websiteP ? fmtPrice(websiteP) : '—'}</div>
+  </div>`;
+
+  // VIN + links
+  h += `<div class="field-group"><div class="field-label">VIN</div>
+    <div style="display:flex;align-items:center;gap:8px">
+      <div style="font-family:'DM Mono',monospace;font-size:12px;color:var(--text2);flex:1;word-break:break-all">${c.vin}</div>
+      <button class="mini-copy-btn" onclick="copyText('${c.vin}',this)">Copy</button>
+    </div>
+  </div>`;
+
+  h += `<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px">`;
+  if (c.websiteUrl) h += `<a href="${c.websiteUrl}" class="carfax-link" target="_blank" style="background:var(--blue-bg);color:var(--blue)"><svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>DublinToyota.com</a>`;
+  if (c.carfaxUrl) h += `<a href="${c.carfaxUrl}" class="carfax-link" target="_blank"><svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>CARFAX</a>`;
+  h += `</div>`;
+
+  // Certification & Edmunds
+  if (c.certification) h += `<div class="field-group"><div class="field-label">Certification</div><div class="field-value" style="font-size:13px">${c.certification}</div></div>`;
+  if (c.edmundsLabel && c.edmundsBelow !== undefined) {
+    const isBelowMarket = Number(c.edmundsBelow) > 0;
+    h += `<div class="field-group"><div class="field-label">Edmunds</div>
+      <span class="edmunds-badge" style="${isBelowMarket?'':'background:var(--amber-bg);color:var(--amber)'}">
+        ${c.edmundsLabel}${isBelowMarket?' · $'+Number(c.edmundsBelow).toLocaleString()+' below market':''}
+      </span>
+    </div>`;
   }
 
-  document.getElementById('drawer-body').innerHTML = `
-    <div style="padding:16px 16px 8px">
-      <div style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:16px">
-        <div>
-          <div style="font-size:11px;color:var(--text3);margin-bottom:2px">Price</div>
-          <div style="font-family:'DM Mono',monospace;font-size:20px;font-weight:700">${price ? fmtPrice(price) : '—'}</div>
+  h += `</div>`; // close padding div
+
+  // Commission section (no appraisal edit, no product/discount inputs)
+  if (g) {
+    const si = grossStatusInfo(g);
+    const tc = commColor(g.topComm);
+    const bc = commColor(g.bottomComm);
+    const miniNote = g.miniFloor === 150 ? ' · T-Stock $150 min' : '';
+    h += `<div style="padding:0 24px 24px">
+      <div class="section-title">Commission Estimate</div>
+      <div style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px">
+        <div style="margin-bottom:10px"><span style="display:inline-flex;align-items:center;padding:3px 10px;border-radius:4px;font-size:11px;font-weight:700;background:${si.bg};color:${si.color}">${si.label}${miniNote}</span></div>
+        <div style="display:flex;align-items:baseline;gap:6px;margin-bottom:4px">
+          <span style="font-family:'DM Mono',monospace;font-size:26px;font-weight:700;color:${tc}">${fmtComm(g.topComm, g.topRaw, g.topIsFloored)}</span>
+          <span style="font-size:18px;color:var(--text3);font-family:'DM Mono',monospace">&ndash;</span>
+          <span style="font-family:'DM Mono',monospace;font-size:18px;font-weight:600;color:${bc}">${fmtComm(g.bottomComm, g.bottomRaw, g.bottomIsFloored)}</span>
+          <span style="font-size:11px;color:var(--text3);margin-left:4px">your check</span>
         </div>
-        <div style="text-align:right">
-          <div style="font-size:11px;color:var(--text3);margin-bottom:2px">Miles</div>
-          <div style="font-family:'DM Mono',monospace;font-size:16px;color:var(--text2)">${mil ? (mil/1000).toFixed(0)+'K' : '—'}</div>
-        </div>
+        <div style="font-size:12px;color:var(--text3)">Front gross: <span style="color:var(--text2)">${fmtG(g.topGross)} &ndash; ${fmtG(g.bottomGross)}</span></div>
+        ${g.mileageAdder > 0 ? `<div style="font-size:11px;color:var(--amber);margin-top:3px">&minus;${fmtG(g.mileageAdder)} recon adj &middot; ${(mil/1000).toFixed(0)}K mi</div>` : ''}
+        <div style="font-size:11px;color:var(--text3);margin-top:8px">Cost ${fmtG(g.cost)} + Recon $2,000 + Detail $500${g.certCost?' + Cert $'+g.certCost.toLocaleString():''}</div>
       </div>
-      <div style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);padding:12px 14px;margin-bottom:16px">
-        <div style="font-size:11px;color:var(--text3);margin-bottom:4px">Commission Estimate</div>
-        <div style="font-family:'DM Mono',monospace">${gpDisplay}</div>
-        ${g && g.mileageAdder > 0 ? `<div style="font-size:11px;color:var(--amber);margin-top:3px">–${fmtG(g.mileageAdder)} recon adj on bottom</div>` : ''}
-      </div>
-      <div style="margin-bottom:8px">
-        <button class="floor-add-lead-btn" onclick="addCarToNewLead('${c.vin}')">
-          <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="16" y1="11" x2="22" y2="11"/></svg>
-          Add to New Lead
-        </button>
-        <button class="floor-add-lead-btn secondary" onclick="openLeadPickerForCar('${c.vin}')">
-          <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>
-          Add to Existing Lead
-        </button>
-      </div>
-      ${c.color ? `<div style="font-size:12px;color:var(--text2);margin-bottom:4px">${c.color}</div>` : ''}
-      ${c.certification ? `<div style="font-size:11px;color:var(--text3)">${c.certification}</div>` : ''}
     </div>`;
+  }
+
+  document.getElementById('drawer-body').innerHTML = h;
 }
 
 function addCarToNewLead(vin) {
@@ -3667,6 +3758,10 @@ async function openLeadPickerForCar(vin) {
     try {
       const res = await apiGet('getLeads');
       leadsData = (res.leads || []).reverse();
+      leadsData.forEach(l => {
+        try { l.vehicleList = l.vehicleList ? JSON.parse(l.vehicleList) : []; }
+        catch(e) { l.vehicleList = []; }
+      });
       document.getElementById('cnt-leads').textContent = leadsData.length;
     } catch(e) {
       document.getElementById('lp-results').innerHTML = '<div style="padding:14px;font-size:13px;color:var(--red);text-align:center">Failed to load leads</div>';
@@ -3713,15 +3808,29 @@ function renderLeadPickerResults(q) {
 async function selectLeadForCar(rowIndex) {
   const lead = leadsData.find(l => l.rowIndex === rowIndex); if (!lead) return;
   const car = inventory.find(c => c.vin === floorVinContext); if (!car) return;
+
+  const currentList = Array.isArray(lead.vehicleList) ? lead.vehicleList : [];
+  if (currentList.some(v => v.vin === car.vin)) {
+    closeLeadPicker();
+    showToast('That car is already on this lead');
+    return;
+  }
+
+  const newEntry = { vin: car.vin, stock: car.stock || '', title: getTitle(car) };
+  const newList = [...currentList, newEntry];
+  lead.vehicleList = newList;
+  if (!lead.vin) { lead.vin = car.vin; lead.vehicle = getTitle(car); }
+
   closeLeadPicker();
   closeDrawer();
+  const name = ((lead.firstName||'') + ' ' + (lead.lastName||'')).trim();
   try {
-    lead.vin = car.vin;
-    lead.vehicle = getTitle(car);
-    await apiPost('updateLead', { rowIndex, field: 'vin', value: car.vin });
-    await apiPost('updateLead', { rowIndex, field: 'vehicle', value: getTitle(car) });
-    const name = ((lead.firstName||'') + ' ' + (lead.lastName||'')).trim();
-    showToast('✓ ' + getTitle(car) + ' linked to ' + name);
+    await apiPost('updateLead', { rowIndex, field: 'vehicleList', value: JSON.stringify(newList) });
+    if (!lead.vin || lead.vin === car.vin) {
+      await apiPost('updateLead', { rowIndex, field: 'vin', value: car.vin });
+      await apiPost('updateLead', { rowIndex, field: 'vehicle', value: getTitle(car) });
+    }
+    showToast('✓ #' + (car.stock || car.vin.slice(-6)) + ' added to ' + name);
   } catch(e) {
     showToast('Failed to link: ' + e.message);
   }

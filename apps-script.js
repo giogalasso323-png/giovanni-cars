@@ -26,7 +26,7 @@ const COLUMNS = [
 
 const LEADS_COLUMNS = [
   'timestamp','firstName','lastName','phone','vehicle','vin',
-  'timeframe','source','status','notes','followUpDate'
+  'timeframe','source','status','notes','followUpDate','vehicleList'
 ];
 
 function doGet(e)     { return handleRequest(e); }
@@ -107,7 +107,8 @@ function submitLead(data) {
     data.source     || 'website',
     data.status     || 'New',
     data.notes      || '',
-    ''
+    '',
+    data.vehicleList || ''
   ];
   sh.appendRow(row);
   return { ok: true };
