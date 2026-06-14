@@ -1100,7 +1100,7 @@ async function downloadPhotosZip() {
   btn.disabled = true;
 
   const zip = new JSZip();
-  let fetched = 0, empty = 0;
+  let fetched = 0, empty = 0, errors = 0;
 
   for (let i = 0; i < vins.length; i++) {
     const vin = vins[i];
@@ -1111,22 +1111,34 @@ async function downloadPhotosZip() {
 
     countEl.textContent = `Fetching ${i + 1} of ${vins.length}: ${label}…`;
 
-    try {
-      const res = await apiPost('getPhotosBase64', { vin, label });
-      if (res.photos && res.photos.length) {
-        const folder = zip.folder(label);
-        res.photos.forEach(p => folder.file(p.name, p.data, { base64: true }));
-        fetched++;
-      } else {
-        empty++;
+    let res = null;
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        res = await apiPost('getPhotosBase64', { vin, label });
+        if (!res.error) break;
+        if (attempt === 0) { countEl.textContent = `Retrying ${label}…`; await new Promise(r => setTimeout(r, 4000)); }
+      } catch(e) {
+        if (attempt === 0) { countEl.textContent = `Retrying ${label}…`; await new Promise(r => setTimeout(r, 4000)); }
       }
-    } catch(e) {
+    }
+
+    if (!res || res.error) {
+      errors++;
+    } else if (res.photos && res.photos.length) {
+      const folder = zip.folder(label);
+      res.photos.forEach(p => folder.file(p.name, p.data, { base64: true }));
+      fetched++;
+    } else {
       empty++;
     }
+
+    if (i < vins.length - 1) await new Promise(r => setTimeout(r, 1500));
   }
 
   if (fetched === 0) {
-    showToast('No photos found for selected cars');
+    let msg = 'No photos found';
+    if (errors) msg += ` — ${errors} car${errors > 1 ? 's' : ''} failed, try again`;
+    showToast(msg);
     btn.disabled = false;
     countEl.textContent = vins.length + ' selected';
     return;
@@ -1144,7 +1156,10 @@ async function downloadPhotosZip() {
 
   btn.disabled = false;
   countEl.textContent = vins.length + ' selected';
-  showToast(fetched + ' car' + (fetched > 1 ? 's' : '') + ' downloaded' + (empty ? ` (${empty} had no photos)` : ''));
+  let msg = fetched + ' car' + (fetched > 1 ? 's' : '') + ' downloaded';
+  if (empty) msg += ` · ${empty} had no photos`;
+  if (errors) msg += ` · ${errors} failed (retry those)`;
+  showToast(msg);
 }
 
 // ── FILTER TABS / SEARCH / SORT ────────────────────────────
