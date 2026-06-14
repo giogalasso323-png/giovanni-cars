@@ -45,6 +45,7 @@ function handleRequest(e) {
       case 'upsertMany':     result = upsertMany(body.cars);                       break;
       case 'updateField':    result = updateField(body.vin, body.field, body.value); break;
       case 'scrapeVehicles': result = scrapeVehicles(body.vins);                   break;
+      case 'getPhotosBase64': result = getPhotosBase64(body.vin, body.label);            break;
       case 'savePhotos':     result = savePhotosToDrive(body.vin, body.stock, body.title); break;
       case 'uploadPhotos':   result = uploadPhotosToDrive(body.vin, body.stock, body.photos); break;
       case 'deletePhotos':   result = deletePhotoFolder(body.vin);                 break;
@@ -508,6 +509,33 @@ function clearBadVehicleInfo() {
     }
   });
   Logger.log('Cleared bad vehicleInfo from ' + cleared + ' rows');
+}
+
+// ── Batch photo download (returns base64 for client-side ZIP) ─
+function getPhotosBase64(vin, label) {
+  if (!vin) return { error: 'No VIN' };
+  vin = norm(vin);
+  var vinLower = vin.toLowerCase();
+  var photos = [];
+  var failed = 0;
+
+  for (var i = 1; i <= 50; i++) {
+    var url = 'https://www.dublintoyota.com/inventoryphotos/' + DEALER_ID + '/' + vinLower + '/ip/' + i + '.jpg';
+    try {
+      var resp = UrlFetchApp.fetch(url, {
+        muteHttpExceptions: true,
+        followRedirects: true,
+        headers: { 'User-Agent': 'Mozilla/5.0 Chrome/120' }
+      });
+      if (resp.getResponseCode() !== 200) break;
+      photos.push({ name: i + '.jpg', data: Utilities.base64Encode(resp.getContent()) });
+    } catch(e) {
+      failed++;
+      if (failed >= 3) break;
+    }
+  }
+
+  return { label: label || vin, photos: photos };
 }
 
 // ── Photo saving to Google Drive ──────────────────────────────

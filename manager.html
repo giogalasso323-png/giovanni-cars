@@ -6,6 +6,7 @@
 <title>Dublin Toyota — Inventory Manager</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
   :root {
@@ -401,6 +402,10 @@
     <span id="selected-count">0 selected</span>
     <button class="btn" onclick="bulkMarkPosted()">Mark as FB Posted</button>
     <button class="btn" onclick="bulkMarkSold()">Mark as Sold</button>
+    <button class="btn" id="btn-download-photos" onclick="downloadPhotosZip()" style="color:var(--green);border-color:var(--green)">
+      <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      Download Photos
+    </button>
     <button class="btn" style="color:var(--red)" onclick="clearSelection()">Clear</button>
   </div>
 
@@ -1084,6 +1089,62 @@ async function bulkMarkSold() {
   clearSelection(); render(); setSyncInfo('saving');
   await apiPost('upsertMany',{cars:vins.map(v=>inventory.find(c=>c.vin===v)).filter(Boolean)});
   setSyncInfo('ok'); showToast('Marked as sold');
+}
+
+async function downloadPhotosZip() {
+  const vins = [...selectedVins];
+  if (!vins.length) return;
+
+  const btn = document.getElementById('btn-download-photos');
+  const countEl = document.getElementById('selected-count');
+  btn.disabled = true;
+
+  const zip = new JSZip();
+  let fetched = 0, empty = 0;
+
+  for (let i = 0; i < vins.length; i++) {
+    const vin = vins[i];
+    const car = inventory.find(c => c.vin === vin);
+    const label = car
+      ? `${car.year} ${car.make} ${car.model}${car.trim ? ' ' + car.trim : ''} (${car.stock || vin.slice(-6)})`
+      : vin;
+
+    countEl.textContent = `Fetching ${i + 1} of ${vins.length}: ${label}…`;
+
+    try {
+      const res = await apiPost('getPhotosBase64', { vin, label });
+      if (res.photos && res.photos.length) {
+        const folder = zip.folder(label);
+        res.photos.forEach(p => folder.file(p.name, p.data, { base64: true }));
+        fetched++;
+      } else {
+        empty++;
+      }
+    } catch(e) {
+      empty++;
+    }
+  }
+
+  if (fetched === 0) {
+    showToast('No photos found for selected cars');
+    btn.disabled = false;
+    countEl.textContent = vins.length + ' selected';
+    return;
+  }
+
+  countEl.textContent = 'Building ZIP…';
+  const today = new Date();
+  const dateStr = today.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  const blob = await zip.generateAsync({ type: 'blob' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `FB Photos - ${dateStr}.zip`;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 10000);
+
+  btn.disabled = false;
+  countEl.textContent = vins.length + ' selected';
+  showToast(fetched + ' car' + (fetched > 1 ? 's' : '') + ' downloaded' + (empty ? ` (${empty} had no photos)` : ''));
 }
 
 // ── FILTER TABS / SEARCH / SORT ────────────────────────────
