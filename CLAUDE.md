@@ -117,11 +117,38 @@ The backend (`apps-script.js`) handles these actions via GET/POST:
 - `inventory-app.html` is an old version — **never touch it**.
 - Giovanni prefers working code with no unnecessary abstractions or comments.
 
-## Current State (as of 2026-06-12)
+## Section Map — manager.html
+Grep for `// ===== SECTION:` to jump to any section. Sections in file order:
+
+| Grep pattern | Approx line | What's there |
+|---|---|---|
+| `SECTION: AUTH` | ~664 | Password hashing, session check (hashPassword, isAuthed, checkPassword) |
+| `SECTION: INIT/BOOT` | ~710 | init(), bootApp(), testAndSaveUrl(), showApp(), resetSetup() |
+| `SECTION: API / DATA LAYER` | ~746 | apiFetch(), loadFromSheet(), setSyncInfo(), statusBadge() |
+| `SECTION: CSV PARSING UTILITIES` | ~815 | parseCSV(), splitCSV(), findCol(), rowToCar(), mergeImport() |
+| `SECTION: FILTERING & RENDERING` | ~892 | applyFilters(), render(), renderTable(), renderCards(), updateCounts(), setView(), sortBy() |
+| `SECTION: BULK SELECTION` | ~1074 | toggleSelect/All, clearSelection, updateActionBar, bulkMarkPosted/Sold, downloadPhotosZip |
+| `SECTION: USED CARS CSV IMPORT` | ~1182 | openUploadModal, readCSVFile, doImport |
+| `SECTION: SCRAPE / WEBSITE SYNC` | ~1228 | openScrapeModal, startScrape (hits dublintoyota.com) |
+| `SECTION: FACEBOOK DESCRIPTION` | ~1327 | buildFBDesc() — builds FB Marketplace post text |
+| `SECTION: DRAWER` | ~1356 | openDrawer, renderDrawer, setFbStatus, photo upload/delete, saveFbPrice, copyFB, closeDrawer |
+| `SECTION: BULK VIN MODAL` | ~1969 | openBulkVinModal, applyBulkVinSelect |
+| `SECTION: LEAD MATCHING ENGINE` | ~2029 | scoreVehicleForLead, findMatchesForLead, runMatchingForAllLeads, showMatchBanner |
+| `SECTION: LEADS / CRM TAB` | ~2201 | showLeadsView, loadLeads, renderLeads, addLead, deleteLead, updateLeadStatus, vehicle search |
+| `SECTION: NEW CARS TAB` | ~2636 | showNewCarsView, renderNewCarsView, openNewCarDrawer, renderNewCarDrawer, startNewScrape |
+| `SECTION: GROSS ANALYSIS` | ~3258 | getMileageBracket, calcGrossData, buildGrossSection, recalcGross, grossTableCell, cost import |
+| `SECTION: FLOOR TAB` | ~3636 | showFloorView, renderFloorCards, openFloorDrawer, renderFloorDrawer |
+| `SECTION: LEAD PICKER MODAL` | ~3824 | openLeadPickerForCar, renderLeadPickerResults, selectLeadForCar |
+
+## Session Handoff
+See `SESSION.md` in this directory for active work-in-progress notes. Update it at the end of each working session so the next session can pick up immediately.
+
+## Current State (as of 2026-06-14)
 - Gross Analysis feature is fully built and working
 - Floor tab is built (floor traffic log)
 - Leads/CRM tab is working with vehicle matching
 - New Cars tab works with CSV import
 - Mobile layout has been tuned for overflow/drawer issues
 - GP column in table view shows colored bars, reveal-on-hover
+- Section markers added to manager.html (`// ===== SECTION: NAME =====`) for fast navigation
 - Last commit: fixed mobile overflow, floor search, drawer layout, vehicle list in leads

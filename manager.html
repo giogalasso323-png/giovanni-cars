@@ -661,7 +661,7 @@
 </div>
 
 <script>
-// ── AUTH ───────────────────────────────────────────────────
+// ===== SECTION: AUTH =====
 const AUTH_KEY  = 'dt_auth_v1';
 const PW_HASH   = '192c33caac3d89ed647f6dc54419161c2bbf4b57d12bb8c546e41d6448597571';
 const AUTH_DAYS = 30;
@@ -706,6 +706,7 @@ let newCarsFilter = 'all', newCarsSearch = '', newCarsSort = 'model';
 let newCarsFiltered = [];
 
 // ── SETUP ──────────────────────────────────────────────────
+// ===== SECTION: INIT/BOOT =====
 function init() {
   if (isAuthed()) {
     document.getElementById('auth-screen').style.display = 'none';
@@ -741,6 +742,7 @@ function resetSetup() {
 }
 
 // ── API ────────────────────────────────────────────────────
+// ===== SECTION: API / DATA LAYER =====
 async function apiFetch(url, action, body) {
   if (!body) {
     const r = await fetch(`${url}?action=${action}`, {redirect:'follow'});
@@ -810,6 +812,7 @@ const fbBadge = c => c.fbStatus==='posted' ? '<span class="badge badge-posted">P
 const daysClass = d => d>60?'hot':d>30?'warm':'';
 
 // ── CSV ────────────────────────────────────────────────────
+// ===== SECTION: CSV PARSING UTILITIES =====
 function parseCSV(text) {
   const lines=text.trim().split('\n'); if(lines.length<2) return [];
   const hdrs=lines[0].split(',').map(h=>h.replace(/^"|"$/g,'').trim().toLowerCase());
@@ -886,6 +889,7 @@ function mergeImport(rows) {
 }
 
 // ── RENDER ─────────────────────────────────────────────────
+// ===== SECTION: FILTERING & RENDERING =====
 function applyFilters() {
   const q=document.getElementById('search').value.toLowerCase();
   const sq=document.getElementById('stock-search').value.toLowerCase();
@@ -1068,6 +1072,7 @@ function updateSortHeaders(){
 }
 
 // ── SELECTION ──────────────────────────────────────────────
+// ===== SECTION: BULK SELECTION =====
 function toggleSelect(vin,el){ if(el.checked)selectedVins.add(vin);else selectedVins.delete(vin); updateActionBar(); }
 function toggleAll(el){ filtered.forEach(c=>{ if(el.checked)selectedVins.add(c.vin);else selectedVins.delete(c.vin); }); updateActionBar(); render(); }
 function clearSelection(){ selectedVins.clear(); document.getElementById('chk-all').checked=false; updateActionBar(); render(); }
@@ -1176,6 +1181,7 @@ document.getElementById('stock-search').addEventListener('input',()=>render());
 document.getElementById('sort-select').addEventListener('change',function(){sortKey=this.value;render();});
 
 // ── UPLOAD ─────────────────────────────────────────────────
+// ===== SECTION: USED CARS CSV IMPORT =====
 function openUploadModal(){ document.getElementById('upload-modal').classList.add('open'); }
 function closeUploadModal(){ document.getElementById('upload-modal').classList.remove('open'); pendingCsvData=null; document.getElementById('upload-preview').style.display='none'; document.getElementById('import-btn').disabled=true; document.getElementById('file-input').value=''; }
 function handleDrop(e){ e.preventDefault(); document.getElementById('upload-zone').classList.remove('drag'); if(e.dataTransfer.files[0]) readCSVFile(e.dataTransfer.files[0]); }
@@ -1221,6 +1227,7 @@ async function doImport(){
 }
 
 // ── SCRAPE ─────────────────────────────────────────────────
+// ===== SECTION: SCRAPE / WEBSITE SYNC =====
 function openScrapeModal(){ scrapeRunning=false; document.getElementById('scrape-modal').classList.add('open'); document.getElementById('scrape-log').style.display='none'; document.getElementById('scrape-btn').disabled=false; document.getElementById('scrape-btn').textContent='Start Refresh'; }
 let scrapeRunning=false;
 function closeScrapeModal(){
@@ -1320,6 +1327,7 @@ async function startScrape(){
 }
 
 
+// ===== SECTION: FACEBOOK DESCRIPTION =====
 function buildFBDesc(c){
   var lines=[];
   if(c.stock) lines.push('Ref: '+c.stock);
@@ -1349,6 +1357,7 @@ function buildFBDesc(c){
   return lines.join('\n');
 }
 
+// ===== SECTION: DRAWER =====
 function openDrawer(vin){
   currentLeadRowIndex=null;
   currentVin=vin;
@@ -1962,6 +1971,7 @@ function closeDrawer(){
 }
 function closeDrawerOverlay(e){ if(e.target===document.getElementById('drawer-overlay')) closeDrawer(); }
 
+// ===== SECTION: BULK VIN MODAL =====
 function openBulkVinModal(){
   document.getElementById('bulk-vin-modal').classList.add('open');
   document.getElementById('bulk-vin-input').value='';
@@ -2022,6 +2032,7 @@ function applyBulkVinSelect(){
  * Score a single inventory vehicle against a lead's preferences.
  * Returns a score 0-100, or -1 if it fails a hard filter.
  */
+// ===== SECTION: LEAD MATCHING ENGINE =====
 function scoreVehicleForLead(car, lead) {
   // Build list of filled prefs with their max weights
   const prefs = [];
@@ -2194,6 +2205,7 @@ const LEAD_STATUS_COLORS = {
   'Cold':'s-cold','Appt':'s-appt','Sold':'s-sold','Lost':'s-lost'
 };
 
+// ===== SECTION: LEADS / CRM TAB =====
 function showLeadsView(){
   leadsFilter = 'all';
   document.getElementById('leads-view').style.display='block';
@@ -2629,6 +2641,7 @@ const TOYOTA_EXT_COLORS = {
 };
 const decodeColor = code => TOYOTA_EXT_COLORS[code] || code || '—';
 
+// ===== SECTION: NEW CARS TAB =====
 function showNewCarsView() {
   document.getElementById('new-cars-view').style.display = 'block';
   document.getElementById('empty-state').style.display = 'none';
@@ -3251,6 +3264,7 @@ const MILEAGE_AGE_MATRIX = [
   [1000, 1500, 2200, 2500, 2500],
 ];
 
+// ===== SECTION: GROSS ANALYSIS =====
 function getMileageBracket(mil) {
   if (mil < 30000) return 0;
   if (mil < 60000) return 1;
@@ -3629,6 +3643,7 @@ async function doImportCost() {
 let floorSearch = '';
 let floorVinContext = '';
 
+// ===== SECTION: FLOOR TAB =====
 function showFloorView() {
   const el = document.getElementById('floor-view');
   el.style.display = 'block';
@@ -3817,6 +3832,7 @@ function renderFloorDrawer(c) {
   document.getElementById('drawer-body').innerHTML = h;
 }
 
+// ===== SECTION: LEAD PICKER MODAL =====
 function addCarToNewLead(vin) {
   closeDrawer();
   openAddLeadModal(vin);
