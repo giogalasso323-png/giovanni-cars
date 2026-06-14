@@ -1,5 +1,8 @@
 # Dublin Toyota Inventory Manager — Claude Code Context
 
+## Session Start Instructions
+When Giovanni opens this project or asks to work on it, immediately read `SESSION.md` and give a short briefing (3–5 sentences max) covering: what the project is, current state, and what's in progress from SESSION.md. Do this automatically — don't wait to be asked.
+
 ## Who This Is For
 Giovanni Galasso, salesperson at Dublin Toyota (Dublin, CA). Not a developer by trade — built this tool himself to manage inventory and Facebook Marketplace listings. He works with Claude Code to add features and fix bugs.
 
