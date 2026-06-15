@@ -271,7 +271,7 @@
   .lead-vehicle-item-info { flex: 1; min-width: 0; }
   .lead-vehicle-item-gross { text-align: right; white-space: nowrap; flex-shrink: 0; }
   /* SUB-DRAWER (vehicle detail, opens left of main drawer) */
-  .sub-overlay { display: none; position: fixed; top: 0; bottom: 0; right: 560px; width: 540px; z-index: 149; box-shadow: -4px 0 24px rgba(0,0,0,0.4); }
+  .sub-overlay { display: none; position: fixed; top: 0; bottom: 0; right: 560px; width: 540px; z-index: 201; box-shadow: -4px 0 24px rgba(0,0,0,0.5); }
   .sub-overlay.open { display: block; }
   .sub-drawer { width: 100%; height: 100%; background: var(--bg1); border-left: 1px solid var(--border); overflow-y: auto; animation: slideIn 0.2s ease; }
   .sub-drawer .drawer-header { background: var(--bg1); }
@@ -1487,13 +1487,22 @@ function buildLeadSectionHtml(lead, car){
   const notAvail = lead.vehicleNotAvailable === 'true' || lead.vehicleNotAvailable === true;
 
   const turnedToNames = getTurnedToNames();
-  const currentTurnedTo = lead.turnedTo || '';
-  const inList = turnedToNames.includes(currentTurnedTo);
-  const turnedToOpts = [
+  const firstVal = lead.turnedToFirst || '';
+  const lastVal = lead.turnedTo || '';
+  const nameOptsFor = (sel) => [
     `<option value="">— Select —</option>`,
-    ...turnedToNames.map(n=>`<option value="${n.replace(/"/g,'&quot;')}"${n===currentTurnedTo?' selected':''}>${n}</option>`),
-    ...(currentTurnedTo && !inList ? [`<option value="${currentTurnedTo.replace(/"/g,'&quot;')}" selected>${currentTurnedTo.replace(/</g,'&lt;')}</option>`] : [])
+    ...turnedToNames.map(n=>`<option value="${n.replace(/"/g,'&quot;')}"${n===sel?' selected':''}>${n}</option>`),
+    ...(sel && !turnedToNames.includes(sel) ? [`<option value="${sel.replace(/"/g,'&quot;')}" selected>${sel.replace(/</g,'&lt;')}</option>`] : [])
   ].join('');
+  const selStyle = `width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:6px;font-family:'Syne',sans-serif;font-size:13px;outline:none`;
+  const firstFieldHtml = firstVal
+    ? `<div id="turned-first-locked" style="display:flex;align-items:center;gap:8px;padding:7px 10px;background:var(--bg3);border:1px solid var(--border);border-radius:6px">
+         <span style="font-size:13px;font-weight:600;color:var(--text);flex:1">${firstVal}</span>
+         <span style="font-size:10px;padding:2px 7px;border-radius:3px;background:rgba(74,158,255,0.12);color:var(--accent);font-weight:700">1st</span>
+         <button class="mini-copy-btn" onclick="unlockTurnedFirst()">Change</button>
+       </div>
+       <select id="turned-first-select" style="display:none;${selStyle}" onchange="setTurnedFirst(this.value)">${nameOptsFor(firstVal)}</select>`
+    : `<select id="turned-first-select" style="${selStyle}" onchange="setTurnedFirst(this.value)">${nameOptsFor('')}</select>`;
 
   const notesEsc = (lead.notes||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
   const viEsc = (lead.vehicleInterest||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
@@ -1569,15 +1578,22 @@ function buildLeadSectionHtml(lead, car){
       <textarea style="width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:6px;font-family:'Syne',sans-serif;font-size:13px;outline:none;resize:vertical;min-height:56px;box-sizing:border-box" placeholder="Add notes…" onblur="updateLeadFieldFromDrawer('notes',this.value)">${notesEsc}</textarea>
     </div>
 
-    <!-- Turned To -->
+    <!-- First / Last -->
     <div>
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
         <div class="field-label" style="margin:0">Turned To</div>
-        <button class="mini-copy-btn" onclick="openTurnedToManager()" style="font-size:10px">Manage List</button>
+        <button class="mini-copy-btn" onclick="openTurnedToManager()" style="font-size:10px">Manage Names</button>
       </div>
-      <select id="turned-to-select" style="width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:6px;font-family:'Syne',sans-serif;font-size:13px;outline:none" onchange="updateLeadFieldFromDrawer('turnedTo',this.value)">
-        ${turnedToOpts}
-      </select>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div>
+          <div class="field-label">First</div>
+          ${firstFieldHtml}
+        </div>
+        <div>
+          <div class="field-label">Last</div>
+          <select style="${selStyle}" onchange="updateLeadFieldFromDrawer('turnedTo',this.value)">${nameOptsFor(lastVal)}</select>
+        </div>
+      </div>
     </div>
   </div>
   <div id="lead-vehicles-section">${buildVehicleListHtml(lead)}</div>`;
@@ -2527,6 +2543,20 @@ function removeTurnedToName(idx) {
   openTurnedToManager();
 }
 
+// ── Turned To — First / Last ──────────────────────────────────
+function setTurnedFirst(value) {
+  if (!value) return;
+  updateLeadFieldFromDrawer('turnedToFirst', value);
+  const lead = leadsData.find(l => l.rowIndex === currentLeadRowIndex);
+  if (lead) document.getElementById('drawer-body').innerHTML = buildLeadSectionHtml(lead, null);
+}
+function unlockTurnedFirst() {
+  const locked = document.getElementById('turned-first-locked');
+  const sel = document.getElementById('turned-first-select');
+  if (locked) locked.style.display = 'none';
+  if (sel) { sel.style.display = 'block'; setTimeout(() => sel.focus(), 50); }
+}
+
 // ── Vehicle Sub-Drawer ────────────────────────────────────────
 function openVehicleSubDrawer(vin) {
   const car = inventory.find(c => c.vin === vin); if (!car) return;
@@ -2666,8 +2696,12 @@ function renderLeads(){
     const originBadge = (lead.source && lead.source !== 'manual' && lead.source !== 'Cowork')
       ? `<span class="origin-tag">${lead.source}</span>`
       : '';
-    const turnedTo = lead.turnedTo
-      ? `<span style="font-size:10px;color:var(--text3);margin-left:4px">→ ${lead.turnedTo}</span>`
+    const turnedToParts = [
+      lead.turnedToFirst ? '1st: '+lead.turnedToFirst : '',
+      lead.turnedTo ? 'Last: '+lead.turnedTo : ''
+    ].filter(Boolean);
+    const turnedTo = turnedToParts.length
+      ? `<span style="font-size:10px;color:var(--text3);margin-left:4px">→ ${turnedToParts.join(' · ')}</span>`
       : '';
 
     const fName = capName(lead.firstName);
