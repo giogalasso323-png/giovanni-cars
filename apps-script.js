@@ -26,7 +26,8 @@ const COLUMNS = [
 
 const LEADS_COLUMNS = [
   'timestamp','firstName','lastName','phone','vehicle','vin',
-  'timeframe','source','status','notes','followUpDate','vehicleList'
+  'timeframe','source','status','notes','followUpDate','vehicleList',
+  'leadType','inFocus','turnedTo'
 ];
 
 function doGet(e)     { return handleRequest(e); }
