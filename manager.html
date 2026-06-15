@@ -266,8 +266,16 @@
   .origin-tag { display: inline-flex; align-items: center; padding: 1px 6px; border-radius: 3px; font-size: 10px; font-weight: 700; background: rgba(139,92,246,0.12); color: #a78bfa; margin-left: 5px; vertical-align: middle; }
   /* LEAD VEHICLE LIST in drawer */
   .lead-vehicle-item { display: flex; align-items: flex-start; justify-content: space-between; padding: 10px 12px; background: var(--bg3); border-radius: 6px; margin-bottom: 6px; gap: 10px; }
+  .lead-vehicle-item.lead-vehicle-clickable { cursor: pointer; transition: background 0.12s, border-color 0.12s; border: 1px solid transparent; }
+  .lead-vehicle-item.lead-vehicle-clickable:hover { background: var(--bg4); border-color: var(--accent); }
   .lead-vehicle-item-info { flex: 1; min-width: 0; }
   .lead-vehicle-item-gross { text-align: right; white-space: nowrap; flex-shrink: 0; }
+  /* SUB-DRAWER (vehicle detail, opens left of main drawer) */
+  .sub-overlay { display: none; position: fixed; top: 0; bottom: 0; right: 560px; width: 540px; z-index: 149; box-shadow: -4px 0 24px rgba(0,0,0,0.4); }
+  .sub-overlay.open { display: block; }
+  .sub-drawer { width: 100%; height: 100%; background: var(--bg1); border-left: 1px solid var(--border); overflow-y: auto; animation: slideIn 0.2s ease; }
+  .sub-drawer .drawer-header { background: var(--bg1); }
+  .sub-drawer .drawer-body { padding: 20px 24px; }
 
   /* MATCHING VEHICLES section in drawer */
   .match-card { background: var(--bg3); border: 1px solid var(--border); border-radius: var(--radius); padding: 10px 12px; margin-bottom: 8px; cursor: pointer; transition: all 0.15s; display: flex; align-items: center; justify-content: space-between; gap: 10px; }
@@ -464,6 +472,34 @@
       <button class="close-btn" onclick="closeDrawer()"><svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
     </div>
     <div class="drawer-body" id="drawer-body"></div>
+  </div>
+</div>
+
+<!-- SUB-DRAWER (vehicle detail panel, opens left of main drawer when clicking car from client tray) -->
+<div id="sub-drawer-overlay" class="sub-overlay">
+  <div class="sub-drawer" onclick="event.stopPropagation()">
+    <div class="drawer-header">
+      <div>
+        <div class="drawer-title" id="sub-drawer-title"></div>
+        <div id="sub-drawer-vin" style="font-family:'DM Mono',monospace;font-size:11px;color:var(--text3);margin-top:3px"></div>
+      </div>
+      <button class="close-btn" onclick="closeVehicleSubDrawer()"><svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+    </div>
+    <div class="drawer-body" id="sub-drawer-body"></div>
+  </div>
+</div>
+
+<!-- TURNED TO MANAGER MODAL -->
+<div class="modal-overlay" id="turned-to-manager-modal" onclick="if(event.target===this)closeTurnedToManager()">
+  <div class="modal" style="max-width:360px">
+    <h2>Manage Turned To Names</h2>
+    <p style="font-size:13px;color:var(--text3);margin-bottom:14px">Add or remove salesperson names for the Turned To dropdown.</p>
+    <div id="ttm-list" style="margin-bottom:14px;max-height:220px;overflow-y:auto"></div>
+    <div style="display:flex;gap:8px;margin-bottom:12px">
+      <input type="text" id="ttm-input" placeholder="Enter name…" style="flex:1;background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:7px 10px;border-radius:6px;font-family:'Syne',sans-serif;font-size:13px;outline:none" onkeydown="if(event.key==='Enter')addTurnedToName()">
+      <button class="btn btn-primary" onclick="addTurnedToName()">Add</button>
+    </div>
+    <button class="btn" style="width:100%" onclick="closeTurnedToManager()">Done</button>
   </div>
 </div>
 
@@ -1418,53 +1454,23 @@ function openDrawer(vin){
 function openDrawerFromLead(rowIndex){
   const lead=leadsData.find(l=>l.rowIndex===rowIndex); if(!lead) return;
   currentLeadRowIndex=rowIndex;
-  const car=lead.vin?inventory.find(c=>c.vin===lead.vin):null;
-  const newCar=!car&&lead.vin?newInventory.find(c=>c.vin===lead.vin):null;
-  if(car){
-    currentVin=car.vin; currentNewVin=null;
-    lastOpenedVin=car.vin;
-    document.getElementById('drawer-title').textContent=getTitle(car);
-    document.getElementById('drawer-vin').textContent=car.vin;
-    renderDrawer(car);
-  } else if(newCar) {
-    currentNewVin=newCar.vin; currentVin=null;
-    document.getElementById('drawer-title').textContent=(newCar.year||'')+' Toyota '+(newCar.modelName||'');
-    document.getElementById('drawer-vin').textContent=newCar.vin;
-    renderNewCarDrawer(newCar, true);
-    document.getElementById('drawer-overlay').classList.add('open');
-    return;
-  } else {
-    currentVin=null;
-    document.getElementById('drawer-title').textContent=(lead.firstName||'')+' '+(lead.lastName||'');
-    document.getElementById('drawer-vin').textContent=lead.vehicle||'No vehicle selected';
-    renderDrawerLeadOnly(lead);
-  }
+  currentVin=null; currentNewVin=null;
+  closeVehicleSubDrawer();
+  const name=[capName(lead.firstName),capName(lead.lastName)].filter(Boolean).join(' ')||'Lead';
+  document.getElementById('drawer-title').textContent=name;
+  document.getElementById('drawer-vin').textContent=fmtPhone(lead.phone)||lead.vehicle||'No phone on file';
+  document.getElementById('drawer-body').innerHTML=buildLeadSectionHtml(lead,null);
   document.getElementById('drawer-overlay').classList.add('open');
 }
 
-function renderDrawerLeadOnly(lead){
-  const timeframeOpts=['ASAP','Within 2 weeks','Within a month','1-3 months','Just browsing']
-    .map(t=>`<option value="${t}"${t===lead.timeframe?' selected':''}>${t}</option>`).join('');
-  const statusOpts=LEAD_STATUSES.map(s=>`<option value="${s}"${s===(lead.status||'New')?' selected':''}>${s}</option>`).join('');
-  document.getElementById('drawer-body').innerHTML=`
-    ${buildLeadSectionHtml(lead,null)}
-    <div style="padding:40px;text-align:center;color:var(--text3)">
-      <div style="font-size:28px;margin-bottom:10px">🚗</div>
-      <div style="font-size:14px;font-weight:600;color:var(--text2);margin-bottom:6px">No vehicle linked</div>
-      <div style="font-size:13px;margin-bottom:16px">Click Change Vehicle to assign a car to this lead.</div>
-    </div>`;
-}
-
 function buildLeadSectionHtml(lead, car){
-  const timeframeOpts=['ASAP','Within 2 weeks','Within a month','1-3 months','Just browsing']
+  const timeframeOpts=['3 days','1 week','2 weeks','3 weeks','1 month','2 months','3 months']
     .map(t=>`<option value="${t}"${t===lead.timeframe?' selected':''}>${t}</option>`).join('');
   const statusOpts=LEAD_STATUSES.map(s=>`<option value="${s}"${s===(lead.status||'New')?' selected':''}>${s}</option>`).join('');
-  const turnedToVal = (lead.turnedTo||'').replace(/"/g,'&quot;');
 
   const currentTab = getLeadTab(lead);
   const originSource = lead.source && lead.source !== 'manual' && lead.source !== 'Cowork' ? lead.source : null;
 
-  // Move buttons — show based on current tab
   let moveBtns = '';
   if (currentTab === 'Focus' || currentTab === 'Lost') {
     const backTo = originSource || 'Lot';
@@ -1475,26 +1481,61 @@ function buildLeadSectionHtml(lead, car){
       <button class="btn" style="font-size:11px;padding:4px 10px;color:var(--red);border-color:rgba(220,38,38,0.3)" onclick="moveLeadTo(${lead.rowIndex},'Lost')">→ Lost</button>`;
   }
 
-  const matchingHtml = buildMatchingSectionHtml(lead);
+  const fName = capName(lead.firstName);
+  const lName = capName(lead.lastName);
+  const phone = fmtPhone(lead.phone);
+  const notAvail = lead.vehicleNotAvailable === 'true' || lead.vehicleNotAvailable === true;
+
+  const turnedToNames = getTurnedToNames();
+  const currentTurnedTo = lead.turnedTo || '';
+  const inList = turnedToNames.includes(currentTurnedTo);
+  const turnedToOpts = [
+    `<option value="">— Select —</option>`,
+    ...turnedToNames.map(n=>`<option value="${n.replace(/"/g,'&quot;')}"${n===currentTurnedTo?' selected':''}>${n}</option>`),
+    ...(currentTurnedTo && !inList ? [`<option value="${currentTurnedTo.replace(/"/g,'&quot;')}" selected>${currentTurnedTo.replace(/</g,'&lt;')}</option>`] : [])
+  ].join('');
+
+  const notesEsc = (lead.notes||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  const viEsc = (lead.vehicleInterest||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 
   return `<div style="background:rgba(74,158,255,0.07);border:1px solid rgba(74,158,255,0.2);border-radius:var(--radius);padding:14px 16px;margin-bottom:16px">
-    <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:12px;gap:10px;flex-wrap:wrap">
-      <div>
-        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
-          <span style="font-size:15px;font-weight:700;color:var(--text)">${lead.firstName||''} ${lead.lastName||''}</span>
-          ${originSource ? `<span class="origin-tag">${originSource}</span>` : ''}
-          ${currentTab==='Focus' ? `<span style="font-size:10px;background:rgba(139,92,246,0.15);color:#a78bfa;padding:2px 7px;border-radius:4px;font-weight:700">Focus</span>` : ''}
-          ${currentTab==='Lost' ? `<span style="font-size:10px;background:var(--red-bg);color:var(--red);padding:2px 7px;border-radius:4px;font-weight:700">Lost</span>` : ''}
+    <!-- Header -->
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:14px;gap:10px;flex-wrap:wrap">
+      <div style="flex:1">
+        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:8px">
+          ${currentTab==='Focus'?`<span style="font-size:10px;background:rgba(139,92,246,0.15);color:#a78bfa;padding:2px 7px;border-radius:4px;font-weight:700">Focus</span>`:''}
+          ${currentTab==='Lost'?`<span style="font-size:10px;background:var(--red-bg);color:var(--red);padding:2px 7px;border-radius:4px;font-weight:700">Lost</span>`:''}
+          ${originSource?`<span class="origin-tag">${originSource}</span>`:''}
         </div>
-        <div style="display:flex;align-items:center;gap:8px;margin-top:4px">
-          <span style="font-size:13px;font-family:'DM Mono',monospace;color:var(--text2)">${lead.phone||''}</span>
-          ${lead.phone?`<button class="mini-copy-btn" onclick="copyText('${lead.phone}',this)">Copy</button>`:''}
+        <!-- First / Last Name -->
+        <div style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:8px">
+          <div>
+            <div class="field-label">First Name</div>
+            <div style="display:flex;align-items:center;gap:6px">
+              <span style="font-size:16px;font-weight:700;color:var(--text)">${fName||'—'}</span>
+              ${fName?`<button class="mini-copy-btn" onclick="copyText('${fName.replace(/'/g,"\\'")}',this)">Copy</button>`:''}
+            </div>
+          </div>
+          <div>
+            <div class="field-label">Last Name</div>
+            <div style="display:flex;align-items:center;gap:6px">
+              <span style="font-size:16px;font-weight:700;color:var(--text)">${lName||'—'}</span>
+              ${lName?`<button class="mini-copy-btn" onclick="copyText('${lName.replace(/'/g,"\\'")}',this)">Copy</button>`:''}
+            </div>
+          </div>
+        </div>
+        <!-- Phone -->
+        <div style="display:flex;align-items:center;gap:8px">
+          <span style="font-size:13px;font-family:'DM Mono',monospace;color:var(--text2)">${phone||'—'}</span>
+          ${lead.phone?`<button class="mini-copy-btn" onclick="copyText('${(lead.phone||'').replace(/'/g,"\\'")}',this)">Copy</button>`:''}
         </div>
       </div>
       <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:flex-start">
         ${moveBtns}
       </div>
     </div>
+
+    <!-- Timeframe + Status -->
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
       <div>
         <div class="field-label">Timeframe</div>
@@ -1509,23 +1550,42 @@ function buildLeadSectionHtml(lead, car){
         </select>
       </div>
     </div>
+
+    <!-- Vehicle Not Available -->
+    <div style="margin-bottom:12px;display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--bg3);border-radius:6px">
+      <input type="checkbox" id="lead-not-avail"${notAvail?' checked':''} onchange="updateLeadFieldFromDrawer('vehicleNotAvailable',this.checked?'true':'false')" style="width:15px;height:15px;cursor:pointer;flex-shrink:0">
+      <label for="lead-not-avail" style="font-size:13px;color:var(--text2);cursor:pointer;line-height:1.3">Vehicle was not available (customer came in for a car we didn't have)</label>
+    </div>
+
+    <!-- Vehicle Interest -->
+    <div style="margin-bottom:10px">
+      <div class="field-label">Vehicle Interest</div>
+      <textarea style="width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:6px;font-family:'Syne',sans-serif;font-size:13px;outline:none;resize:vertical;min-height:56px;box-sizing:border-box" placeholder="What vehicle is the customer looking for?" onblur="updateLeadFieldFromDrawer('vehicleInterest',this.value)">${viEsc}</textarea>
+    </div>
+
+    <!-- Notes -->
     <div style="margin-bottom:10px">
       <div class="field-label">Notes</div>
-      <input type="text" style="width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:6px;font-family:'Syne',sans-serif;font-size:13px;outline:none" value="${(lead.notes||'').replace(/"/g,'&quot;')}" placeholder="Add note…" onblur="updateLeadFieldFromDrawer('notes',this.value)" onkeydown="if(event.key==='Enter')this.blur()">
+      <textarea style="width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:6px;font-family:'Syne',sans-serif;font-size:13px;outline:none;resize:vertical;min-height:56px;box-sizing:border-box" placeholder="Add notes…" onblur="updateLeadFieldFromDrawer('notes',this.value)">${notesEsc}</textarea>
     </div>
-    <div style="margin-bottom:4px">
-      <div class="field-label">Turned To</div>
-      <input type="text" style="width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:6px;font-family:'Syne',sans-serif;font-size:13px;outline:none" value="${turnedToVal}" placeholder="Salesperson name…" onblur="updateLeadFieldFromDrawer('turnedTo',this.value)" onkeydown="if(event.key==='Enter')this.blur()">
+
+    <!-- Turned To -->
+    <div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+        <div class="field-label" style="margin:0">Turned To</div>
+        <button class="mini-copy-btn" onclick="openTurnedToManager()" style="font-size:10px">Manage List</button>
+      </div>
+      <select id="turned-to-select" style="width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:6px;font-family:'Syne',sans-serif;font-size:13px;outline:none" onchange="updateLeadFieldFromDrawer('turnedTo',this.value)">
+        ${turnedToOpts}
+      </select>
     </div>
   </div>
-  <div id="lead-vehicles-section">${buildVehicleListHtml(lead)}</div>
-  ${matchingHtml}`;
+  <div id="lead-vehicles-section">${buildVehicleListHtml(lead)}</div>`;
 }
 
 function buildVehicleListHtml(lead) {
   const list = Array.isArray(lead.vehicleList) ? lead.vehicleList : [];
 
-  // Enrich and sort by top commission
   const enriched = list.map((v, idx) => {
     const car = inventory.find(c => c.vin === v.vin)
              || inventory.find(c => c.stock && v.stock && c.stock.toUpperCase() === v.stock.toUpperCase());
@@ -1540,10 +1600,10 @@ function buildVehicleListHtml(lead) {
   const items = enriched.map(({ v, car, g, idx }) => {
     const title = car ? getTitle(car) : (v.title || v.stock || v.vin || '?');
     const stock = v.stock || (car ? car.stock : '') || '';
-    const websiteUrl = car ? (car.websiteUrl || '') : '';
-    const stockLink = websiteUrl
-      ? `<a href="${websiteUrl}" target="_blank" style="font-size:11px;color:var(--blue);text-decoration:none;font-family:'DM Mono',monospace">#${stock} ↗</a>`
-      : `<span style="font-size:11px;color:var(--text3);font-family:'DM Mono',monospace">#${stock}</span>`;
+    const price = car ? fmtPrice(car.websitePrice||car.price) : '—';
+    const miles = car ? fmtMiles(car.mileage) : '—';
+    const vin = car ? car.vin : (v.vin || '');
+    const clickable = !!car;
 
     let grossHtml = '<div style="font-size:11px;color:var(--text3)">No cost data</div>';
     if (g) {
@@ -1553,16 +1613,17 @@ function buildVehicleListHtml(lead) {
         <div style="text-align:right;margin-top:2px"><span style="font-size:10px;font-weight:700;padding:1px 6px;border-radius:3px;background:${si.bg};color:${si.color}">${si.label}</span></div>`;
     }
 
-    return `<div class="lead-vehicle-item">
+    return `<div class="lead-vehicle-item${clickable?' lead-vehicle-clickable':''}"${clickable?` onclick="openVehicleSubDrawer('${vin}')"`:''}>
       <div class="lead-vehicle-item-info">
-        <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:2px">${title}</div>
-        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-          ${stockLink}
-          ${car ? `<span style="font-size:11px;color:var(--text3)">${fmtPrice(car.websitePrice||car.price)} · ${fmtMiles(car.mileage)}</span>` : ''}
+        <div style="font-size:13px;font-weight:800;color:var(--blue);font-family:'DM Mono',monospace;margin-bottom:3px">#${stock||'—'}</div>
+        <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:5px">${title}</div>
+        <div style="display:flex;gap:16px">
+          <span style="font-size:11px;color:var(--text3)">Price: <strong style="color:var(--text2)">${price}</strong></span>
+          <span style="font-size:11px;color:var(--text3)">Miles: <strong style="color:var(--text2)">${miles}</strong></span>
         </div>
       </div>
       <div class="lead-vehicle-item-gross">${grossHtml}</div>
-      <button class="icon-btn" title="Remove" onclick="removeVehicleFromLead(${lead.rowIndex},${idx})" style="flex-shrink:0;align-self:center">
+      <button class="icon-btn" title="Remove" onclick="event.stopPropagation();removeVehicleFromLead(${lead.rowIndex},${idx})" style="flex-shrink:0;align-self:flex-start;margin-top:4px">
         <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
       </button>
     </div>`;
@@ -1597,11 +1658,8 @@ async function moveLeadTo(rowIndex, newType) {
     await apiPost('updateLead', { rowIndex, field: 'leadType', value: newType });
     showToast('Moved to ' + newType);
     renderLeads();
-    // Re-render the drawer lead section so move buttons update
     if (currentLeadRowIndex === rowIndex) {
-      const car = lead.vin ? inventory.find(c => c.vin === lead.vin) : null;
-      const lsEl = document.querySelector('#drawer-body > div:first-child');
-      if (lsEl) lsEl.outerHTML = buildLeadSectionHtml(lead, car);
+      document.getElementById('drawer-body').innerHTML = buildLeadSectionHtml(lead, null);
     }
   } catch(e) { showToast('Failed: ' + e.message); }
 }
@@ -1689,7 +1747,9 @@ async function removeVehicleFromLead(rowIndex, idx) {
   } catch(e) { showToast('Failed to remove'); }
 }
 
-function renderDrawer(c){
+function renderDrawer(c, opts={}){
+  const targetId = opts.targetId || 'drawer-body';
+  const skipLeadSection = opts.skipLeadSection || false;
   const d=daysOnLot(c);
   const fb=buildFBDesc(c);
   const websiteP = c.websitePrice||c.price||0;
@@ -1697,7 +1757,7 @@ function renderDrawer(c){
   const origP = c.originalPrice||0;
   const hasMismatch = c.fbStatus==='posted' && currentFbP && websiteP && currentFbP !== websiteP;
   const daysPosted = c.fbPostedDate ? Math.floor((Date.now()-new Date(c.fbPostedDate))/86400000) : 0;
-  const isLeadContext = currentLeadRowIndex !== null;
+  const isLeadContext = !skipLeadSection && currentLeadRowIndex !== null;
   let h='';
 
   // Lead section at top when opened from leads tab
@@ -1854,7 +1914,7 @@ function renderDrawer(c){
   </div>`;
   if(c.lastChecked) h+=`<div style="font-size:11px;color:var(--text3);padding-bottom:24px">Last refreshed: ${new Date(c.lastChecked).toLocaleString()}</div>`;
 
-  document.getElementById('drawer-body').innerHTML=h;
+  document.getElementById(targetId).innerHTML=h;
 }
 
 
@@ -2144,7 +2204,9 @@ async function clearPriceAlert(){
 }
 function closeDrawer(){
   if(isSaving){ showToast('⚠ Still saving — wait for confirmation before moving on'); return; }
-  pendingPhotos=[]; document.getElementById('drawer-overlay').classList.remove('open'); currentVin=null; currentNewVin=null;
+  pendingPhotos=[]; document.getElementById('drawer-overlay').classList.remove('open');
+  closeVehicleSubDrawer();
+  currentVin=null; currentNewVin=null; currentLeadRowIndex=null;
 }
 function closeDrawerOverlay(e){ if(e.target===document.getElementById('drawer-overlay')) closeDrawer(); }
 
@@ -2398,6 +2460,85 @@ const LEAD_STATUS_COLORS = {
 };
 
 // ===== SECTION: LEADS / CRM TAB =====
+
+// ── Lead Helpers ──────────────────────────────────────────────
+function fmtPhone(p) {
+  const d = String(p||'').replace(/\D/g,'');
+  if (d.length === 10) return `(${d.slice(0,3)}) ${d.slice(3,6)}-${d.slice(6)}`;
+  if (d.length === 11 && d[0]==='1') return `(${d.slice(1,4)}) ${d.slice(4,7)}-${d.slice(7)}`;
+  return p || '';
+}
+function capName(n) {
+  return String(n||'').split(' ').map(w=>w?w[0].toUpperCase()+w.slice(1):'').join(' ').trim();
+}
+
+// ── Turned To name list (localStorage) ───────────────────────
+function getTurnedToNames() {
+  try { return JSON.parse(localStorage.getItem('turnedToNames')||'[]'); } catch { return []; }
+}
+function saveTurnedToNames(names) {
+  localStorage.setItem('turnedToNames', JSON.stringify(names));
+}
+function openTurnedToManager() {
+  const names = getTurnedToNames();
+  document.getElementById('ttm-list').innerHTML = names.length
+    ? names.map((n,i)=>`
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--border)">
+          <span style="font-size:13px;color:var(--text)">${n}</span>
+          <button class="icon-btn" onclick="removeTurnedToName(${i})" title="Remove" style="color:var(--red)">
+            <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        </div>`).join('')
+    : '<div style="color:var(--text3);font-size:13px;padding:10px 0">No names added yet.</div>';
+  document.getElementById('ttm-input').value = '';
+  document.getElementById('turned-to-manager-modal').classList.add('open');
+}
+function closeTurnedToManager() {
+  document.getElementById('turned-to-manager-modal').classList.remove('open');
+  // Refresh turned-to dropdown in client tray if open
+  if (currentLeadRowIndex !== null) {
+    const lead = leadsData.find(l => l.rowIndex === currentLeadRowIndex);
+    const sel = document.getElementById('turned-to-select');
+    if (lead && sel) {
+      const names = getTurnedToNames();
+      const current = lead.turnedTo || '';
+      const inList = names.includes(current);
+      sel.innerHTML = [
+        `<option value="">— Select —</option>`,
+        ...names.map(n=>`<option value="${n}"${n===current?' selected':''}>${n}</option>`),
+        ...(current && !inList ? [`<option value="${current}" selected>${current}</option>`] : [])
+      ].join('');
+    }
+  }
+}
+function addTurnedToName() {
+  const input = document.getElementById('ttm-input');
+  const name = (input.value||'').trim(); if (!name) return;
+  const names = getTurnedToNames();
+  if (names.includes(name)) { showToast('Name already in list'); return; }
+  names.push(name);
+  saveTurnedToNames(names);
+  openTurnedToManager();
+}
+function removeTurnedToName(idx) {
+  const names = getTurnedToNames();
+  names.splice(idx, 1);
+  saveTurnedToNames(names);
+  openTurnedToManager();
+}
+
+// ── Vehicle Sub-Drawer ────────────────────────────────────────
+function openVehicleSubDrawer(vin) {
+  const car = inventory.find(c => c.vin === vin); if (!car) return;
+  document.getElementById('sub-drawer-title').textContent = getTitle(car);
+  document.getElementById('sub-drawer-vin').textContent = car.vin;
+  renderDrawer(car, { targetId: 'sub-drawer-body', skipLeadSection: true });
+  document.getElementById('sub-drawer-overlay').classList.add('open');
+}
+function closeVehicleSubDrawer() {
+  document.getElementById('sub-drawer-overlay').classList.remove('open');
+}
+
 function showLeadsView(){
   leadsFilter = 'all';
   document.getElementById('leads-view').style.display='block';
@@ -2529,13 +2670,26 @@ function renderLeads(){
       ? `<span style="font-size:10px;color:var(--text3);margin-left:4px">→ ${lead.turnedTo}</span>`
       : '';
 
+    const fName = capName(lead.firstName);
+    const lName = capName(lead.lastName);
+    const phone = fmtPhone(lead.phone);
     return `<tr class="${isSelected?'lead-selected':''}" onclick="openDrawerFromLead(${lead.rowIndex})" style="cursor:pointer">
       <td onclick="event.stopPropagation()"><input type="checkbox" ${isSelected?'checked':''} onchange="toggleLeadSelect(${lead.rowIndex},this)"></td>
       <td style="color:var(--text3);font-family:'DM Mono',monospace;font-size:11px;white-space:nowrap">${date}</td>
-      <td class="td-main" style="white-space:nowrap">${lead.firstName||''} ${lead.lastName||''}${originBadge}${inFocusBadge}${turnedTo}</td>
+      <td class="td-main" onclick="event.stopPropagation()">
+        <div style="display:flex;align-items:center;gap:4px;white-space:nowrap">
+          <span style="font-size:13px;font-weight:600;color:var(--text)">${fName||'—'}</span>
+          ${fName?`<button class="mini-copy-btn" onclick="copyText('${fName.replace(/'/g,"\\'")}',this)">Copy</button>`:''}
+        </div>
+        <div style="display:flex;align-items:center;gap:4px;white-space:nowrap;margin-top:2px">
+          <span style="font-size:12px;color:var(--text2)">${lName||'—'}</span>
+          ${lName?`<button class="mini-copy-btn" onclick="copyText('${lName.replace(/'/g,"\\'")}',this)">Copy</button>`:''}
+        </div>
+        <div style="margin-top:3px">${originBadge}${inFocusBadge}${turnedTo}</div>
+      </td>
       <td onclick="event.stopPropagation()" style="white-space:nowrap">
-        <span style="font-family:'DM Mono',monospace;font-size:12px;color:var(--text2)">${lead.phone||'—'}</span>
-        ${lead.phone?`<button class="mini-copy-btn" style="margin-left:6px" onclick="copyText('${lead.phone}',this)">Copy</button>`:''}
+        <span style="font-family:'DM Mono',monospace;font-size:12px;color:var(--text2)">${phone||'—'}</span>
+        ${lead.phone?`<button class="mini-copy-btn" style="margin-left:6px" onclick="copyText('${(lead.phone||'').replace(/'/g,"\\'")}',this)">Copy</button>`:''}
       </td>
       <td>${vehicleCell}${matchBadge}</td>
       <td><span style="font-size:11px;background:var(--bg3);padding:2px 8px;border-radius:4px;color:var(--text3);white-space:nowrap">${lead.timeframe||'—'}</span></td>
