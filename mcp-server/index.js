@@ -220,6 +220,21 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
       inputSchema: { type: 'object', properties: {} }
     },
     {
+      name: 'import_cost_data',
+      description: 'Import cost/appraisal data from a parsed DMS XLS export. Updates appraisedValue and certCost on existing inventory cars matched by VIN or stock number. This is the same as the "Import Cost Data" button in the web app — use this instead of calling update_car_field per car.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          records: {
+            type: 'array',
+            description: 'Array of cost records. Each must have vin or stock, plus appraisedValue and certCost.',
+            items: { type: 'object' }
+          }
+        },
+        required: ['records']
+      }
+    },
+    {
       name: 'import_used_cars',
       description: 'Bulk upsert used car inventory from parsed CSV/XLS data. Each car object should include vin plus any available fields (year, make, model, trim, color, mileage, price, stock, etc.). Existing cars are updated by VIN; new VINs are added. Use this after parsing a DMS or inventory export file.',
       inputSchema: {
@@ -420,6 +435,11 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
       case 'get_new_inventory':
         result = await callScript('getNewInventory');
+        break;
+
+      case 'import_cost_data':
+        if (!args.records || !args.records.length) { result = { error: 'No records provided' }; break; }
+        result = await callScript('importCostData', { records: args.records });
         break;
 
       case 'import_used_cars':
