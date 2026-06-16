@@ -1572,7 +1572,7 @@ function buildLeadSectionHtml(lead, car){
   const viEsc = (lead.vehicleInterest||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
   const fEsc = fName.replace(/"/g,'&quot;');
   const lEsc = lName.replace(/"/g,'&quot;');
-  const phEsc = (lead.phone||'').replace(/"/g,'&quot;');
+  const phEsc = String(lead.phone||'').replace(/"/g,'&quot;');
 
   const firstSection = firstVal ? `
     <div id="rep-first-locked" style="display:flex;align-items:center;gap:8px;padding:7px 10px;background:var(--bg3);border:1px solid rgba(82,153,255,0.4);border-radius:6px">
