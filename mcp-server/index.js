@@ -218,6 +218,40 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
       name: 'get_new_inventory',
       description: 'Get all new car inventory.',
       inputSchema: { type: 'object', properties: {} }
+    },
+    {
+      name: 'import_used_cars',
+      description: 'Bulk upsert used car inventory from parsed CSV/XLS data. Each car object should include vin plus any available fields (year, make, model, trim, color, mileage, price, stock, etc.). Existing cars are updated by VIN; new VINs are added. Use this after parsing a DMS or inventory export file.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          cars: {
+            type: 'array',
+            description: 'Array of car objects. Each must have a vin field.',
+            items: { type: 'object' }
+          }
+        },
+        required: ['cars']
+      }
+    },
+    {
+      name: 'import_new_cars',
+      description: 'Import new car inventory from parsed CSV data. Replaces the New Inventory sheet by default. Use this after parsing a new car CSV export from the DMS.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          cars: {
+            type: 'array',
+            description: 'Array of new car objects from the parsed CSV.',
+            items: { type: 'object' }
+          },
+          replace: {
+            type: 'boolean',
+            description: 'If true (default), clears the sheet before importing. Set false to append.'
+          }
+        },
+        required: ['cars']
+      }
     }
   ]
 }));
@@ -386,6 +420,16 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
       case 'get_new_inventory':
         result = await callScript('getNewInventory');
+        break;
+
+      case 'import_used_cars':
+        if (!args.cars || !args.cars.length) { result = { error: 'No cars provided' }; break; }
+        result = await callScript('upsertMany', { cars: args.cars });
+        break;
+
+      case 'import_new_cars':
+        if (!args.cars || !args.cars.length) { result = { error: 'No cars provided' }; break; }
+        result = await callScript('importNewCars', { cars: args.cars, replace: args.replace !== false });
         break;
 
       default:
