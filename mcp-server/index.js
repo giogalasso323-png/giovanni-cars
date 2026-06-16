@@ -71,6 +71,11 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
       inputSchema: { type: 'object', properties: {} }
     },
     {
+      name: 'scrape_inventory',
+      description: 'Trigger a website sync — scrapes dublintoyota.com for current prices, availability, and sold status, then updates the inventory sheet. This is the same as clicking the Sync button in the web app. Takes 2-5 minutes to complete. Run this to detect price drops, sold cars, and cars removed from the website.',
+      inputSchema: { type: 'object', properties: {} }
+    },
+    {
       name: 'search_inventory',
       description: 'Search used car inventory by model name, keyword, status, or price. Returns slim summaries (no FB descriptions). Use this for most searches — faster and more complete than get_inventory.',
       inputSchema: {
@@ -278,6 +283,10 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     let result;
 
     switch (name) {
+
+      case 'scrape_inventory':
+        result = await callScript('scrapeVehicles');
+        break;
 
       case 'ping':
         result = await callScript('ping');
