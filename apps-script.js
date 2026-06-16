@@ -98,20 +98,12 @@ function submitLead(data) {
     return { error: 'Missing lead data' };
   }
   var sh = getLeadsSheet();
-  var row = [
-    new Date().toISOString(),
-    data.firstName  || '',
-    data.lastName   || '',
-    data.phone      || '',
-    data.vehicle    || '',
-    data.vin        || '',
-    data.timeframe  || '',
-    data.source     || 'website',
-    data.status     || 'New',
-    data.notes      || '',
-    '',
-    data.vehicleList || ''
-  ];
+  var row = LEADS_COLUMNS.map(function(col) {
+    if (col === 'timestamp') return new Date().toISOString();
+    if (col === 'source' && !data[col]) return 'manual';
+    if (col === 'status' && !data[col]) return 'New';
+    return data[col] !== undefined ? data[col] : '';
+  });
   sh.appendRow(row);
   return { ok: true };
 }

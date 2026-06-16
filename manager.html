@@ -1525,17 +1525,21 @@ function buildLeadSectionHtml(lead, car){
   const statusOpts=LEAD_STATUSES.map(s=>`<option value="${s}"${s===(lead.status||'New')?' selected':''}>${s}</option>`).join('');
 
   const currentTab = getLeadTab(lead);
-  const originSource = lead.source && lead.source !== 'manual' && lead.source !== 'Cowork' ? lead.source : null;
+  const TYPE_STYLE = {
+    'Lot':            { color:'var(--accent)',  border:'rgba(74,158,255,0.3)' },
+    'FB Marketplace': { color:'#a78bfa',        border:'rgba(139,92,246,0.3)' },
+    'FB Ad':          { color:'#f59e0b',         border:'rgba(245,158,11,0.3)' },
+    'Focus':          { color:'#a78bfa',        border:'rgba(139,92,246,0.3)' },
+    'Lost':           { color:'var(--red)',     border:'rgba(220,38,38,0.3)' }
+  };
+  const ts = TYPE_STYLE[currentTab] || { color:'var(--text2)', border:'var(--border)' };
 
-  let moveBtns = '';
-  if (currentTab === 'Focus' || currentTab === 'Lost') {
-    const backTo = originSource || 'Lot';
-    moveBtns = `<button class="btn" style="font-size:11px;padding:4px 10px" onclick="moveLeadTo(${lead.rowIndex},'${backTo}')">← Back to ${backTo}</button>`;
-  } else {
-    moveBtns = `
-      <button class="btn" style="font-size:11px;padding:4px 10px;background:rgba(139,92,246,0.12);color:#a78bfa;border-color:rgba(139,92,246,0.3)" onclick="moveLeadTo(${lead.rowIndex},'Focus')">→ Focus</button>
-      <button class="btn" style="font-size:11px;padding:4px 10px;color:var(--red);border-color:rgba(220,38,38,0.3)" onclick="moveLeadTo(${lead.rowIndex},'Lost')">→ Lost</button>`;
-  }
+  const mkTypeBtn = (type, label) => {
+    const active = currentTab === type;
+    return active
+      ? `<button class="lead-type-tab active" disabled style="opacity:0.5;cursor:default">${label}</button>`
+      : `<button class="lead-type-tab" onclick="changeLeadType('${type}')">${label}</button>`;
+  };
 
   const fName = capName(lead.firstName);
   const lName = capName(lead.lastName);
@@ -1545,45 +1549,78 @@ function buildLeadSectionHtml(lead, car){
   const firstVal = lead.turnedToFirst || '';
   const lastVal = lead.turnedTo || '';
   const inpStyle = `width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:6px;font-family:'Syne',sans-serif;font-size:13px;outline:none;box-sizing:border-box`;
-  const selStyle = inpStyle;
 
   const notesEsc = (lead.notes||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
   const viEsc = (lead.vehicleInterest||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 
+  const firstSection = firstVal ? `
+    <div id="rep-first-locked" style="display:flex;align-items:center;gap:8px;padding:7px 10px;background:var(--bg3);border:1px solid rgba(74,158,255,0.4);border-radius:6px">
+      <span style="font-size:13px;font-weight:600;color:var(--text);flex:1">${firstVal}</span>
+      <button class="mini-copy-btn" onclick="unlockRepFirst()">Change</button>
+    </div>
+    <div id="rep-first-edit" style="display:none;margin-top:4px">
+      <div class="name-combo" style="margin-bottom:4px">
+        <input type="text" id="rep-first-input" value="${firstVal.replace(/"/g,'&quot;')}" autocomplete="off" placeholder="Type or select…" style="${inpStyle}"
+          oninput="filterNameCombo('combo-first-dd','rep-first-input')"
+          onfocus="openNameCombo('combo-first-dd','rep-first-input')"
+          onblur="closeNameComboDelayed('combo-first-dd');saveTurnedFirstFromInput()">
+        <div id="combo-first-dd" class="name-combo-dropdown"></div>
+      </div>
+      <button class="mini-copy-btn" onclick="cancelRepFirstEdit()">Cancel</button>
+    </div>` : `
+    <div class="name-combo">
+      <input type="text" id="rep-first-input" value="" autocomplete="off" placeholder="Type or select…" style="${inpStyle}"
+        oninput="filterNameCombo('combo-first-dd','rep-first-input')"
+        onfocus="openNameCombo('combo-first-dd','rep-first-input')"
+        onblur="closeNameComboDelayed('combo-first-dd');saveTurnedFirstFromInput()">
+      <div id="combo-first-dd" class="name-combo-dropdown"></div>
+    </div>`;
+
   return `<div style="background:rgba(74,158,255,0.07);border:1px solid rgba(74,158,255,0.2);border-radius:var(--radius);padding:14px 16px;margin-bottom:16px">
-    <!-- Header -->
-    <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:14px;gap:10px;flex-wrap:wrap">
-      <div style="flex:1">
-        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:8px">
-          ${currentTab==='Focus'?`<span style="font-size:10px;background:rgba(139,92,246,0.15);color:#a78bfa;padding:2px 7px;border-radius:4px;font-weight:700">Focus</span>`:''}
-          ${currentTab==='Lost'?`<span style="font-size:10px;background:var(--red-bg);color:var(--red);padding:2px 7px;border-radius:4px;font-weight:700">Lost</span>`:''}
-          ${originSource?`<span class="origin-tag">${originSource}</span>`:''}
-        </div>
-        <!-- First / Last Name -->
-        <div style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:8px">
-          <div>
-            <div class="field-label">First Name</div>
-            <div style="display:flex;align-items:center;gap:6px">
-              <span style="font-size:16px;font-weight:700;color:var(--text)">${fName||'—'}</span>
-              ${fName?`<button class="mini-copy-btn" onclick="copyText('${fName.replace(/'/g,"\\'")}',this)">Copy</button>`:''}
-            </div>
-          </div>
-          <div>
-            <div class="field-label">Last Name</div>
-            <div style="display:flex;align-items:center;gap:6px">
-              <span style="font-size:16px;font-weight:700;color:var(--text)">${lName||'—'}</span>
-              ${lName?`<button class="mini-copy-btn" onclick="copyText('${lName.replace(/'/g,"\\'")}',this)">Copy</button>`:''}
-            </div>
+    <!-- Name + Phone -->
+    <div style="margin-bottom:14px">
+      <div style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:8px">
+        <div>
+          <div class="field-label">First Name</div>
+          <div style="display:flex;align-items:center;gap:6px">
+            <span style="font-size:16px;font-weight:700;color:var(--text)">${fName||'—'}</span>
+            ${fName?`<button class="mini-copy-btn" onclick="copyText('${fName.replace(/'/g,"\\'")}',this)">Copy</button>`:''}
           </div>
         </div>
-        <!-- Phone -->
-        <div style="display:flex;align-items:center;gap:8px">
-          <span style="font-size:13px;font-family:'DM Mono',monospace;color:var(--text2)">${phone||'—'}</span>
-          ${lead.phone?`<button class="mini-copy-btn" onclick="copyText('${String(lead.phone||'').replace(/'/g,"\\'")}',this)">Copy</button>`:''}
+        <div>
+          <div class="field-label">Last Name</div>
+          <div style="display:flex;align-items:center;gap:6px">
+            <span style="font-size:16px;font-weight:700;color:var(--text)">${lName||'—'}</span>
+            ${lName?`<button class="mini-copy-btn" onclick="copyText('${lName.replace(/'/g,"\\'")}',this)">Copy</button>`:''}
+          </div>
         </div>
       </div>
-      <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:flex-start">
-        ${moveBtns}
+      <div style="display:flex;align-items:center;gap:8px">
+        <span style="font-size:13px;font-family:'DM Mono',monospace;color:var(--text2)">${phone||'—'}</span>
+        ${lead.phone?`<button class="mini-copy-btn" onclick="copyText('${String(lead.phone||'').replace(/'/g,"\\'")}',this)">Copy</button>`:''}
+      </div>
+    </div>
+
+    <!-- Lead Type (locked display, unlocks with Change) -->
+    <div style="margin-bottom:12px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px">
+        <div class="field-label" style="margin:0">Lead Type</div>
+        <button class="mini-copy-btn" onclick="toggleLeadTypeEdit()">Change</button>
+      </div>
+      <div id="lead-type-locked" style="display:flex;align-items:center;padding:7px 10px;background:var(--bg3);border:1px solid ${ts.border};border-radius:6px">
+        <span style="font-size:13px;font-weight:700;color:${ts.color}">${currentTab}</span>
+      </div>
+      <div id="lead-type-edit" style="display:none;margin-top:6px">
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px">
+          ${mkTypeBtn('Lot','Lot')}
+          ${mkTypeBtn('FB Marketplace','FB Marketplace')}
+          ${mkTypeBtn('FB Ad','FB Ad')}
+        </div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+          ${mkTypeBtn('Focus','→ Focus')}
+          ${mkTypeBtn('Lost','→ Lost')}
+          <button class="mini-copy-btn" onclick="toggleLeadTypeEdit()">Cancel</button>
+        </div>
       </div>
     </div>
 
@@ -1616,12 +1653,12 @@ function buildLeadSectionHtml(lead, car){
     </div>
 
     <!-- Notes -->
-    <div style="margin-bottom:10px">
+    <div style="margin-bottom:12px">
       <div class="field-label">Notes</div>
       <textarea style="width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:6px;font-family:'Syne',sans-serif;font-size:13px;outline:none;resize:vertical;min-height:56px;box-sizing:border-box" placeholder="Add notes…" onblur="updateLeadFieldFromDrawer('notes',this.value)">${notesEsc}</textarea>
     </div>
 
-    <!-- Sales Reps (First / Last) -->
+    <!-- Sales Reps -->
     <div>
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
         <div class="field-label" style="margin:0">Sales Reps</div>
@@ -1629,15 +1666,8 @@ function buildLeadSectionHtml(lead, car){
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
         <div>
-          <div class="field-label" style="margin-bottom:4px">First ${firstVal?`<span style="font-size:10px;padding:1px 6px;border-radius:3px;background:rgba(74,158,255,0.12);color:var(--accent);font-weight:700;margin-left:4px">Locked</span>`:''}</div>
-          <div class="name-combo">
-            <input type="text" id="rep-first-input" value="${firstVal.replace(/"/g,'&quot;')}" autocomplete="off" placeholder="Type or select…"
-              style="${inpStyle}${firstVal?';border-color:rgba(74,158,255,0.4)':''}"
-              oninput="filterNameCombo('combo-first-dd','rep-first-input')"
-              onfocus="openNameCombo('combo-first-dd','rep-first-input')"
-              onblur="closeNameComboDelayed('combo-first-dd');saveTurnedFirstFromInput()">
-            <div id="combo-first-dd" class="name-combo-dropdown"></div>
-          </div>
+          <div class="field-label" style="margin-bottom:4px">First</div>
+          ${firstSection}
         </div>
         <div>
           <div class="field-label" style="margin-bottom:4px">Last</div>
@@ -2477,6 +2507,9 @@ let leadsTab = 'Lot'; // 'Lot' | 'FB Marketplace' | 'FB Ad' | 'Focus' | 'Lost'
 function getLeadTab(lead) {
   if (lead.leadType) return lead.leadType;
   if (lead.inFocus === true || lead.inFocus === 'true') return 'Focus';
+  // Backward compat: infer tab from source for leads added before leadType was saved
+  const src = lead.source || '';
+  if (src === 'FB Marketplace' || src === 'FB Ad') return src;
   return 'Lot';
 }
 
@@ -2575,20 +2608,9 @@ function openTurnedToManager() {
 }
 function closeTurnedToManager() {
   document.getElementById('turned-to-manager-modal').classList.remove('open');
-  // Refresh turned-to dropdown in client tray if open
   if (currentLeadRowIndex !== null) {
     const lead = leadsData.find(l => l.rowIndex === currentLeadRowIndex);
-    const sel = document.getElementById('turned-to-select');
-    if (lead && sel) {
-      const names = getTurnedToNames();
-      const current = lead.turnedTo || '';
-      const inList = names.includes(current);
-      sel.innerHTML = [
-        `<option value="">— Select —</option>`,
-        ...names.map(n=>`<option value="${n}"${n===current?' selected':''}>${n}</option>`),
-        ...(current && !inList ? [`<option value="${current}" selected>${current}</option>`] : [])
-      ].join('');
-    }
+    if (lead) document.getElementById('drawer-body').innerHTML = buildLeadSectionHtml(lead, null);
   }
 }
 function addTurnedToName() {
@@ -2647,10 +2669,46 @@ function saveTurnedFirstFromInput() {
   const value = inp.value.trim();
   const lead = leadsData.find(l => l.rowIndex === currentLeadRowIndex); if (!lead) return;
   const changed = value !== (lead.turnedToFirst || '');
-  if (!changed) return;
+  if (!changed) {
+    // Collapse edit view back to locked display
+    const edit = document.getElementById('rep-first-edit');
+    const locked = document.getElementById('rep-first-locked');
+    if (edit && locked) { edit.style.display = 'none'; locked.style.display = 'flex'; }
+    return;
+  }
   updateLeadFieldFromDrawer('turnedToFirst', value);
-  // Re-render to update locked/unlocked visual state
   document.getElementById('drawer-body').innerHTML = buildLeadSectionHtml(lead, null);
+}
+function unlockRepFirst() {
+  const locked = document.getElementById('rep-first-locked');
+  const edit = document.getElementById('rep-first-edit');
+  if (locked) locked.style.display = 'none';
+  if (edit) {
+    edit.style.display = 'block';
+    setTimeout(() => { const inp = document.getElementById('rep-first-input'); if (inp) { inp.focus(); inp.select(); } }, 50);
+  }
+}
+function cancelRepFirstEdit() {
+  const lead = leadsData.find(l => l.rowIndex === currentLeadRowIndex);
+  const inp = document.getElementById('rep-first-input');
+  if (inp && lead) inp.value = lead.turnedToFirst || '';
+  const edit = document.getElementById('rep-first-edit');
+  const locked = document.getElementById('rep-first-locked');
+  if (edit) edit.style.display = 'none';
+  if (locked) locked.style.display = 'flex';
+}
+function toggleLeadTypeEdit() {
+  const edit = document.getElementById('lead-type-edit');
+  const locked = document.getElementById('lead-type-locked');
+  if (!edit || !locked) return;
+  const open = edit.style.display !== 'none';
+  edit.style.display = open ? 'none' : 'flex';
+  edit.style.flexDirection = open ? '' : 'column';
+  locked.style.display = open ? 'flex' : 'none';
+}
+async function changeLeadType(newType) {
+  if (currentLeadRowIndex === null) return;
+  await moveLeadTo(currentLeadRowIndex, newType);
 }
 
 // ── LVA filter (Live Only vs All) ─────────────────────────────
@@ -3132,10 +3190,7 @@ async function selectVehicleForLead(vin){
     await apiPost('updateLead',{rowIndex:currentLeadRowIndex,field:'vin',value:vin});
     await apiPost('updateLead',{rowIndex:currentLeadRowIndex,field:'vehicle',value:getTitle(car)});
   } catch(e){ showToast('Failed to save vehicle change'); return; }
-  currentVin=vin;
-  document.getElementById('drawer-title').textContent=getTitle(car);
-  document.getElementById('drawer-vin').textContent=car.vin;
-  renderDrawer(car);
+  if(lead) document.getElementById('drawer-body').innerHTML = buildLeadSectionHtml(lead, null);
   showToast('Vehicle updated');
   renderLeads();
 }
