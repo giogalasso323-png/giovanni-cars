@@ -1543,7 +1543,8 @@ function buildLeadSectionHtml(lead, car){
   const SOURCE_STYLE = {
     'Lot':            { color:'var(--blue)',  border:'rgba(82,153,255,0.3)' },
     'FB Marketplace': { color:'#a78bfa',      border:'rgba(167,139,250,0.3)' },
-    'FB Ad':          { color:'var(--amber)', border:'rgba(240,160,48,0.3)' }
+    'FB Ad':          { color:'var(--amber)', border:'rgba(240,160,48,0.3)' },
+    'Website':        { color:'var(--green)', border:'rgba(52,211,153,0.3)' }
   };
   const ss = SOURCE_STYLE[sourceType] || { color:'var(--text2)', border:'var(--border)' };
 
@@ -1649,6 +1650,7 @@ function buildLeadSectionHtml(lead, car){
           ${mkSrcBtn('Lot','Lot')}
           ${mkSrcBtn('FB Marketplace','FB Marketplace')}
           ${mkSrcBtn('FB Ad','FB Ad')}
+          ${mkSrcBtn('Website','Website')}
         </div>
         <button class="mini-copy-btn" onclick="toggleLeadTypeEdit()" style="margin-top:2px">Cancel</button>
       </div>
@@ -2640,27 +2642,25 @@ let leadsFilter = 'all'; // 'all' | 'matched'
 let leadsTab = 'Lot'; // 'Lot' | 'FB Marketplace' | 'FB Ad' | 'Focus' | 'Lost'
 
 function getLeadTab(lead) {
-  // Pipeline status (inFocus field) takes priority over source type
   const ip = lead.inFocus || '';
   if (ip === 'Focus' || ip === true || ip === 'true') return 'Focus';
   if (ip === 'Lost') return 'Lost';
-  // leadType might store old Focus/Lost (before model change)
   const lt = lead.leadType || '';
   if (lt === 'Focus') return 'Focus';
   if (lt === 'Lost') return 'Lost';
   if (lt) return lt;
-  // Fallback: infer from source field for old leads
   const src = lead.source || '';
   if (src === 'FB Marketplace' || src === 'FB Ad') return src;
+  if (src === 'website' || src === 'Website' || src === 'Website - Get in Touch') return 'Website';
   return 'Lot';
 }
 
 function getLeadSourceType(lead) {
-  // Always returns the source bucket (Lot/FB Marketplace/FB Ad), never Focus/Lost
   const lt = lead.leadType || '';
   if (lt && lt !== 'Focus' && lt !== 'Lost') return lt;
   const src = lead.source || '';
   if (src === 'FB Marketplace' || src === 'FB Ad') return src;
+  if (src === 'website' || src === 'Website' || src === 'Website - Get in Touch') return 'Website';
   return 'Lot';
 }
 
@@ -2969,7 +2969,7 @@ function renderLeads(){
   const subtitle = document.getElementById('leads-subtitle');
 
   // Render tab bar with counts
-  const TABS = ['Lot','FB Marketplace','FB Ad','Focus','Lost'];
+  const TABS = ['Lot','FB Marketplace','FB Ad','Website','Focus','Lost'];
   const tabCls = { 'Focus':'tab-focus', 'Lost':'tab-lost' };
   const tabsEl = document.getElementById('lead-type-tabs');
   if (tabsEl) {
@@ -3036,7 +3036,7 @@ function renderLeads(){
     const fullName = [fName, lName].filter(Boolean).join(' ') || '—';
     const phone = fmtPhone(lead.phone);
     const srcBadge = (leadsTab === 'Focus' || leadsTab === 'Lost')
-      ? (() => { const src = getLeadSourceType(lead); const srcColors = {'Lot':'var(--blue)','FB Marketplace':'var(--purple)','FB Ad':'var(--amber)'}; return `<span style="font-size:10px;color:${srcColors[src]||'var(--text3)'};background:var(--bg3);padding:2px 7px;border-radius:4px;font-weight:600">${src}</span>`; })()
+      ? (() => { const src = getLeadSourceType(lead); const srcColors = {'Lot':'var(--blue)','FB Marketplace':'var(--purple)','FB Ad':'var(--amber)','Website':'var(--green)'}; return `<span style="font-size:10px;color:${srcColors[src]||'var(--text3)'};background:var(--bg3);padding:2px 7px;border-radius:4px;font-weight:600">${src}</span>`; })()
       : '';
     return `<tr class="${isSelected?'lead-selected':''}" onclick="openDrawerFromLead(${lead.rowIndex})" style="cursor:pointer">
       <td onclick="event.stopPropagation()"><input type="checkbox" ${isSelected?'checked':''} onchange="toggleLeadSelect(${lead.rowIndex},this)"></td>

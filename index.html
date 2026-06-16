@@ -995,6 +995,8 @@ async function submitContactForm(e) {
         vehicle:   document.getElementById('cVehicle').value.trim(),
         timeframe: document.getElementById('cTimeframe').value,
         source:    'Website - Get in Touch',
+        leadType:  'Website',
+        addedBy:   'Website',
         status:    'New'
       })
     });
@@ -1087,7 +1089,9 @@ async function submitLead(e) {
     firstName, lastName, phone, timeframe,
     vehicle,
     vin: currentCar ? (currentCar.vin || '') : '',
-    source: 'website'
+    source: 'website',
+    leadType: 'Website',
+    addedBy: 'Website'
   };
 
   try {
