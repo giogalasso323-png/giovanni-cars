@@ -59,6 +59,8 @@ function handleRequest(e) {
       case 'updateNewCar':       result = updateNewCar(body.vin, body.field, body.value); break;
       case 'scrapeNewVehicles':  result = scrapeNewVehicles(body.vins);                   break;
       case 'importCostData': result = importCostData(body.records);               break;
+      case 'getSettings':    result = getSettings();                               break;
+      case 'saveSetting':    result = saveSetting(body.key, body.value);          break;
       case 'ping':           result = { ok: true };                                break;
       default:               result = { error: 'Unknown action: ' + action };
     }
@@ -112,6 +114,42 @@ function deleteLead(rowIndex) {
   if (!rowIndex) return { error: 'Missing rowIndex' };
   var sh = getLeadsSheet();
   sh.deleteRow(Number(rowIndex));
+  return { ok: true };
+}
+
+// ── Settings Sheet ────────────────────────────────────────────
+function getSettingsSheet() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sh = ss.getSheetByName('Settings');
+  if (!sh) {
+    sh = ss.insertSheet('Settings');
+    sh.getRange(1, 1, 1, 2).setValues([['key', 'value']]);
+    sh.setFrozenRows(1);
+  }
+  return sh;
+}
+
+function getSettings() {
+  var sh = getSettingsSheet();
+  var last = sh.getLastRow();
+  if (last < 2) return {};
+  var data = sh.getRange(2, 1, last - 1, 2).getValues();
+  var result = {};
+  data.forEach(function(row) { if (row[0]) result[String(row[0])] = String(row[1]); });
+  return result;
+}
+
+function saveSetting(key, value) {
+  if (!key) return { error: 'Missing key' };
+  var sh = getSettingsSheet();
+  var last = sh.getLastRow();
+  if (last >= 2) {
+    var data = sh.getRange(2, 1, last - 1, 1).getValues();
+    for (var i = 0; i < data.length; i++) {
+      if (data[i][0] === key) { sh.getRange(i + 2, 2).setValue(value); return { ok: true }; }
+    }
+  }
+  sh.appendRow([key, value]);
   return { ok: true };
 }
 

@@ -858,6 +858,7 @@ function bootApp() {
   localStorage.setItem(URL_KEY, saved);
   showApp();
   loadFromSheet();
+  loadRepNames();
 }
 
 async function testAndSaveUrl() {
@@ -1527,21 +1528,26 @@ function buildLeadSectionHtml(lead, car){
     .map(t=>`<option value="${t}"${t===lead.timeframe?' selected':''}>${t}</option>`).join('');
   const statusOpts=LEAD_STATUSES.map(s=>`<option value="${s}"${s===(lead.status||'New')?' selected':''}>${s}</option>`).join('');
 
-  const currentTab = getLeadTab(lead);
-  const TYPE_STYLE = {
-    'Lot':            { color:'var(--accent)',  border:'rgba(74,158,255,0.3)' },
-    'FB Marketplace': { color:'#a78bfa',        border:'rgba(139,92,246,0.3)' },
-    'FB Ad':          { color:'#f59e0b',         border:'rgba(245,158,11,0.3)' },
-    'Focus':          { color:'#a78bfa',        border:'rgba(139,92,246,0.3)' },
-    'Lost':           { color:'var(--red)',     border:'rgba(220,38,38,0.3)' }
-  };
-  const ts = TYPE_STYLE[currentTab] || { color:'var(--text2)', border:'var(--border)' };
+  const sourceType = getLeadSourceType(lead);  // Lot / FB Marketplace / FB Ad
+  const inFocus = lead.inFocus || '';           // '' | 'Focus' | 'Lost'
 
-  const mkTypeBtn = (type, label) => {
-    const active = currentTab === type;
+  const SOURCE_STYLE = {
+    'Lot':            { color:'var(--blue)',  border:'rgba(82,153,255,0.3)' },
+    'FB Marketplace': { color:'#a78bfa',      border:'rgba(167,139,250,0.3)' },
+    'FB Ad':          { color:'var(--amber)', border:'rgba(240,160,48,0.3)' }
+  };
+  const ss = SOURCE_STYLE[sourceType] || { color:'var(--text2)', border:'var(--border)' };
+
+  const mkSrcBtn = (type, label) => {
+    const active = sourceType === type;
     return active
       ? `<button class="lead-type-tab active" disabled style="opacity:0.5;cursor:default">${label}</button>`
       : `<button class="lead-type-tab" onclick="changeLeadType('${type}')">${label}</button>`;
+  };
+
+  const mkPipeBtn = (val, label, color) => {
+    const active = inFocus === val;
+    return `<button class="lead-type-tab${active?' active':''}" style="${active?`background:${color};color:#fff;border-color:${color};opacity:1;cursor:default`:''}" ${active?'disabled':''} onclick="${val===''?'returnLeadToSource()':'moveLeadTo('+lead.rowIndex+',\''+val+'\')'}">${label}</button>`;
   };
 
   const fName = capName(lead.firstName);
@@ -1555,9 +1561,12 @@ function buildLeadSectionHtml(lead, car){
 
   const notesEsc = (lead.notes||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
   const viEsc = (lead.vehicleInterest||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  const fEsc = fName.replace(/"/g,'&quot;');
+  const lEsc = lName.replace(/"/g,'&quot;');
+  const phEsc = (lead.phone||'').replace(/"/g,'&quot;');
 
   const firstSection = firstVal ? `
-    <div id="rep-first-locked" style="display:flex;align-items:center;gap:8px;padding:7px 10px;background:var(--bg3);border:1px solid rgba(74,158,255,0.4);border-radius:6px">
+    <div id="rep-first-locked" style="display:flex;align-items:center;gap:8px;padding:7px 10px;background:var(--bg3);border:1px solid rgba(82,153,255,0.4);border-radius:6px">
       <span style="font-size:13px;font-weight:600;color:var(--text);flex:1">${firstVal}</span>
       <button class="mini-copy-btn" onclick="unlockRepFirst()">Change</button>
     </div>
@@ -1579,51 +1588,70 @@ function buildLeadSectionHtml(lead, car){
       <div id="combo-first-dd" class="name-combo-dropdown"></div>
     </div>`;
 
-  return `<div style="background:rgba(74,158,255,0.07);border:1px solid rgba(74,158,255,0.2);border-radius:var(--radius);padding:14px 16px;margin-bottom:16px">
-    <!-- Name + Phone -->
-    <div style="margin-bottom:14px">
-      <div style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:8px">
+  return `<div style="background:rgba(82,153,255,0.06);border:1px solid rgba(82,153,255,0.18);border-radius:var(--radius);padding:14px 16px;margin-bottom:16px">
+
+    <!-- Contact Info: display + edit -->
+    <div id="lead-contact-display" style="margin-bottom:14px">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px">
         <div>
-          <div class="field-label">First Name</div>
-          <div style="display:flex;align-items:center;gap:6px">
-            <span style="font-size:16px;font-weight:700;color:var(--text)">${fName||'—'}</span>
-            ${fName?`<button class="mini-copy-btn" onclick="copyText('${fName.replace(/'/g,"\\'")}',this)">Copy</button>`:''}
+          <div style="font-size:17px;font-weight:800;color:var(--text);line-height:1.2">${(fName||'') + (lName?' '+lName:'') || '—'}</div>
+          <div style="display:flex;align-items:center;gap:8px;margin-top:5px">
+            <span style="font-size:13px;font-family:'DM Mono',monospace;color:var(--text2)">${phone||'—'}</span>
+            ${lead.phone?`<button class="mini-copy-btn" onclick="event.stopPropagation();copyText('${String(lead.phone||'').replace(/'/g,"\\'")}',this)">Copy</button>`:''}
           </div>
         </div>
-        <div>
-          <div class="field-label">Last Name</div>
-          <div style="display:flex;align-items:center;gap:6px">
-            <span style="font-size:16px;font-weight:700;color:var(--text)">${lName||'—'}</span>
-            ${lName?`<button class="mini-copy-btn" onclick="copyText('${lName.replace(/'/g,"\\'")}',this)">Copy</button>`:''}
-          </div>
-        </div>
-      </div>
-      <div style="display:flex;align-items:center;gap:8px">
-        <span style="font-size:13px;font-family:'DM Mono',monospace;color:var(--text2)">${phone||'—'}</span>
-        ${lead.phone?`<button class="mini-copy-btn" onclick="copyText('${String(lead.phone||'').replace(/'/g,"\\'")}',this)">Copy</button>`:''}
+        <button class="mini-copy-btn" onclick="openContactEdit()" style="flex-shrink:0;margin-top:2px">Edit</button>
       </div>
     </div>
 
-    <!-- Lead Type (locked display, unlocks with Change) -->
+    <div id="lead-contact-edit" style="display:none;margin-bottom:14px;padding:12px;background:var(--bg3);border:1px solid var(--border2);border-radius:8px">
+      <div class="field-label" style="margin-bottom:8px;font-size:11px;text-transform:uppercase;letter-spacing:0.5px">Edit Contact</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+        <div>
+          <div class="field-label">First Name</div>
+          <input type="text" id="edit-first-input" value="${fEsc}" autocomplete="off" style="${inpStyle}" placeholder="First name">
+        </div>
+        <div>
+          <div class="field-label">Last Name</div>
+          <input type="text" id="edit-last-input" value="${lEsc}" autocomplete="off" style="${inpStyle}" placeholder="Last name">
+        </div>
+      </div>
+      <div style="margin-bottom:8px">
+        <div class="field-label">Phone</div>
+        <input type="text" id="edit-phone-input" value="${phEsc}" autocomplete="off" style="${inpStyle}" placeholder="Phone number">
+      </div>
+      <div style="display:flex;gap:8px">
+        <button class="btn" style="font-size:12px;padding:5px 14px" onclick="saveContactEdit()">Save</button>
+        <button class="mini-copy-btn" onclick="cancelContactEdit()">Cancel</button>
+      </div>
+    </div>
+
+    <!-- Lead Source (original channel — Lot / FB Marketplace / FB Ad) -->
     <div style="margin-bottom:12px">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px">
-        <div class="field-label" style="margin:0">Lead Type</div>
+        <div class="field-label" style="margin:0">Lead Source</div>
         <button class="mini-copy-btn" onclick="toggleLeadTypeEdit()">Change</button>
       </div>
-      <div id="lead-type-locked" style="display:flex;align-items:center;padding:7px 10px;background:var(--bg3);border:1px solid ${ts.border};border-radius:6px">
-        <span style="font-size:13px;font-weight:700;color:${ts.color}">${currentTab}</span>
+      <div id="lead-type-locked" style="display:flex;align-items:center;padding:7px 10px;background:var(--bg3);border:1px solid ${ss.border};border-radius:6px">
+        <span style="font-size:13px;font-weight:700;color:${ss.color}">${sourceType}</span>
       </div>
       <div id="lead-type-edit" style="display:none;margin-top:6px">
-        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px">
-          ${mkTypeBtn('Lot','Lot')}
-          ${mkTypeBtn('FB Marketplace','FB Marketplace')}
-          ${mkTypeBtn('FB Ad','FB Ad')}
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:4px">
+          ${mkSrcBtn('Lot','Lot')}
+          ${mkSrcBtn('FB Marketplace','FB Marketplace')}
+          ${mkSrcBtn('FB Ad','FB Ad')}
         </div>
-        <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
-          ${mkTypeBtn('Focus','→ Focus')}
-          ${mkTypeBtn('Lost','→ Lost')}
-          <button class="mini-copy-btn" onclick="toggleLeadTypeEdit()">Cancel</button>
-        </div>
+        <button class="mini-copy-btn" onclick="toggleLeadTypeEdit()" style="margin-top:2px">Cancel</button>
+      </div>
+    </div>
+
+    <!-- Pipeline Status (Active / Focus / Lost) -->
+    <div style="margin-bottom:12px">
+      <div class="field-label" style="margin-bottom:6px">Pipeline Status</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap">
+        ${mkPipeBtn('','Active','var(--green)')}
+        ${mkPipeBtn('Focus','Focus','var(--purple)')}
+        ${mkPipeBtn('Lost','Lost','var(--red)')}
       </div>
     </div>
 
@@ -1687,6 +1715,35 @@ function buildLeadSectionHtml(lead, car){
     </div>
   </div>
   <div id="lead-vehicles-section">${buildVehicleListHtml(lead)}</div>`;
+}
+
+function openContactEdit() {
+  document.getElementById('lead-contact-display').style.display = 'none';
+  document.getElementById('lead-contact-edit').style.display = 'block';
+  const inp = document.getElementById('edit-first-input');
+  if (inp) setTimeout(() => inp.focus(), 50);
+}
+function cancelContactEdit() {
+  document.getElementById('lead-contact-edit').style.display = 'none';
+  document.getElementById('lead-contact-display').style.display = '';
+}
+async function saveContactEdit() {
+  if (currentLeadRowIndex === null) return;
+  const lead = leadsData.find(l => l.rowIndex === currentLeadRowIndex);
+  if (!lead) return;
+  const fn = (document.getElementById('edit-first-input').value||'').trim();
+  const ln = (document.getElementById('edit-last-input').value||'').trim();
+  const ph = (document.getElementById('edit-phone-input').value||'').trim();
+  const saves = [];
+  if (fn !== (lead.firstName||'')) { lead.firstName = fn; saves.push(apiPost('updateLead',{rowIndex:currentLeadRowIndex,field:'firstName',value:fn})); }
+  if (ln !== (lead.lastName||''))  { lead.lastName  = ln; saves.push(apiPost('updateLead',{rowIndex:currentLeadRowIndex,field:'lastName',value:ln})); }
+  if (ph !== (lead.phone||''))     { lead.phone     = ph; saves.push(apiPost('updateLead',{rowIndex:currentLeadRowIndex,field:'phone',value:ph})); }
+  try {
+    if (saves.length) await Promise.all(saves);
+    showToast(saves.length ? 'Contact updated' : 'No changes');
+    renderLeads();
+    document.getElementById('drawer-body').innerHTML = buildLeadSectionHtml(lead, null);
+  } catch(e) { showToast('Failed: ' + e.message); }
 }
 
 function buildVehicleListHtml(lead) {
@@ -1759,15 +1816,38 @@ function selectAlLeadType(type) {
 async function moveLeadTo(rowIndex, newType) {
   const lead = leadsData.find(l => l.rowIndex === rowIndex);
   if (!lead) return;
-  lead.leadType = newType;
+  const saves = [];
+  if (newType === 'Focus' || newType === 'Lost') {
+    // Pipeline state change — preserve source type in leadType
+    lead.inFocus = newType;
+    saves.push(apiPost('updateLead', { rowIndex, field: 'inFocus', value: newType }));
+    // Also ensure leadType is a source type (not a stale Focus/Lost from old data)
+    const src = getLeadSourceType(lead);
+    if (lead.leadType !== src) {
+      lead.leadType = src;
+      saves.push(apiPost('updateLead', { rowIndex, field: 'leadType', value: src }));
+    }
+  } else {
+    // Source type change — clear pipeline status
+    lead.leadType = newType;
+    lead.inFocus = '';
+    saves.push(apiPost('updateLead', { rowIndex, field: 'leadType', value: newType }));
+    saves.push(apiPost('updateLead', { rowIndex, field: 'inFocus', value: '' }));
+  }
   try {
-    await apiPost('updateLead', { rowIndex, field: 'leadType', value: newType });
-    showToast('Moved to ' + newType);
+    await Promise.all(saves);
+    showToast(newType === 'Focus' || newType === 'Lost' ? 'Set to ' + newType : 'Moved to ' + newType);
     renderLeads();
     if (currentLeadRowIndex === rowIndex) {
       document.getElementById('drawer-body').innerHTML = buildLeadSectionHtml(lead, null);
     }
   } catch(e) { showToast('Failed: ' + e.message); }
+}
+async function returnLeadToSource() {
+  if (currentLeadRowIndex === null) return;
+  const lead = leadsData.find(l => l.rowIndex === currentLeadRowIndex);
+  if (!lead) return;
+  await moveLeadTo(currentLeadRowIndex, getLeadSourceType(lead));
 }
 
 // ── Add Vehicle to Lead ───────────────────────────────────────
@@ -2514,9 +2594,25 @@ let leadsFilter = 'all'; // 'all' | 'matched'
 let leadsTab = 'Lot'; // 'Lot' | 'FB Marketplace' | 'FB Ad' | 'Focus' | 'Lost'
 
 function getLeadTab(lead) {
-  if (lead.leadType) return lead.leadType;
-  if (lead.inFocus === true || lead.inFocus === 'true') return 'Focus';
-  // Backward compat: infer tab from source for leads added before leadType was saved
+  // Pipeline status (inFocus field) takes priority over source type
+  const ip = lead.inFocus || '';
+  if (ip === 'Focus' || ip === true || ip === 'true') return 'Focus';
+  if (ip === 'Lost') return 'Lost';
+  // leadType might store old Focus/Lost (before model change)
+  const lt = lead.leadType || '';
+  if (lt === 'Focus') return 'Focus';
+  if (lt === 'Lost') return 'Lost';
+  if (lt) return lt;
+  // Fallback: infer from source field for old leads
+  const src = lead.source || '';
+  if (src === 'FB Marketplace' || src === 'FB Ad') return src;
+  return 'Lot';
+}
+
+function getLeadSourceType(lead) {
+  // Always returns the source bucket (Lot/FB Marketplace/FB Ad), never Focus/Lost
+  const lt = lead.leadType || '';
+  if (lt && lt !== 'Focus' && lt !== 'Lost') return lt;
   const src = lead.source || '';
   if (src === 'FB Marketplace' || src === 'FB Ad') return src;
   return 'Lot';
@@ -2575,6 +2671,7 @@ function buildMatchingSectionHtml(lead) {
 // ── LEADS ──────────────────────────────────────────────────
 let leadsData = [];
 let selectedLeads = new Set();
+let appSettings = { repNames: [] };
 const LEAD_STATUSES = ['New','One Way Communication','Two Way Communication','Cold','Appt','Sold','Lost'];
 const LEAD_STATUS_COLORS = {
   'New':'s-new','One Way Communication':'s-oneway','Two Way Communication':'s-twoway',
@@ -2594,12 +2691,28 @@ function capName(n) {
   return String(n||'').split(' ').map(w=>w?w[0].toUpperCase()+w.slice(1):'').join(' ').trim();
 }
 
-// ── Turned To name list (localStorage) ───────────────────────
+// ── Sales rep name list (backend-persisted, localStorage fallback) ──
+async function loadRepNames() {
+  try {
+    const res = await apiGet('getSettings');
+    if (res.repNames) {
+      const parsed = JSON.parse(res.repNames);
+      if (Array.isArray(parsed) && parsed.length) {
+        appSettings.repNames = parsed;
+        localStorage.setItem('turnedToNames', JSON.stringify(parsed));
+        return;
+      }
+    }
+  } catch(e) {}
+  try { appSettings.repNames = JSON.parse(localStorage.getItem('turnedToNames')||'[]'); } catch { appSettings.repNames = []; }
+}
 function getTurnedToNames() {
-  try { return JSON.parse(localStorage.getItem('turnedToNames')||'[]'); } catch { return []; }
+  return appSettings.repNames || [];
 }
 function saveTurnedToNames(names) {
+  appSettings.repNames = names;
   localStorage.setItem('turnedToNames', JSON.stringify(names));
+  apiPost('saveSetting', { key: 'repNames', value: JSON.stringify(names) }).catch(() => {});
 }
 function openTurnedToManager() {
   const names = getTurnedToNames();
@@ -2862,14 +2975,6 @@ function renderLeads(){
       ? `<span class="match-badge">● ${lead._matches.length} Match${lead._matches.length!==1?'es':''}</span>`
       : '';
 
-    const inFocusBadge = (leadsTab === 'Focus')
-      ? `<span style="font-size:10px;background:rgba(139,92,246,0.12);color:#a78bfa;padding:2px 7px;border-radius:4px;font-weight:600;margin-left:4px">Focus</span>`
-      : (leadsTab === 'Lost')
-      ? `<span style="font-size:10px;background:var(--red-bg);color:var(--red);padding:2px 7px;border-radius:4px;font-weight:600;margin-left:4px">Lost</span>`
-      : '';
-    const originBadge = (lead.source && lead.source !== 'manual' && lead.source !== 'Cowork')
-      ? `<span class="origin-tag">${lead.source}</span>`
-      : '';
     const turnedToParts = [
       lead.turnedToFirst ? '1st: '+lead.turnedToFirst : '',
       lead.turnedTo ? 'Last: '+lead.turnedTo : ''
@@ -2880,24 +2985,24 @@ function renderLeads(){
 
     const fName = capName(lead.firstName);
     const lName = capName(lead.lastName);
+    const fullName = [fName, lName].filter(Boolean).join(' ') || '—';
     const phone = fmtPhone(lead.phone);
+    const srcBadge = (leadsTab === 'Focus' || leadsTab === 'Lost')
+      ? (() => { const src = getLeadSourceType(lead); const srcColors = {'Lot':'var(--blue)','FB Marketplace':'var(--purple)','FB Ad':'var(--amber)'}; return `<span style="font-size:10px;color:${srcColors[src]||'var(--text3)'};background:var(--bg3);padding:2px 7px;border-radius:4px;font-weight:600">${src}</span>`; })()
+      : '';
     return `<tr class="${isSelected?'lead-selected':''}" onclick="openDrawerFromLead(${lead.rowIndex})" style="cursor:pointer">
       <td onclick="event.stopPropagation()"><input type="checkbox" ${isSelected?'checked':''} onchange="toggleLeadSelect(${lead.rowIndex},this)"></td>
       <td style="color:var(--text3);font-family:'DM Mono',monospace;font-size:11px;white-space:nowrap">${date}</td>
-      <td class="td-main" onclick="event.stopPropagation()">
-        <div style="display:flex;align-items:center;gap:4px;white-space:nowrap">
-          <span style="font-size:13px;font-weight:600;color:var(--text)">${fName||'—'}</span>
-          ${fName?`<button class="mini-copy-btn" onclick="copyText('${fName.replace(/'/g,"\\'")}',this)">Copy</button>`:''}
+      <td class="td-main">
+        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+          <span style="font-size:13px;font-weight:600;color:var(--text)">${fullName}</span>
+          ${fullName !== '—' ? `<button class="mini-copy-btn" onclick="event.stopPropagation();copyText('${fullName.replace(/'/g,"\\'")}',this)">Copy</button>` : ''}
         </div>
-        <div style="display:flex;align-items:center;gap:4px;white-space:nowrap;margin-top:2px">
-          <span style="font-size:12px;color:var(--text2)">${lName||'—'}</span>
-          ${lName?`<button class="mini-copy-btn" onclick="copyText('${lName.replace(/'/g,"\\'")}',this)">Copy</button>`:''}
-        </div>
-        <div style="margin-top:3px">${originBadge}${inFocusBadge}${turnedTo}</div>
+        <div style="display:flex;align-items:center;gap:4px;flex-wrap:wrap;margin-top:3px">${srcBadge}${turnedTo}</div>
       </td>
-      <td onclick="event.stopPropagation()" style="white-space:nowrap">
+      <td style="white-space:nowrap">
         <span style="font-family:'DM Mono',monospace;font-size:12px;color:var(--text2)">${phone||'—'}</span>
-        ${lead.phone?`<button class="mini-copy-btn" style="margin-left:6px" onclick="copyText('${String(lead.phone||'').replace(/'/g,"\\'")}',this)">Copy</button>`:''}
+        ${lead.phone?`<button class="mini-copy-btn" style="margin-left:6px" onclick="event.stopPropagation();copyText('${String(lead.phone||'').replace(/'/g,"\\'")}',this)">Copy</button>`:''}
       </td>
       <td>${vehicleCell}${matchBadge}</td>
       <td><span style="font-size:11px;background:var(--bg3);padding:2px 8px;border-radius:4px;color:var(--text3);white-space:nowrap">${lead.timeframe||'—'}</span></td>
