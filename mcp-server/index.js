@@ -72,8 +72,14 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
     },
     {
       name: 'scrape_inventory',
-      description: 'Trigger a website sync — scrapes dublintoyota.com for current prices, availability, and sold status, then updates the inventory sheet. This is the same as clicking the Sync button in the web app. Takes 2-5 minutes to complete. Run this to detect price drops, sold cars, and cars removed from the website.',
-      inputSchema: { type: 'object', properties: {} }
+      description: 'Sync inventory with dublintoyota.com — checks current prices, availability, and sold status, then updates the sheet. Run in chunks of 25 (default) to avoid timeouts. Call repeatedly with offset to cover all cars. Returns { scraped, delistCount, errors, total, done } — done:true means all cars covered.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          limit:  { type: 'number', description: 'Cars to scrape per call (default 25)' },
+          offset: { type: 'number', description: 'Start from this car index (default 0). Increment by limit each call to page through all inventory.' }
+        }
+      }
     },
     {
       name: 'search_inventory',
@@ -285,19 +291,23 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     switch (name) {
 
       case 'scrape_inventory': {
-        // Step 1: get all active VINs
+        const limit  = args.limit  || 25;
+        const offset = args.offset || 0;
+
+        // Get all active VINs
         const allData = await callScript('getAll');
         const allCars = allData.cars || [];
         const vinsToScrape = allCars
           .filter(c => c.websiteStatus !== 'Sold/Unavailable' && c.fbStatus !== 'sold' && c.vin)
           .map(c => c.vin);
-        if (!vinsToScrape.length) { result = { scraped: 0, message: 'No active vehicles to scrape' }; break; }
+        if (!vinsToScrape.length) { result = { scraped: 0, total: 0, done: true, message: 'No active vehicles' }; break; }
 
-        // Step 2: scrape in batches of 5, write back each batch
+        const chunk = vinsToScrape.slice(offset, offset + limit);
         const BATCH = 5;
         let scraped = 0, delistCount = 0, errors = 0;
-        for (let i = 0; i < vinsToScrape.length; i += BATCH) {
-          const batch = vinsToScrape.slice(i, i + BATCH);
+
+        for (let i = 0; i < chunk.length; i += BATCH) {
+          const batch = chunk.slice(i, i + BATCH);
           try {
             const res = await callScript('scrapeVehicles', { vins: batch });
             const results = res.results || [];
@@ -306,7 +316,14 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             if (results.length) await callScript('upsertMany', { cars: results });
           } catch (e) { errors++; }
         }
-        result = { scraped, delistCount, errors, total: vinsToScrape.length };
+
+        result = {
+          scraped, delistCount, errors,
+          total: vinsToScrape.length,
+          offset, limit,
+          done: (offset + limit) >= vinsToScrape.length,
+          nextOffset: (offset + limit) >= vinsToScrape.length ? null : offset + limit
+        };
         break;
       }
 
