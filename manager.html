@@ -4,23 +4,23 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Dublin Toyota — Inventory Manager</title>
-<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
   :root {
-    --bg: #0f0f10; --bg2: #181819; --bg3: #222224; --bg4: #2c2c2f;
-    --border: rgba(255,255,255,0.08); --border2: rgba(255,255,255,0.14);
-    --text: #f0efe8; --text2: #9a9994; --text3: #5c5c58;
-    --red: #e8473f; --red-bg: rgba(232,71,63,0.12);
-    --green: #3fb950; --green-bg: rgba(63,185,80,0.12);
-    --amber: #f0a030; --amber-bg: rgba(240,160,48,0.12);
-    --blue: #4a9eff; --blue-bg: rgba(74,158,255,0.12);
-    --purple: #a78bfa; --purple-bg: rgba(167,139,250,0.12);
+    --bg: #0e1016; --bg2: #15192a; --bg3: #1e2236; --bg4: #272d46;
+    --border: rgba(255,255,255,0.1); --border2: rgba(255,255,255,0.2);
+    --text: #e2e8f5; --text2: #8592b0; --text3: #5e6880;
+    --red: #e8473f; --red-bg: rgba(232,71,63,0.14);
+    --green: #3fb950; --green-bg: rgba(63,185,80,0.14);
+    --amber: #f0a030; --amber-bg: rgba(240,160,48,0.14);
+    --blue: #5299ff; --blue-bg: rgba(82,153,255,0.14);
+    --purple: #a78bfa; --purple-bg: rgba(167,139,250,0.14);
     --accent: #e8473f; --radius: 8px; --radius-lg: 12px;
   }
-  body { font-family: 'Syne', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; font-size: 14px; overflow-x: hidden; }
+  body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; font-size: 14px; overflow-x: hidden; }
 
   /* SETUP */
   .setup-screen { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; }
@@ -34,7 +34,7 @@
   .step-body strong { color: var(--text); }
   .mono { font-family: 'DM Mono', monospace; font-size: 11px; color: var(--text3); background: var(--bg3); padding: 2px 6px; border-radius: 3px; }
   .url-row { display: flex; gap: 8px; margin-top: 8px; }
-  .url-row input { flex: 1; background: var(--bg3); border: 1px solid var(--border); color: var(--text); padding: 9px 12px; border-radius: var(--radius); font-family: 'Syne', sans-serif; font-size: 13px; outline: none; }
+  .url-row input { flex: 1; background: var(--bg3); border: 1px solid var(--border); color: var(--text); padding: 9px 12px; border-radius: var(--radius); font-family: 'Inter', sans-serif; font-size: 13px; outline: none; }
   .url-row input:focus { border-color: var(--border2); }
   .url-row input::placeholder { color: var(--text3); }
   .connect-status { font-size: 12px; margin-top: 8px; min-height: 18px; }
@@ -56,7 +56,7 @@
 
   /* TABS */
   .filter-tabs { display: flex; gap: 4px; padding: 0 28px; border-bottom: 1px solid var(--border); background: var(--bg2); overflow-x: auto; }
-  .filter-tab { padding: 10px 14px; font-size: 13px; font-weight: 500; color: var(--text3); cursor: pointer; border: none; background: none; border-bottom: 2px solid transparent; font-family: 'Syne', sans-serif; transition: all 0.15s; white-space: nowrap; }
+  .filter-tab { padding: 10px 14px; font-size: 13px; font-weight: 500; color: var(--text3); cursor: pointer; border: none; background: none; border-bottom: 2px solid transparent; font-family: 'Inter', sans-serif; transition: all 0.15s; white-space: nowrap; }
   .filter-tab:hover { color: var(--text2); }
   .filter-tab.active { color: var(--text); border-bottom-color: var(--accent); }
   .tab-count { background: var(--bg3); color: var(--text3); font-size: 10px; padding: 1px 6px; border-radius: 10px; margin-left: 4px; font-family: 'DM Mono', monospace; }
@@ -66,10 +66,10 @@
   .toolbar { display: flex; align-items: center; gap: 10px; padding: 12px 28px; border-bottom: 1px solid var(--border); background: var(--bg2); flex-wrap: wrap; }
   .search-wrap { position: relative; flex: 1; min-width: 180px; max-width: 320px; }
   .search-wrap svg { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); opacity: 0.4; pointer-events: none; }
-  input[type="search"] { width: 100%; background: var(--bg3); border: 1px solid var(--border); color: var(--text); padding: 8px 10px 8px 34px; border-radius: var(--radius); font-family: 'Syne', sans-serif; font-size: 13px; outline: none; }
+  input[type="search"] { width: 100%; background: var(--bg3); border: 1px solid var(--border); color: var(--text); padding: 8px 10px 8px 34px; border-radius: var(--radius); font-family: 'Inter', sans-serif; font-size: 13px; outline: none; }
   input[type="search"]:focus { border-color: var(--border2); }
-  select { background: var(--bg3); border: 1px solid var(--border); color: var(--text); padding: 8px 28px 8px 12px; border-radius: var(--radius); font-family: 'Syne', sans-serif; font-size: 13px; outline: none; cursor: pointer; appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' fill='none'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%239a9994' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 10px center; }
-  .btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px; border-radius: var(--radius); font-family: 'Syne', sans-serif; font-size: 13px; font-weight: 500; cursor: pointer; border: 1px solid var(--border); background: var(--bg3); color: var(--text); transition: all 0.15s; white-space: nowrap; }
+  select { background: var(--bg3); border: 1px solid var(--border); color: var(--text); padding: 8px 28px 8px 12px; border-radius: var(--radius); font-family: 'Inter', sans-serif; font-size: 13px; outline: none; cursor: pointer; appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' fill='none'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%239a9994' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 10px center; }
+  .btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px; border-radius: var(--radius); font-family: 'Inter', sans-serif; font-size: 13px; font-weight: 500; cursor: pointer; border: 1px solid var(--border); background: var(--bg3); color: var(--text); transition: all 0.15s; white-space: nowrap; }
   .btn:hover { background: var(--bg4); border-color: var(--border2); }
   .btn:disabled { opacity: 0.45; cursor: not-allowed; }
   .btn-primary { background: var(--accent); border-color: var(--accent); color: #fff; }
@@ -92,11 +92,11 @@
   tbody tr { border-bottom: 1px solid var(--border); cursor: pointer; transition: background 0.1s; }
   tbody tr:hover { background: var(--bg2); }
   tbody td { padding: 11px 12px; color: var(--text2); vertical-align: middle; font-family: 'DM Mono', monospace; font-size: 12px; }
-  .td-main { font-family: 'Syne', sans-serif; font-size: 13px; color: var(--text); font-weight: 500; }
+  .td-main { font-family: 'Inter', sans-serif; font-size: 13px; color: var(--text); font-weight: 500; }
   .td-vin { font-family: 'DM Mono', monospace; font-size: 11px; color: var(--text3); letter-spacing: 0.5px; }
 
   /* BADGES */
-  .badge { display: inline-flex; align-items: center; padding: 3px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; font-family: 'Syne', sans-serif; white-space: nowrap; }
+  .badge { display: inline-flex; align-items: center; padding: 3px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; font-family: 'Inter', sans-serif; white-space: nowrap; }
   .badge-live { background: var(--green-bg); color: var(--green); }
   .badge-sold { background: var(--red-bg); color: var(--red); }
   .badge-notfound { background: var(--bg3); color: var(--text3); }
@@ -136,7 +136,7 @@
   .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
   .section-title { font-size: 11px; font-weight: 600; color: var(--text3); letter-spacing: 0.6px; text-transform: uppercase; margin-bottom: 12px; margin-top: 24px; }
   .fb-box { background: var(--bg3); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 14px 14px 14px; font-family: 'DM Mono', monospace; font-size: 12px; color: var(--text2); line-height: 1.7; white-space: pre-wrap; word-break: break-word; position: relative; padding-top: 38px; }
-  .copy-btn { position: absolute; top: 10px; right: 10px; background: var(--bg4); border: 1px solid var(--border); color: var(--text2); padding: 5px 10px; border-radius: 5px; font-size: 11px; cursor: pointer; font-family: 'Syne', sans-serif; font-weight: 500; transition: all 0.15s; }
+  .copy-btn { position: absolute; top: 10px; right: 10px; background: var(--bg4); border: 1px solid var(--border); color: var(--text2); padding: 5px 10px; border-radius: 5px; font-size: 11px; cursor: pointer; font-family: 'Inter', sans-serif; font-weight: 500; transition: all 0.15s; }
   .copy-btn:hover { color: var(--text); } .copy-btn.copied { color: var(--green); border-color: var(--green); }
   .photo-drop-zone { border: 2px dashed var(--border2); border-radius: var(--radius); padding: 20px; text-align: center; cursor: pointer; transition: all 0.15s; margin-bottom: 10px; }
   .photo-drop-zone:hover, .photo-drop-zone.drag-over { border-color: var(--accent); background: rgba(232,71,63,0.04); }
@@ -145,7 +145,7 @@
   .photo-thumb-wrap { position: relative; }
   .photo-thumb-remove { position: absolute; top: 2px; right: 2px; background: rgba(0,0,0,0.7); color: #fff; border: none; border-radius: 50%; width: 16px; height: 16px; font-size: 10px; cursor: pointer; display: flex; align-items: center; justify-content: center; line-height: 1; }
   .upload-progress { font-size: 12px; color: var(--text2); margin-top: 6px; }
-  .mini-copy-btn { background: var(--bg4); border: 1px solid var(--border); color: var(--text3); padding: 3px 9px; border-radius: 4px; font-size: 11px; cursor: pointer; font-family: 'Syne', sans-serif; font-weight: 500; transition: all 0.15s; white-space: nowrap; flex-shrink: 0; }
+  .mini-copy-btn { background: var(--bg4); border: 1px solid var(--border); color: var(--text3); padding: 3px 9px; border-radius: 4px; font-size: 11px; cursor: pointer; font-family: 'Inter', sans-serif; font-weight: 500; transition: all 0.15s; white-space: nowrap; flex-shrink: 0; }
   .mini-copy-btn:hover { color: var(--text); border-color: var(--border2); }
   .mini-copy-btn.copied { color: var(--green); border-color: var(--green); }
   .fb-price-input { background: var(--bg3); border: 1px solid var(--border); color: var(--text3); padding: 6px 10px; border-radius: var(--radius); font-family: 'DM Mono', monospace; font-size: 14px; font-weight: 600; width: 120px; outline: none; cursor: not-allowed; opacity: 0.5; }
@@ -155,7 +155,7 @@
   tbody tr.row-active { background: rgba(74,158,255,0.07) !important; }
   tbody tr.row-active td { border-bottom-color: rgba(74,158,255,0.2); }
   .status-control { display: flex; gap: 8px; flex-wrap: wrap; }
-  .status-btn { padding: 6px 14px; border-radius: 5px; font-size: 12px; font-weight: 600; cursor: pointer; border: 1px solid var(--border); background: var(--bg3); color: var(--text2); font-family: 'Syne', sans-serif; transition: all 0.15s; }
+  .status-btn { padding: 6px 14px; border-radius: 5px; font-size: 12px; font-weight: 600; cursor: pointer; border: 1px solid var(--border); background: var(--bg3); color: var(--text2); font-family: 'Inter', sans-serif; transition: all 0.15s; }
   .status-btn:hover { border-color: var(--border2); }
   .status-btn.s-posted { background: var(--blue-bg); color: var(--blue); border-color: var(--blue); }
   .status-btn.s-unposted { background: var(--amber-bg); color: var(--amber); border-color: var(--amber); }
@@ -199,7 +199,7 @@
   .lead-table td { padding: 10px 12px; border-bottom: 1px solid var(--border); vertical-align: middle; }
   .lead-table tbody tr:hover td { background: var(--bg2); }
   .lead-table tbody tr.lead-selected td { background: rgba(74,158,255,0.06); }
-  .lead-status-sel { padding: 3px 8px; border-radius: 5px; font-size: 11px; font-weight: 600; cursor: pointer; border: 1px solid transparent; font-family: 'Syne', sans-serif; outline: none; max-width: 160px; }
+  .lead-status-sel { padding: 3px 8px; border-radius: 5px; font-size: 11px; font-weight: 600; cursor: pointer; border: 1px solid transparent; font-family: 'Inter', sans-serif; outline: none; max-width: 160px; }
   .lead-status-sel.s-new        { background: var(--blue-bg);                   color: var(--blue); }
   .lead-status-sel.s-oneway     { background: var(--amber-bg);                  color: var(--amber); }
   .lead-status-sel.s-twoway     { background: var(--green-bg);                  color: var(--green); }
@@ -207,7 +207,7 @@
   .lead-status-sel.s-appt       { background: rgba(139,92,246,0.12);            color: #a78bfa; }
   .lead-status-sel.s-sold       { background: var(--green-bg);                  color: var(--green); font-weight: 700; }
   .lead-status-sel.s-lost       { background: var(--red-bg);                    color: var(--red); }
-  .lead-note-input { background: transparent; border: none; border-bottom: 1px dashed var(--border2); color: var(--text2); font-family: 'Syne', sans-serif; font-size: 12px; width: 150px; outline: none; padding: 2px 4px; }
+  .lead-note-input { background: transparent; border: none; border-bottom: 1px dashed var(--border2); color: var(--text2); font-family: 'Inter', sans-serif; font-size: 12px; width: 150px; outline: none; padding: 2px 4px; }
   .lead-note-input:focus { border-bottom-color: var(--accent); color: var(--text); }
   .leads-toolbar { display: flex; align-items: center; justify-content: space-between; padding: 12px 28px; border-bottom: 1px solid var(--border); background: var(--bg2); flex-wrap: wrap; gap: 8px; }
   .leads-toolbar h2 { font-size: 16px; font-weight: 700; }
@@ -229,7 +229,7 @@
 
   /* CHIP SELECTS */
   .chip-group { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
-  .chip { display: inline-flex; align-items: center; padding: 4px 10px; border-radius: 20px; font-size: 12px; font-family: 'Syne', sans-serif; cursor: pointer; border: 1px solid var(--border2); background: var(--bg3); color: var(--text2); transition: all 0.15s; user-select: none; }
+  .chip { display: inline-flex; align-items: center; padding: 4px 10px; border-radius: 20px; font-size: 12px; font-family: 'Inter', sans-serif; cursor: pointer; border: 1px solid var(--border2); background: var(--bg3); color: var(--text2); transition: all 0.15s; user-select: none; }
   .chip:hover { border-color: var(--blue); color: var(--blue); }
   .chip.selected { background: var(--blue-bg); border-color: var(--blue); color: var(--blue); font-weight: 600; }
 
@@ -237,7 +237,7 @@
   .floor-view-inner { max-width: 600px; margin: 0 auto; padding: 12px 12px 80px; }
   .floor-toolbar { display: flex; align-items: center; justify-content: space-between; padding: 10px 16px; border-bottom: 1px solid var(--border); background: var(--bg2); }
   .floor-toolbar h2 { font-size: 15px; font-weight: 700; }
-  .floor-search { background: var(--bg3); border: 1px solid var(--border); color: var(--text); padding: 7px 12px; border-radius: var(--radius); font-family: 'Syne', sans-serif; font-size: 13px; outline: none; width: 180px; }
+  .floor-search { background: var(--bg3); border: 1px solid var(--border); color: var(--text); padding: 7px 12px; border-radius: var(--radius); font-family: 'Inter', sans-serif; font-size: 13px; outline: none; width: 180px; }
   .floor-card { background: var(--bg2); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; margin-bottom: 10px; cursor: pointer; transition: border-color 0.15s, background 0.15s; display: flex; align-items: center; gap: 14px; }
   .floor-card:hover { border-color: var(--border2); background: var(--bg3); }
   .floor-card:active { background: var(--bg4); }
@@ -248,7 +248,7 @@
   .floor-card-right { text-align: right; flex-shrink: 0; }
   .floor-card-price { font-size: 14px; font-weight: 700; color: var(--text); font-family: 'DM Mono', monospace; }
   .floor-card-gp { margin-top: 4px; font-size: 12px; font-family: 'DM Mono', monospace; font-weight: 600; }
-  .floor-add-lead-btn { display: flex; align-items: center; gap: 6px; width: 100%; padding: 11px 16px; border-radius: 8px; border: 1px solid var(--border2); background: var(--bg3); color: var(--text); font-family: 'Syne', sans-serif; font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.15s; margin-bottom: 8px; }
+  .floor-add-lead-btn { display: flex; align-items: center; gap: 6px; width: 100%; padding: 11px 16px; border-radius: 8px; border: 1px solid var(--border2); background: var(--bg3); color: var(--text); font-family: 'Inter', sans-serif; font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.15s; margin-bottom: 8px; }
   .floor-add-lead-btn:hover { border-color: var(--accent); background: rgba(74,158,255,0.07); color: var(--accent); }
   .floor-add-lead-btn.secondary { color: var(--text2); border-color: var(--border); font-size: 13px; font-weight: 500; }
   .floor-add-lead-btn.secondary:hover { border-color: var(--border2); background: var(--bg4); color: var(--text); }
@@ -258,7 +258,7 @@
 
   /* LEAD TYPE TABS */
   .lead-type-tabs { display: flex; gap: 4px; padding: 8px 28px; border-bottom: 1px solid var(--border); background: var(--bg2); overflow-x: auto; }
-  .lead-type-tab { padding: 4px 14px; border-radius: 20px; font-size: 12px; font-weight: 600; cursor: pointer; border: 1px solid var(--border); background: transparent; color: var(--text3); white-space: nowrap; transition: all 0.15s; font-family: 'Syne', sans-serif; }
+  .lead-type-tab { padding: 4px 14px; border-radius: 20px; font-size: 12px; font-weight: 600; cursor: pointer; border: 1px solid var(--border); background: transparent; color: var(--text3); white-space: nowrap; transition: all 0.15s; font-family: 'Inter', sans-serif; }
   .lead-type-tab:hover { color: var(--text); border-color: var(--text3); }
   .lead-type-tab.active { background: var(--accent); color: #fff; border-color: var(--accent); }
   .lead-type-tab.tab-focus.active { background: rgba(139,92,246,1); border-color: rgba(139,92,246,1); }
@@ -502,7 +502,7 @@
     <p style="font-size:13px;color:var(--text3);margin-bottom:14px">Add or remove salesperson names for the Turned To dropdown.</p>
     <div id="ttm-list" style="margin-bottom:14px;max-height:220px;overflow-y:auto"></div>
     <div style="display:flex;gap:8px;margin-bottom:12px">
-      <input type="text" id="ttm-input" placeholder="Enter name…" style="flex:1;background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:7px 10px;border-radius:6px;font-family:'Syne',sans-serif;font-size:13px;outline:none" onkeydown="if(event.key==='Enter')addTurnedToName()">
+      <input type="text" id="ttm-input" placeholder="Enter name…" style="flex:1;background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:7px 10px;border-radius:6px;font-family:'Inter',sans-serif;font-size:13px;outline:none" onkeydown="if(event.key==='Enter')addTurnedToName()">
       <button class="btn btn-primary" onclick="addTurnedToName()">Add</button>
     </div>
     <button class="btn" style="width:100%" onclick="closeTurnedToManager()">Done</button>
@@ -528,7 +528,7 @@
   </div>
 </div>
 
-<div class="modal-overlay" id="upload-modal">
+<div class="modal-overlay" id="upload-modal" onclick="if(event.target===this)closeUploadModal()">
   <div class="modal">
     <h2>Import Inventory CSV</h2>
     <p>Drop your Dealer Daily export here. New VINs get added; existing ones get updated. Your FB status, descriptions, and history are always preserved.</p>
@@ -547,7 +547,7 @@
 </div>
 
 <!-- SCRAPE MODAL -->
-<div class="modal-overlay" id="scrape-modal">
+<div class="modal-overlay" id="scrape-modal" onclick="if(event.target===this)closeScrapeModal()">
   <div class="modal" style="width:520px">
     <h2>Refresh Web Data</h2>
     <p>Pulls live price, website status, CARFAX, features, and Edmunds value for each active VIN from DublinToyota.com. Results save directly to your Google Sheet.</p>
@@ -560,7 +560,7 @@
 </div>
 
 <!-- NEW CARS SCRAPE MODAL -->
-<div class="modal-overlay" id="new-scrape-modal">
+<div class="modal-overlay" id="new-scrape-modal" onclick="if(event.target===this)closeNewScrapeModal()">
   <div class="modal" style="width:520px">
     <h2>Refresh New Car Web Data</h2>
     <p>Looks up each new car VIN on DublinToyota.com, finds the listing URL, and confirms whether it's live on the site. Online/Stop Sale cars only.</p>
@@ -594,13 +594,13 @@
 <div class="toast" id="toast"></div>
 
 <!-- VEHICLE SEARCH MODAL -->
-<div class="modal-overlay" id="vehicle-search-modal">
+<div class="modal-overlay" id="vehicle-search-modal" onclick="if(event.target===this)closeVehicleSearch()">
   <div class="modal" style="width:560px;max-height:80vh;display:flex;flex-direction:column;padding-bottom:0">
     <h2>Change Vehicle</h2>
-    <p>Search your inventory and select the car this lead is interested in.</p>
+    <p>Search inventory and select a car to associate with this lead. Click outside to close.</p>
     <div style="position:relative;margin-bottom:12px">
       <svg style="position:absolute;left:10px;top:50%;transform:translateY(-50%);opacity:0.4;pointer-events:none" width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
-      <input type="text" id="vs-search" placeholder="Search year, make, model, color, stock #…" style="width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:9px 12px 9px 34px;border-radius:var(--radius);font-family:'Syne',sans-serif;font-size:13px;outline:none" oninput="renderVehicleSearchResults(this.value)">
+      <input type="text" id="vs-search" placeholder="Search year, make, model, color, stock #…" style="width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:9px 12px 9px 34px;border-radius:var(--radius);font-family:'Inter',sans-serif;font-size:13px;outline:none" oninput="renderVehicleSearchResults(this.value)">
     </div>
     <div id="vs-results" style="overflow-y:auto;max-height:340px;border:1px solid var(--border);border-radius:var(--radius);margin-bottom:16px"></div>
     <div class="modal-footer" style="padding-bottom:16px">
@@ -611,20 +611,23 @@
 
 <!-- ADD VEHICLE TO LEAD MODAL -->
 <div class="modal-overlay" id="lead-vehicle-add-modal" onclick="if(event.target===this)closeLeadVehicleSearch()">
-  <div class="modal" style="width:500px;max-height:80vh;display:flex;flex-direction:column;gap:0">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
-      <h2 style="margin:0">Add Vehicle to Lead</h2>
-      <button id="lva-filter-btn" class="btn" style="font-size:11px;padding:4px 10px" onclick="toggleLvaFilter()">Live Only</button>
+  <div class="modal" style="width:520px;max-height:82vh;display:flex;flex-direction:column">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-shrink:0">
+      <h2 style="margin:0;font-size:16px">Add Vehicle to Lead</h2>
+      <div style="display:flex;background:var(--bg3);border:1px solid var(--border);border-radius:6px;overflow:hidden">
+        <button id="lva-btn-live" class="btn" style="font-size:11px;padding:5px 12px;border:none;border-radius:0;border-right:1px solid var(--border);background:var(--accent);color:#fff" onclick="setLvaFilter(false)">Live Only</button>
+        <button id="lva-btn-all" class="btn" style="font-size:11px;padding:5px 12px;border:none;border-radius:0" onclick="setLvaFilter(true)">All Inventory</button>
+      </div>
     </div>
-    <div style="position:relative;margin-bottom:10px">
+    <div style="position:relative;margin-bottom:10px;flex-shrink:0">
       <svg style="position:absolute;left:10px;top:50%;transform:translateY(-50%);opacity:0.4;pointer-events:none" width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
-      <input type="text" id="lva-search" placeholder="Search stock #, model, color…" autocomplete="off"
-        style="width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:8px 10px 8px 32px;border-radius:var(--radius);font-family:'Syne',sans-serif;font-size:13px;outline:none;box-sizing:border-box"
+      <input type="text" id="lva-search" placeholder="Search stock #, year, make, model, color…" autocomplete="off"
+        style="width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:8px 10px 8px 32px;border-radius:var(--radius);font-family:'Inter',sans-serif;font-size:13px;outline:none;box-sizing:border-box"
         oninput="renderLvaResults(this.value)" onfocus="renderLvaResults(this.value)">
     </div>
-    <div id="lva-results" style="flex:1;overflow-y:auto;border:1px solid var(--border);border-radius:var(--radius);max-height:380px"></div>
-    <div class="modal-footer" style="margin-top:12px">
-      <button class="btn" onclick="closeLeadVehicleSearch()">Cancel</button>
+    <div id="lva-results" style="flex:1;overflow-y:auto;border:1px solid var(--border);border-radius:var(--radius);min-height:0"></div>
+    <div style="display:flex;justify-content:flex-end;padding-top:12px;flex-shrink:0">
+      <button class="btn" onclick="closeLeadVehicleSearch()">Close</button>
     </div>
   </div>
 </div>
@@ -638,16 +641,16 @@
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
       <div>
         <div class="field-label">First Name *</div>
-        <input type="text" id="al-firstname" style="width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:8px 10px;border-radius:var(--radius);font-family:'Syne',sans-serif;font-size:13px;outline:none;box-sizing:border-box" placeholder="Jane">
+        <input type="text" id="al-firstname" style="width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:8px 10px;border-radius:var(--radius);font-family:'Inter',sans-serif;font-size:13px;outline:none;box-sizing:border-box" placeholder="Jane">
       </div>
       <div>
         <div class="field-label">Last Name *</div>
-        <input type="text" id="al-lastname" style="width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:8px 10px;border-radius:var(--radius);font-family:'Syne',sans-serif;font-size:13px;outline:none;box-sizing:border-box" placeholder="Smith">
+        <input type="text" id="al-lastname" style="width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:8px 10px;border-radius:var(--radius);font-family:'Inter',sans-serif;font-size:13px;outline:none;box-sizing:border-box" placeholder="Smith">
       </div>
     </div>
     <div style="margin-bottom:10px">
       <div class="field-label">Phone *</div>
-      <input type="tel" id="al-phone" style="width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:8px 10px;border-radius:var(--radius);font-family:'Syne',sans-serif;font-size:13px;outline:none;box-sizing:border-box" placeholder="(555) 000-0000">
+      <input type="tel" id="al-phone" style="width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:8px 10px;border-radius:var(--radius);font-family:'Inter',sans-serif;font-size:13px;outline:none;box-sizing:border-box" placeholder="(555) 000-0000">
     </div>
 
     <!-- Lead Type -->
@@ -665,7 +668,7 @@
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
       <div>
         <div class="field-label">Timeframe</div>
-        <select id="al-timeframe" style="width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:8px 10px;border-radius:var(--radius);font-family:'Syne',sans-serif;font-size:13px;outline:none;appearance:none">
+        <select id="al-timeframe" style="width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:8px 10px;border-radius:var(--radius);font-family:'Inter',sans-serif;font-size:13px;outline:none;appearance:none">
           <option value="">Select…</option>
           <option value="3 days">3 days</option>
           <option value="1 week">1 week</option>
@@ -678,7 +681,7 @@
       </div>
       <div>
         <div class="field-label">Status</div>
-        <select id="al-status" style="width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:8px 10px;border-radius:var(--radius);font-family:'Syne',sans-serif;font-size:13px;outline:none;appearance:none">
+        <select id="al-status" style="width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:8px 10px;border-radius:var(--radius);font-family:'Inter',sans-serif;font-size:13px;outline:none;appearance:none">
           <option value="New">New</option>
           <option value="One Way Communication">One Way Communication</option>
           <option value="Two Way Communication">Two Way Communication</option>
@@ -698,11 +701,11 @@
 
     <!-- Specific Vehicle -->
     <div style="margin-bottom:10px">
-      <div class="field-label">Vehicle They Came In For</div>
+      <div class="field-label">Specific Vehicle (from our inventory)</div>
       <div style="position:relative">
         <svg style="position:absolute;left:10px;top:50%;transform:translateY(-50%);opacity:0.4;pointer-events:none" width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
         <input type="text" id="al-vehicle-search" placeholder="Search year, make, model, stock…" autocomplete="off"
-          style="width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:8px 10px 8px 32px;border-radius:var(--radius);font-family:'Syne',sans-serif;font-size:13px;outline:none;box-sizing:border-box"
+          style="width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:8px 10px 8px 32px;border-radius:var(--radius);font-family:'Inter',sans-serif;font-size:13px;outline:none;box-sizing:border-box"
           oninput="renderAlResults(this.value)" onfocus="renderAlResults(this.value)">
       </div>
       <div id="al-vehicle-results" style="display:none;border:1px solid var(--border);border-top:none;border-radius:0 0 var(--radius) var(--radius);background:var(--bg2);max-height:180px;overflow-y:auto"></div>
@@ -712,13 +715,13 @@
     <!-- Vehicle Interest -->
     <div style="margin-bottom:10px">
       <div class="field-label">Vehicle Interest (what they're looking for)</div>
-      <textarea id="al-vehicle-interest" style="width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:8px 10px;border-radius:var(--radius);font-family:'Syne',sans-serif;font-size:13px;outline:none;resize:vertical;min-height:52px;box-sizing:border-box" placeholder="e.g. Looking for a used RAV4 under $30k, prefer low miles…"></textarea>
+      <textarea id="al-vehicle-interest" style="width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:8px 10px;border-radius:var(--radius);font-family:'Inter',sans-serif;font-size:13px;outline:none;resize:vertical;min-height:52px;box-sizing:border-box" placeholder="e.g. Looking for a used RAV4 under $30k, prefer low miles…"></textarea>
     </div>
 
     <!-- Notes -->
     <div style="margin-bottom:10px">
       <div class="field-label">Notes</div>
-      <textarea id="al-notes" style="width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:8px 10px;border-radius:var(--radius);font-family:'Syne',sans-serif;font-size:13px;outline:none;resize:vertical;min-height:52px;box-sizing:border-box" placeholder="Optional note…"></textarea>
+      <textarea id="al-notes" style="width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:8px 10px;border-radius:var(--radius);font-family:'Inter',sans-serif;font-size:13px;outline:none;resize:vertical;min-height:52px;box-sizing:border-box" placeholder="Optional note…"></textarea>
     </div>
 
     <!-- Sales Reps -->
@@ -732,7 +735,7 @@
           <div class="field-label">First</div>
           <div class="name-combo">
             <input type="text" id="al-rep-first" autocomplete="off" placeholder="Type or select…"
-              style="width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:8px 10px;border-radius:var(--radius);font-family:'Syne',sans-serif;font-size:13px;outline:none;box-sizing:border-box"
+              style="width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:8px 10px;border-radius:var(--radius);font-family:'Inter',sans-serif;font-size:13px;outline:none;box-sizing:border-box"
               oninput="filterNameCombo('al-first-dd','al-rep-first')"
               onfocus="openNameCombo('al-first-dd','al-rep-first')"
               onblur="closeNameComboDelayed('al-first-dd')">
@@ -743,7 +746,7 @@
           <div class="field-label">Last</div>
           <div class="name-combo">
             <input type="text" id="al-rep-last" autocomplete="off" placeholder="Type or select…"
-              style="width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:8px 10px;border-radius:var(--radius);font-family:'Syne',sans-serif;font-size:13px;outline:none;box-sizing:border-box"
+              style="width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:8px 10px;border-radius:var(--radius);font-family:'Inter',sans-serif;font-size:13px;outline:none;box-sizing:border-box"
               oninput="filterNameCombo('al-last-dd','al-rep-last')"
               onfocus="openNameCombo('al-last-dd','al-rep-last')"
               onblur="closeNameComboDelayed('al-last-dd')">
@@ -769,7 +772,7 @@
     <div style="position:relative;margin-bottom:10px">
       <svg style="position:absolute;left:10px;top:50%;transform:translateY(-50%);opacity:0.4;pointer-events:none" width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
       <input type="text" id="lp-search" placeholder="Search by name or phone…" autocomplete="off"
-        style="width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:8px 10px 8px 32px;border-radius:var(--radius);font-family:'Syne',sans-serif;font-size:13px;outline:none"
+        style="width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:8px 10px 8px 32px;border-radius:var(--radius);font-family:'Inter',sans-serif;font-size:13px;outline:none"
         oninput="renderLeadPickerResults(this.value)">
     </div>
     <div id="lp-results" style="max-height:340px;overflow-y:auto;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg2);margin-bottom:14px"></div>
@@ -1548,7 +1551,7 @@ function buildLeadSectionHtml(lead, car){
 
   const firstVal = lead.turnedToFirst || '';
   const lastVal = lead.turnedTo || '';
-  const inpStyle = `width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:6px;font-family:'Syne',sans-serif;font-size:13px;outline:none;box-sizing:border-box`;
+  const inpStyle = `width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:6px;font-family:'Inter',sans-serif;font-size:13px;outline:none;box-sizing:border-box`;
 
   const notesEsc = (lead.notes||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
   const viEsc = (lead.vehicleInterest||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
@@ -1628,13 +1631,13 @@ function buildLeadSectionHtml(lead, car){
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
       <div>
         <div class="field-label">Timeframe</div>
-        <select style="width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:6px;font-family:'Syne',sans-serif;font-size:13px;outline:none" onchange="updateLeadFieldFromDrawer('timeframe',this.value)">
+        <select style="width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:6px;font-family:'Inter',sans-serif;font-size:13px;outline:none" onchange="updateLeadFieldFromDrawer('timeframe',this.value)">
           <option value="">Select…</option>${timeframeOpts}
         </select>
       </div>
       <div>
         <div class="field-label">Status</div>
-        <select style="width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:6px;font-family:'Syne',sans-serif;font-size:13px;outline:none" onchange="updateLeadFieldFromDrawer('status',this.value)">
+        <select style="width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:6px;font-family:'Inter',sans-serif;font-size:13px;outline:none" onchange="updateLeadFieldFromDrawer('status',this.value)">
           ${statusOpts}
         </select>
       </div>
@@ -1649,13 +1652,13 @@ function buildLeadSectionHtml(lead, car){
     <!-- Vehicle Interest -->
     <div style="margin-bottom:10px">
       <div class="field-label">Vehicle Interest</div>
-      <textarea style="width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:6px;font-family:'Syne',sans-serif;font-size:13px;outline:none;resize:vertical;min-height:56px;box-sizing:border-box" placeholder="What vehicle is the customer looking for?" onblur="updateLeadFieldFromDrawer('vehicleInterest',this.value)">${viEsc}</textarea>
+      <textarea style="width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:6px;font-family:'Inter',sans-serif;font-size:13px;outline:none;resize:vertical;min-height:56px;box-sizing:border-box" placeholder="What vehicle is the customer looking for?" onblur="updateLeadFieldFromDrawer('vehicleInterest',this.value)">${viEsc}</textarea>
     </div>
 
     <!-- Notes -->
     <div style="margin-bottom:12px">
       <div class="field-label">Notes</div>
-      <textarea style="width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:6px;font-family:'Syne',sans-serif;font-size:13px;outline:none;resize:vertical;min-height:56px;box-sizing:border-box" placeholder="Add notes…" onblur="updateLeadFieldFromDrawer('notes',this.value)">${notesEsc}</textarea>
+      <textarea style="width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:6px;font-family:'Inter',sans-serif;font-size:13px;outline:none;resize:vertical;min-height:56px;box-sizing:border-box" placeholder="Add notes…" onblur="updateLeadFieldFromDrawer('notes',this.value)">${notesEsc}</textarea>
     </div>
 
     <!-- Sales Reps -->
@@ -1770,11 +1773,8 @@ async function moveLeadTo(rowIndex, newType) {
 // ── Add Vehicle to Lead ───────────────────────────────────────
 function openLeadVehicleSearch(rowIndex) {
   currentLeadRowIndex = rowIndex;
-  lvaShowAll = false;
-  const btn = document.getElementById('lva-filter-btn');
-  if (btn) btn.textContent = 'Live Only';
   document.getElementById('lva-search').value = '';
-  renderLvaResults('');
+  setLvaFilter(false);
   document.getElementById('lead-vehicle-add-modal').classList.add('open');
   setTimeout(() => document.getElementById('lva-search').focus(), 100);
 }
@@ -1808,16 +1808,25 @@ function renderLvaResults(q) {
     const g = calcGrossData(c, 0, 0);
     const commStr = g ? `${fmtG(g.bottomComm)}–${fmtG(g.topComm)}` : '';
     const already = existingVins.has(c.vin);
+    const ws = c.websiteStatus || '';
+    const sTag = c.soldDate || ws.toLowerCase()==='sold'
+      ? `<span style="font-size:10px;font-weight:700;padding:1px 6px;border-radius:3px;background:var(--red-bg);color:var(--red)">Sold</span>`
+      : ws === 'Live'
+        ? `<span style="font-size:10px;font-weight:700;padding:1px 6px;border-radius:3px;background:var(--green-bg);color:var(--green)">Live</span>`
+        : ws ? `<span style="font-size:10px;font-weight:700;padding:1px 6px;border-radius:3px;background:var(--amber-bg);color:var(--amber)">${ws}</span>` : '';
     return `<div onclick="${already ? '' : `addVehicleToLead('${c.vin}')`}"
       style="padding:11px 14px;border-bottom:1px solid var(--border);cursor:${already?'default':'pointer'};opacity:${already?0.5:1}"
       onmouseover="if(!${already})this.style.background='var(--bg3)'" onmouseout="this.style.background=''">
-      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
-        <div>
-          <div style="font-size:13px;font-weight:600;color:var(--text)">${getTitle(c)}</div>
-          <div style="font-size:11px;color:var(--text3);font-family:'DM Mono',monospace;margin-top:2px">#${c.stock||'—'} · ${fmtPrice(c.websitePrice||c.price)} · ${fmtMiles(c.mileage)}</div>
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
+        <div style="min-width:0">
+          <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:2px">
+            <span style="font-size:13px;font-weight:600;color:var(--text)">${getTitle(c)}</span>
+            ${sTag}
+          </div>
+          <div style="font-size:11px;color:var(--text3);font-family:'DM Mono',monospace">#${c.stock||'—'} · ${fmtPrice(c.websitePrice||c.price)} · ${fmtMiles(c.mileage)}</div>
         </div>
-        <div style="font-size:12px;font-weight:600;color:${g?commColor(g.bottomComm):'var(--text3)'};white-space:nowrap">
-          ${already ? '<span style="color:var(--text3)">Added</span>' : commStr}
+        <div style="font-size:12px;font-weight:600;color:${g?commColor(g.bottomComm):'var(--text3)'};white-space:nowrap;flex-shrink:0;padding-top:2px">
+          ${already ? '<span style="color:var(--green)">✓ Added</span>' : commStr}
         </div>
       </div>
     </div>`;
@@ -2713,10 +2722,12 @@ async function changeLeadType(newType) {
 
 // ── LVA filter (Live Only vs All) ─────────────────────────────
 let lvaShowAll = false;
-function toggleLvaFilter() {
-  lvaShowAll = !lvaShowAll;
-  const btn = document.getElementById('lva-filter-btn');
-  if (btn) btn.textContent = lvaShowAll ? 'Show All' : 'Live Only';
+function setLvaFilter(showAll) {
+  lvaShowAll = showAll;
+  const btnLive = document.getElementById('lva-btn-live');
+  const btnAll = document.getElementById('lva-btn-all');
+  if (btnLive) { btnLive.style.background = showAll ? '' : 'var(--accent)'; btnLive.style.color = showAll ? '' : '#fff'; }
+  if (btnAll)  { btnAll.style.background  = showAll ? 'var(--accent)' : ''; btnAll.style.color  = showAll ? '#fff' : ''; }
   renderLvaResults(document.getElementById('lva-search').value);
 }
 
@@ -3075,11 +3086,19 @@ function renderAlResults(q){
     results.innerHTML='<div style="padding:12px 14px;font-size:12px;color:var(--text3)">No vehicles match</div>';
     results.style.display='block'; return;
   }
-  results.innerHTML=cars.map(c=>`
-    <div onclick="selectAlVehicle('${c.vin}')" style="padding:9px 14px;border-bottom:1px solid var(--border);cursor:pointer;transition:background 0.1s" onmouseover="this.style.background='var(--bg3)'" onmouseout="this.style.background=''">
-      <div style="font-size:13px;font-weight:600;color:var(--text)">${getTitle(c)}</div>
-      <div style="font-size:11px;color:var(--text3);font-family:'DM Mono',monospace;margin-top:1px">${c.vin}${c.stock?' · #'+c.stock:''}${c.websitePrice?' · '+fmtPrice(c.websitePrice):''}</div>
-    </div>`).join('');
+  results.innerHTML=cars.map(c=>{
+    const ws = c.websiteStatus || '';
+    const sTag = ws === 'Live'
+      ? `<span style="font-size:10px;font-weight:700;padding:1px 5px;border-radius:3px;background:var(--green-bg);color:var(--green)">Live</span>`
+      : `<span style="font-size:10px;font-weight:700;padding:1px 5px;border-radius:3px;background:var(--amber-bg);color:var(--amber)">${ws||'Not Live'}</span>`;
+    return `<div onclick="selectAlVehicle('${c.vin}')" style="padding:9px 14px;border-bottom:1px solid var(--border);cursor:pointer;transition:background 0.1s" onmouseover="this.style.background='var(--bg3)'" onmouseout="this.style.background=''">
+      <div style="display:flex;align-items:center;gap:6px;margin-bottom:1px">
+        <span style="font-size:13px;font-weight:600;color:var(--text)">${getTitle(c)}</span>
+        ${sTag}
+      </div>
+      <div style="font-size:11px;color:var(--text3);font-family:'DM Mono',monospace">${c.stock?'#'+c.stock+' · ':''}${c.websitePrice?fmtPrice(c.websitePrice)+' · ':''}${fmtMiles(c.mileage)}</div>
+    </div>`;
+  }).join('');
   results.style.display='block';
 }
 
@@ -3309,7 +3328,7 @@ function renderNewCarsView() {
     </tr>`;
   }).join('');
 
-  const sortSel = `<select onchange="setNewCarsSort(this.value)" style="background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:8px 28px 8px 12px;border-radius:var(--radius);font-family:'Syne',sans-serif;font-size:13px;outline:none;cursor:pointer;appearance:none;background-image:url('data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%2710%27 height=%276%27 fill=%27none%27%3E%3Cpath d=%27M1 1l4 4 4-4%27 stroke=%27%239a9994%27 stroke-width=%271.5%27 stroke-linecap=%27round%27 stroke-linejoin=%27round%27/%3E%3C/svg%3E');background-repeat:no-repeat;background-position:right 10px center">
+  const sortSel = `<select onchange="setNewCarsSort(this.value)" style="background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:8px 28px 8px 12px;border-radius:var(--radius);font-family:'Inter',sans-serif;font-size:13px;outline:none;cursor:pointer;appearance:none;background-image:url('data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%2710%27 height=%276%27 fill=%27none%27%3E%3Cpath d=%27M1 1l4 4 4-4%27 stroke=%27%239a9994%27 stroke-width=%271.5%27 stroke-linecap=%27round%27 stroke-linejoin=%27round%27/%3E%3C/svg%3E');background-repeat:no-repeat;background-position:right 10px center">
     <option value="model" ${newCarsSort==='model'?'selected':''}>Model A–Z</option>
     <option value="price-asc" ${newCarsSort==='price-asc'?'selected':''}>Price Low–High</option>
     <option value="price-desc" ${newCarsSort==='price-desc'?'selected':''}>Price High–Low</option>
@@ -3415,18 +3434,18 @@ function renderNewCarDrawer(c, isLeadContext) {
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
           <div><div class="field-label">Timeframe</div>
-            <select style="width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:6px;font-family:'Syne',sans-serif;font-size:13px;outline:none" onchange="updateLeadFieldFromDrawer('timeframe',this.value)">
+            <select style="width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:6px;font-family:'Inter',sans-serif;font-size:13px;outline:none" onchange="updateLeadFieldFromDrawer('timeframe',this.value)">
               <option value="">Select…</option>${tfopts}
             </select>
           </div>
           <div><div class="field-label">Status</div>
-            <select style="width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:6px;font-family:'Syne',sans-serif;font-size:13px;outline:none" onchange="updateLeadFieldFromDrawer('status',this.value)">
+            <select style="width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:6px;font-family:'Inter',sans-serif;font-size:13px;outline:none" onchange="updateLeadFieldFromDrawer('status',this.value)">
               ${stopts}
             </select>
           </div>
         </div>
         <div><div class="field-label">Notes</div>
-          <input type="text" style="width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:6px;font-family:'Syne',sans-serif;font-size:13px;outline:none" value="${(lead.notes||'').replace(/"/g,'&quot;')}" placeholder="Add note…" onblur="updateLeadFieldFromDrawer('notes',this.value)" onkeydown="if(event.key==='Enter')this.blur()">
+          <input type="text" style="width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:6px;font-family:'Inter',sans-serif;font-size:13px;outline:none" value="${(lead.notes||'').replace(/"/g,'&quot;')}" placeholder="Add note…" onblur="updateLeadFieldFromDrawer('notes',this.value)" onkeydown="if(event.key==='Enter')this.blur()">
         </div>
       </div>`;
     }
@@ -3525,7 +3544,7 @@ function renderNewCarDrawer(c, isLeadContext) {
   // Notes
   h += `<div class="section-title">Notes</div>
   <div class="field-group">
-    <input type="text" id="new-car-notes" style="width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:8px 10px;border-radius:var(--radius);font-family:'Syne',sans-serif;font-size:13px;outline:none" value="${(c.notes||'').replace(/"/g,'&quot;')}" placeholder="Add a note…" onblur="saveNewCarNote(this.value)" onkeydown="if(event.key==='Enter')this.blur()">
+    <input type="text" id="new-car-notes" style="width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:8px 10px;border-radius:var(--radius);font-family:'Inter',sans-serif;font-size:13px;outline:none" value="${(c.notes||'').replace(/"/g,'&quot;')}" placeholder="Add a note…" onblur="saveNewCarNote(this.value)" onkeydown="if(event.key==='Enter')this.blur()">
   </div>`;
 
   // FB Status
