@@ -1523,7 +1523,12 @@ function openDrawerFromLead(rowIndex){
   const name=[capName(lead.firstName),capName(lead.lastName)].filter(Boolean).join(' ')||'Lead';
   document.getElementById('drawer-title').textContent=name;
   document.getElementById('drawer-vin').textContent=fmtPhone(lead.phone)||lead.vehicle||'No phone on file';
-  document.getElementById('drawer-body').innerHTML=buildLeadSectionHtml(lead,null);
+  try {
+    document.getElementById('drawer-body').innerHTML=buildLeadSectionHtml(lead,null);
+  } catch(err) {
+    document.getElementById('drawer-body').innerHTML=`<div style="padding:20px;color:var(--red)">Error loading lead: ${err.message}</div>`;
+    console.error('openDrawerFromLead error:', err);
+  }
   document.getElementById('drawer-overlay').classList.add('open');
 }
 
@@ -1755,6 +1760,7 @@ function buildVehicleListHtml(lead) {
 
   // Display in user-defined order (drag to reorder). Enrich with inventory data.
   const items = list.map((v, idx) => {
+    try {
     const car = inventory.find(c => c.vin === v.vin)
              || inventory.find(c => c.stock && v.stock && c.stock.toUpperCase() === v.stock.toUpperCase());
     const g = car ? calcGrossData(car, 0, 0) : null;
@@ -1797,6 +1803,7 @@ function buildVehicleListHtml(lead) {
         <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
       </button>
     </div>`;
+    } catch(err) { return `<div style="padding:8px;font-size:12px;color:var(--red)">Error loading vehicle ${idx+1}</div>`; }
   }).join('');
 
   return `<div style="margin-bottom:14px">
@@ -3315,7 +3322,7 @@ async function updateLeadFieldFromDrawer(field, value){
   const lead=leadsData.find(l=>l.rowIndex===currentLeadRowIndex);
   if(lead) lead[field]=value;
   if(field==='status') updateLeadsSubtitle();
-  if(field==='timeframe'||field==='status') renderLeads();
+  if((field==='timeframe'||field==='status') && document.getElementById('leads-content')) renderLeads();
   try { await apiPost('updateLead',{rowIndex:currentLeadRowIndex,field,value}); }
   catch(e){ showToast('Save failed'); }
 }
