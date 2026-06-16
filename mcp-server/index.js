@@ -284,9 +284,31 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
     switch (name) {
 
-      case 'scrape_inventory':
-        result = await callScript('scrapeVehicles');
+      case 'scrape_inventory': {
+        // Step 1: get all active VINs
+        const allData = await callScript('getAll');
+        const allCars = allData.cars || [];
+        const vinsToScrape = allCars
+          .filter(c => c.websiteStatus !== 'Sold/Unavailable' && c.fbStatus !== 'sold' && c.vin)
+          .map(c => c.vin);
+        if (!vinsToScrape.length) { result = { scraped: 0, message: 'No active vehicles to scrape' }; break; }
+
+        // Step 2: scrape in batches of 5, write back each batch
+        const BATCH = 5;
+        let scraped = 0, delistCount = 0, errors = 0;
+        for (let i = 0; i < vinsToScrape.length; i += BATCH) {
+          const batch = vinsToScrape.slice(i, i + BATCH);
+          try {
+            const res = await callScript('scrapeVehicles', { vins: batch });
+            const results = res.results || [];
+            scraped += results.length;
+            delistCount += results.filter(r => (r.websiteStatus || '').includes('Delist')).length;
+            if (results.length) await callScript('upsertMany', { cars: results });
+          } catch (e) { errors++; }
+        }
+        result = { scraped, delistCount, errors, total: vinsToScrape.length };
         break;
+      }
 
       case 'ping':
         result = await callScript('ping');
