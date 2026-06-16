@@ -357,7 +357,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         result = await callScript('submitLead', {
           ...args,
           leadType: args.leadType || 'Lot',
-          source: args.leadType || 'Cowork'
+          source: args.leadType || 'Cowork',
+          addedBy: 'Cowork'
         });
         break;
 
