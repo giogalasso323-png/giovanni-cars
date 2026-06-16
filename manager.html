@@ -265,11 +265,14 @@
   .lead-type-tab.tab-lost.active { background: var(--red); border-color: var(--red); }
   .origin-tag { display: inline-flex; align-items: center; padding: 1px 6px; border-radius: 3px; font-size: 10px; font-weight: 700; background: rgba(139,92,246,0.12); color: #a78bfa; margin-left: 5px; vertical-align: middle; }
   /* LEAD VEHICLE LIST in drawer */
-  .lead-vehicle-item { display: flex; align-items: flex-start; justify-content: space-between; padding: 10px 12px; background: var(--bg3); border-radius: 6px; margin-bottom: 6px; gap: 10px; }
-  .lead-vehicle-item.lead-vehicle-clickable { cursor: pointer; transition: background 0.12s, border-color 0.12s; border: 1px solid transparent; }
-  .lead-vehicle-item.lead-vehicle-clickable:hover { background: var(--bg4); border-color: var(--accent); }
+  .lead-vehicle-item { display: flex; align-items: flex-start; justify-content: space-between; padding: 10px 12px; background: var(--bg3); border-radius: 6px; margin-bottom: 6px; gap: 10px; border: 1px solid transparent; }
+  .lead-vehicle-item.lead-vehicle-clickable { cursor: pointer; transition: background 0.12s, border-color 0.12s; }
+  .lead-vehicle-item.lead-vehicle-clickable:hover { background: var(--bg4); border-color: var(--border2); }
+  .lead-vehicle-item.lead-vehicle-open { border-color: var(--blue); background: rgba(82,153,255,0.07); }
   .lead-vehicle-item-info { flex: 1; min-width: 0; }
   .lead-vehicle-item-gross { text-align: right; white-space: nowrap; flex-shrink: 0; }
+  .lead-vehicle-drag-handle { display: flex; align-items: center; padding: 0 4px 0 0; cursor: grab; align-self: center; opacity: 0.4; flex-shrink: 0; }
+  .lead-vehicle-drag-handle:active { cursor: grabbing; }
   /* SUB-DRAWER (vehicle detail, opens left of main drawer) */
   .sub-overlay { display: none; position: fixed; top: 0; bottom: 0; right: 560px; width: 540px; z-index: 201; box-shadow: -4px 0 24px rgba(0,0,0,0.5); }
   .sub-overlay.open { display: block; }
@@ -836,6 +839,7 @@ let currentView = 'table', activeFilter = 'all', sortKey = 'date-desc';
 let selectedVins = new Set(), pendingCsvData = null, currentVin = null, lastOpenedVin = null;
 let pendingPhotos = [];
 let currentLeadRowIndex = null;
+let currentSubDrawerVin = null;
 // New cars state
 let currentNewVin = null, lastOpenedNewVin = null;
 let newCarsFilter = 'all', newCarsSearch = '', newCarsSort = 'model';
@@ -1749,24 +1753,18 @@ async function saveContactEdit() {
 function buildVehicleListHtml(lead) {
   const list = Array.isArray(lead.vehicleList) ? lead.vehicleList : [];
 
-  const enriched = list.map((v, idx) => {
+  // Display in user-defined order (drag to reorder). Enrich with inventory data.
+  const items = list.map((v, idx) => {
     const car = inventory.find(c => c.vin === v.vin)
              || inventory.find(c => c.stock && v.stock && c.stock.toUpperCase() === v.stock.toUpperCase());
     const g = car ? calcGrossData(car, 0, 0) : null;
-    return { v, car, g, idx };
-  }).sort((a, b) => {
-    const aC = a.g ? a.g.topComm : -9999;
-    const bC = b.g ? b.g.topComm : -9999;
-    return bC - aC;
-  });
-
-  const items = enriched.map(({ v, car, g, idx }) => {
     const title = car ? getTitle(car) : (v.title || v.stock || v.vin || '?');
     const stock = v.stock || (car ? car.stock : '') || '';
     const price = car ? fmtPrice(car.websitePrice||car.price) : '—';
     const miles = car ? fmtMiles(car.mileage) : '—';
     const vin = car ? car.vin : (v.vin || '');
     const clickable = !!car;
+    const isOpen = car && vin === currentSubDrawerVin;
 
     let grossHtml = '<div style="font-size:11px;color:var(--text3)">No cost data</div>';
     if (g) {
@@ -1776,7 +1774,16 @@ function buildVehicleListHtml(lead) {
         <div style="text-align:right;margin-top:2px"><span style="font-size:10px;font-weight:700;padding:1px 6px;border-radius:3px;background:${si.bg};color:${si.color}">${si.label}</span></div>`;
     }
 
-    return `<div class="lead-vehicle-item${clickable?' lead-vehicle-clickable':''}"${clickable?` onclick="openVehicleSubDrawer('${vin}')"`:''}>
+    return `<div class="lead-vehicle-item${clickable?' lead-vehicle-clickable':''}${isOpen?' lead-vehicle-open':''}"
+      draggable="true"
+      ondragstart="vehicleDragStart(event,${idx})"
+      ondragover="vehicleDragOver(event)"
+      ondrop="vehicleDrop(event,${idx},${lead.rowIndex})"
+      ondragend="vehicleDragEnd(event)"
+      ${clickable?`onclick="openVehicleSubDrawer('${vin}')"`:''}>
+      <div class="lead-vehicle-drag-handle" onclick="event.stopPropagation()" title="Drag to reorder">
+        <svg width="10" height="14" viewBox="0 0 10 14" fill="currentColor" style="color:var(--text3)"><circle cx="3" cy="2" r="1.5"/><circle cx="7" cy="2" r="1.5"/><circle cx="3" cy="7" r="1.5"/><circle cx="7" cy="7" r="1.5"/><circle cx="3" cy="12" r="1.5"/><circle cx="7" cy="12" r="1.5"/></svg>
+      </div>
       <div class="lead-vehicle-item-info">
         <div style="font-size:13px;font-weight:800;color:var(--blue);font-family:'DM Mono',monospace;margin-bottom:3px">#${stock||'—'}</div>
         <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:5px">${title}</div>
@@ -1799,6 +1806,38 @@ function buildVehicleListHtml(lead) {
     </div>
     ${items || '<div style="font-size:13px;color:var(--text3);padding:6px 0">No vehicles added yet. Click + Add Car to attach options.</div>'}
   </div>`;
+}
+
+let _dragSrcIdx = null;
+function vehicleDragStart(e, idx) {
+  _dragSrcIdx = idx;
+  e.dataTransfer.effectAllowed = 'move';
+  e.currentTarget.style.opacity = '0.4';
+}
+function vehicleDragOver(e) {
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'move';
+  e.currentTarget.style.background = 'var(--bg4)';
+}
+function vehicleDragEnd(e) {
+  e.currentTarget.style.opacity = '';
+  e.currentTarget.style.background = '';
+}
+async function vehicleDrop(e, targetIdx, rowIndex) {
+  e.preventDefault();
+  e.currentTarget.style.background = '';
+  if (_dragSrcIdx === null || _dragSrcIdx === targetIdx) { _dragSrcIdx = null; return; }
+  const lead = leadsData.find(l => l.rowIndex === rowIndex);
+  if (!lead) return;
+  const list = [...lead.vehicleList];
+  const [moved] = list.splice(_dragSrcIdx, 1);
+  list.splice(targetIdx, 0, moved);
+  lead.vehicleList = list;
+  _dragSrcIdx = null;
+  document.getElementById('lead-vehicles-section').innerHTML = buildVehicleListHtml(lead);
+  try {
+    await apiPost('updateLead', { rowIndex, field: 'vehicleList', value: JSON.stringify(list) });
+  } catch(err) { showToast('Save failed'); }
 }
 
 // ── Lead Type Selection in Add Modal ─────────────────────────
@@ -2846,13 +2885,16 @@ function setLvaFilter(showAll) {
 
 // ── Vehicle Sub-Drawer ────────────────────────────────────────
 function openVehicleSubDrawer(vin) {
+  if (currentSubDrawerVin === vin) { closeVehicleSubDrawer(); return; }
   const car = inventory.find(c => c.vin === vin); if (!car) return;
+  currentSubDrawerVin = vin;
   document.getElementById('sub-drawer-title').textContent = getTitle(car);
   document.getElementById('sub-drawer-vin').textContent = car.vin;
   renderDrawer(car, { targetId: 'sub-drawer-body', skipLeadSection: true });
   document.getElementById('sub-drawer-overlay').classList.add('open');
 }
 function closeVehicleSubDrawer() {
+  currentSubDrawerVin = null;
   document.getElementById('sub-drawer-overlay').classList.remove('open');
 }
 
@@ -2955,25 +2997,24 @@ function renderLeads(){
     const date = lead.timestamp ? new Date(lead.timestamp).toLocaleDateString([],{month:'short',day:'numeric',year:'numeric'}) : '—';
     const status = lead.status || 'New';
     const cls = LEAD_STATUS_COLORS[status]||'s-new';
-    const statusOpts = LEAD_STATUSES.map(s=>`<option value="${s}"${s===status?' selected':''}>${s}</option>`).join('');
+    // Table status dropdown excludes Sold and Lost — handled via pipeline status
+    const TABLE_STATUSES = LEAD_STATUSES.filter(s => s !== 'Sold' && s !== 'Lost');
+    const statusOpts = TABLE_STATUSES.map(s=>`<option value="${s}"${s===status?' selected':''}>${s}</option>`).join('');
     const isSelected = selectedLeads.has(lead.rowIndex);
-    const hasMatches = lead._matches && lead._matches.length > 0;
 
-    // Match to inventory by VIN
-    const matchedCar = lead.vin ? inventory.find(c=>c.vin===lead.vin) : null;
-    const vehicleCell = matchedCar
+    // Show first car from the customer's vehicle list
+    const vList = Array.isArray(lead.vehicleList) ? lead.vehicleList : [];
+    const firstV = vList[0] || null;
+    const firstCar = firstV ? (inventory.find(c=>c.vin===firstV.vin) || null) : null;
+    const vehicleCell = firstCar
       ? `<div class="lead-vehicle-match">
-           <span style="font-size:12px;color:var(--text2)">${lead.vehicle||getTitle(matchedCar)}</span>
-           <button class="icon-btn" title="Refresh this vehicle's web data" onclick="event.stopPropagation();refreshLeadVehicle('${lead.vin}',this)" style="color:var(--blue);padding:2px 4px">
-             <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M4 4v5h5"/><path d="M20 20v-5h-5"/><path d="M4 9a9 9 0 0115.47-3.47"/><path d="M20 15a9 9 0 01-15.47 3.47"/></svg>
-           </button>
-           <div style="margin-top:4px">${statusBadge(matchedCar)}</div>
+           <span style="font-size:12px;color:var(--text2)">${getTitle(firstCar)}</span>
+           ${vList.length > 1 ? `<span style="font-size:10px;color:var(--text3);margin-left:4px">+${vList.length-1} more</span>` : ''}
+           <div style="margin-top:3px">${statusBadge(firstCar)}</div>
          </div>`
-      : `<span style="font-size:12px;color:var(--text2)">${lead.vehicle||'—'}</span>`;
-
-    const matchBadge = hasMatches
-      ? `<span class="match-badge">● ${lead._matches.length} Match${lead._matches.length!==1?'es':''}</span>`
-      : '';
+      : firstV
+      ? `<span style="font-size:12px;color:var(--text2)">${firstV.title||firstV.stock||'—'}</span>`
+      : `<span style="font-size:12px;color:var(--text3)">—</span>`;
 
     const turnedToParts = [
       lead.turnedToFirst ? '1st: '+lead.turnedToFirst : '',
@@ -3004,10 +3045,9 @@ function renderLeads(){
         <span style="font-family:'DM Mono',monospace;font-size:12px;color:var(--text2)">${phone||'—'}</span>
         ${lead.phone?`<button class="mini-copy-btn" style="margin-left:6px" onclick="event.stopPropagation();copyText('${String(lead.phone||'').replace(/'/g,"\\'")}',this)">Copy</button>`:''}
       </td>
-      <td>${vehicleCell}${matchBadge}</td>
+      <td>${vehicleCell}</td>
       <td><span style="font-size:11px;background:var(--bg3);padding:2px 8px;border-radius:4px;color:var(--text3);white-space:nowrap">${lead.timeframe||'—'}</span></td>
-      <td><select class="lead-status-sel ${cls}" onchange="updateLeadStatus(${lead.rowIndex},this)">${statusOpts}</select></td>
-      <td><input class="lead-note-input" type="text" value="${(lead.notes||'').replace(/"/g,'&quot;')}" placeholder="Add note…" onblur="saveLeadNote(${lead.rowIndex},this)" onkeydown="if(event.key==='Enter')this.blur()"></td>
+      <td onclick="event.stopPropagation()"><select class="lead-status-sel ${cls}" onchange="updateLeadStatus(${lead.rowIndex},this)">${statusOpts}</select></td>
       <td onclick="event.stopPropagation()">
         <button class="icon-btn" title="Delete lead" onclick="confirmDeleteLead(${lead.rowIndex})">
           <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2"/></svg>
@@ -3018,7 +3058,7 @@ function renderLeads(){
 
   content.innerHTML=`<div class="table-wrap"><table class="lead-table"><thead><tr>
     <th style="width:32px"><input type="checkbox" onchange="toggleAllLeads(this)"></th>
-    <th>Date</th><th>Name</th><th>Phone</th><th>Vehicle</th><th>Timeframe</th><th>Status</th><th>Notes</th><th></th>
+    <th>Date</th><th>Name</th><th>Phone</th><th>Vehicle</th><th>Timeframe</th><th>Status</th><th></th>
   </tr></thead><tbody>${rows}</tbody></table></div>`;
 }
 
@@ -3275,6 +3315,7 @@ async function updateLeadFieldFromDrawer(field, value){
   const lead=leadsData.find(l=>l.rowIndex===currentLeadRowIndex);
   if(lead) lead[field]=value;
   if(field==='status') updateLeadsSubtitle();
+  if(field==='timeframe'||field==='status') renderLeads();
   try { await apiPost('updateLead',{rowIndex:currentLeadRowIndex,field,value}); }
   catch(e){ showToast('Save failed'); }
 }
