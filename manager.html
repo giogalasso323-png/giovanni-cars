@@ -4087,7 +4087,8 @@ function commColor(comm) {
 function fmtComm(comm, raw, isFloored) {
   const main = fmtG(comm);
   if (!isFloored) return main;
-  return main + `<span style="font-size:0.78em;opacity:0.55;margin-left:3px">(${fmtG(raw)})</span>`;
+  const rawFmt = raw < 0 ? fmtG(raw) : `(${fmtG(raw)})`;
+  return main + `<span style="font-size:0.78em;opacity:0.55;margin-left:3px">${rawFmt}</span>`;
 }
 
 function buildGrossStatusBadge(g) {
@@ -4104,18 +4105,19 @@ function buildGrossSection(c) {
   const si = grossStatusInfo(g);
   const topColor    = commColor(g.topComm);
   const bottomColor = commColor(g.bottomComm);
+  const sameComm    = g.topComm === g.bottomComm;
   return `
   <div class="section-title">Commission Estimate</div>
   <div id="gross-section" style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px;margin-bottom:16px">
     <div id="gross-badge" style="margin-bottom:10px">${buildGrossStatusBadge(g)}</div>
     <div style="display:flex;align-items:baseline;gap:6px;margin-bottom:2px">
       <span id="comm-top" style="font-family:'DM Mono',monospace;font-size:26px;font-weight:700;color:${topColor}">${fmtComm(g.topComm, g.topRaw, g.topIsFloored)}</span>
-      <span style="font-size:18px;color:var(--text3);font-family:'DM Mono',monospace">&ndash;</span>
-      <span id="comm-bottom" style="font-family:'DM Mono',monospace;font-size:18px;font-weight:600;color:${bottomColor}">${fmtComm(g.bottomComm, g.bottomRaw, g.bottomIsFloored)}</span>
+      ${!sameComm ? `<span style="font-size:18px;color:var(--text3);font-family:'DM Mono',monospace">&ndash;</span>
+      <span id="comm-bottom" style="font-family:'DM Mono',monospace;font-size:18px;font-weight:600;color:${bottomColor}">${fmtComm(g.bottomComm, g.bottomRaw, g.bottomIsFloored)}</span>` : ''}
       <span style="font-size:11px;color:var(--text3);margin-left:4px">your check</span>
     </div>
     <div style="font-size:12px;color:var(--text3);margin-bottom:4px">
-      Front gross: <span id="gross-range" style="color:var(--text2)">${fmtG(g.topGross)} &ndash; ${fmtG(g.bottomGross)}</span>
+      Front gross: <span id="gross-range" style="color:var(--text2)">${g.mileageAdder > 0 ? `${fmtG(g.topGross)} &ndash; ${fmtG(g.bottomGross)}` : fmtG(g.topGross)}</span>
     </div>
     ${g.mileageAdder > 0 ? `<div style="font-size:11px;color:var(--amber);margin-bottom:10px">&minus;${fmtG(g.mileageAdder)} recon adj &middot; ${(mil/1000).toFixed(0)}K mi &middot; ${age}yr old</div>` : '<div style="margin-bottom:10px"></div>'}
     <div style="border-top:1px solid var(--border);padding-top:10px;margin-bottom:10px">
@@ -4191,13 +4193,12 @@ function grossTableCell(c) {
   }
   const tc = commColor(g.topComm);
   const bc = commColor(g.bottomComm);
+  const same = g.topComm === g.bottomComm;
   return `<td style="white-space:nowrap">
     <span class="gp-bar" style="background:${tc};width:26px"></span>
-    <span class="gp-gap"></span>
-    <span class="gp-bar" style="background:${bc};width:20px"></span>
+    ${!same ? `<span class="gp-gap"></span><span class="gp-bar" style="background:${bc};width:20px"></span>` : ''}
     <span class="gp-num" style="font-size:11px;font-weight:700;color:${tc}">${fmtG(g.topComm)}</span>
-    <span class="gp-dash"> &ndash; </span>
-    <span class="gp-num" style="font-size:10px;color:${bc}">${fmtG(g.bottomComm)}</span>
+    ${!same ? `<span class="gp-dash"> &ndash; </span><span class="gp-num" style="font-size:10px;color:${bc}">${fmtG(g.bottomComm)}</span>` : ''}
   </td>`;
 }
 
@@ -4451,7 +4452,9 @@ function renderFloorCards() {
       } else {
         const tc = commColor(g.topComm);
         const bc = commColor(g.bottomComm);
-        gpHtml = `<span style="color:${tc}">${fmtG(g.topComm)}</span><span style="color:var(--text3)"> – </span><span style="color:${bc}">${fmtG(g.bottomComm)}</span>`;
+        gpHtml = g.topComm === g.bottomComm
+          ? `<span style="color:${tc}">${fmtG(g.topComm)}</span>`
+          : `<span style="color:${tc}">${fmtG(g.topComm)}</span><span style="color:var(--text3)"> – </span><span style="color:${bc}">${fmtG(g.bottomComm)}</span>`;
       }
     }
     return `<div class="floor-card" onclick="openFloorDrawer('${c.vin}')">
