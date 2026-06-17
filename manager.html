@@ -4029,9 +4029,10 @@ function getAgeBracket(year) {
   return 3;
 }
 
-function getMileageAdder(mil, year) {
+function getMileageAdder(mil, year, isCertified) {
   if (!mil || !year) return 0;
-  return MILEAGE_AGE_MATRIX[getAgeBracket(year)][getMileageBracket(mil)];
+  const base = MILEAGE_AGE_MATRIX[getAgeBracket(year)][getMileageBracket(mil)];
+  return isCertified ? Math.round(base * 0.5) : base;
 }
 
 function getMiniFloor(c) {
@@ -4044,8 +4045,9 @@ function calcGrossData(c, productPrice, carDiscount) {
   if (!cost || !sticker) return null;
   const certCost = Number(c.certCost) > 0 ? Number(c.certCost) :
     (c.certification && c.certification.includes('Toyota Certified') ? 650 : 0);
+  const isCertified = certCost > 0;
   const fixedCosts = 2000 + 500 + certCost;
-  const mileageAdder = getMileageAdder(Number(c.mileage) || 0, c.year);
+  const mileageAdder = getMileageAdder(Number(c.mileage) || 0, c.year, isCertified);
   const productGross = (productPrice || 0) > 0 ? ((productPrice || 0) - 750) : 0;
   const discount = carDiscount || 0;
   const topGross = sticker - cost - fixedCosts + productGross - discount;
