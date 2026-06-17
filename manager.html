@@ -4088,9 +4088,8 @@ function commColor(comm) {
 
 function fmtComm(comm, raw, isFloored) {
   const main = fmtG(comm);
-  if (!isFloored) return main;
-  const rawFmt = raw < 0 ? fmtG(raw) : `(${fmtG(raw)})`;
-  return main + `<span style="font-size:0.78em;opacity:0.55;margin-left:3px">${rawFmt}</span>`;
+  if (!isFloored || raw <= 0) return main;
+  return main + `<span style="font-size:0.78em;opacity:0.55;margin-left:3px">(${fmtG(raw)})</span>`;
 }
 
 function buildGrossStatusBadge(g) {
