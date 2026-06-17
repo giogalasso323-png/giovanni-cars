@@ -263,6 +263,7 @@
   .lead-type-tab.active { background: var(--accent); color: #fff; border-color: var(--accent); }
   .lead-type-tab.tab-focus.active { background: rgba(139,92,246,1); border-color: rgba(139,92,246,1); }
   .lead-type-tab.tab-lost.active { background: var(--red); border-color: var(--red); }
+  .lead-type-tab.tab-sold.active { background: var(--green); border-color: var(--green); }
   .origin-tag { display: inline-flex; align-items: center; padding: 1px 6px; border-radius: 3px; font-size: 10px; font-weight: 700; background: rgba(139,92,246,0.12); color: #a78bfa; margin-left: 5px; vertical-align: middle; }
   /* LEAD VEHICLE LIST in drawer */
   .lead-vehicle-item { display: flex; align-items: flex-start; justify-content: space-between; padding: 10px 12px; background: var(--bg3); border-radius: 6px; margin-bottom: 6px; gap: 10px; border: 1px solid transparent; }
@@ -1656,13 +1657,14 @@ function buildLeadSectionHtml(lead, car){
       </div>
     </div>
 
-    <!-- Pipeline Status (Active / Focus / Lost) -->
+    <!-- Pipeline Status (Active / Focus / Lost / Sold) -->
     <div style="margin-bottom:12px">
       <div class="field-label" style="margin-bottom:6px">Pipeline Status</div>
       <div style="display:flex;gap:6px;flex-wrap:wrap">
         ${mkPipeBtn('','Active','var(--green)')}
         ${mkPipeBtn('Focus','Focus','var(--purple)')}
         ${mkPipeBtn('Lost','Lost','var(--red)')}
+        ${mkPipeBtn('Sold','Sold','var(--green)')}
       </div>
     </div>
 
@@ -1865,7 +1867,7 @@ async function moveLeadTo(rowIndex, newType) {
   const lead = leadsData.find(l => l.rowIndex === rowIndex);
   if (!lead) return;
   const saves = [];
-  if (newType === 'Focus' || newType === 'Lost') {
+  if (newType === 'Focus' || newType === 'Lost' || newType === 'Sold') {
     // Pipeline state change — preserve source type in leadType
     lead.inFocus = newType;
     saves.push(apiPost('updateLead', { rowIndex, field: 'inFocus', value: newType }));
@@ -1884,7 +1886,7 @@ async function moveLeadTo(rowIndex, newType) {
   }
   try {
     await Promise.all(saves);
-    showToast(newType === 'Focus' || newType === 'Lost' ? 'Set to ' + newType : 'Moved to ' + newType);
+    showToast(newType === 'Focus' || newType === 'Lost' || newType === 'Sold' ? 'Set to ' + newType : 'Moved to ' + newType);
     renderLeads();
     if (currentLeadRowIndex === rowIndex) {
       document.getElementById('drawer-body').innerHTML = buildLeadSectionHtml(lead, null);
@@ -2639,12 +2641,13 @@ function viewMatchedLeads() {
 }
 
 let leadsFilter = 'all'; // 'all' | 'matched'
-let leadsTab = 'Lot'; // 'Lot' | 'FB Marketplace' | 'FB Ad' | 'Focus' | 'Lost'
+let leadsTab = 'Lot'; // 'Lot' | 'FB Marketplace' | 'FB Ad' | 'Website' | 'Focus' | 'Lost' | 'Sold'
 
 function getLeadTab(lead) {
   const ip = lead.inFocus || '';
   if (ip === 'Focus' || ip === true || ip === 'true') return 'Focus';
   if (ip === 'Lost') return 'Lost';
+  if (ip === 'Sold') return 'Sold';
   const lt = lead.leadType || '';
   if (lt === 'Focus') return 'Focus';
   if (lt === 'Lost') return 'Lost';
@@ -2969,8 +2972,8 @@ function renderLeads(){
   const subtitle = document.getElementById('leads-subtitle');
 
   // Render tab bar with counts
-  const TABS = ['Lot','FB Marketplace','FB Ad','Website','Focus','Lost'];
-  const tabCls = { 'Focus':'tab-focus', 'Lost':'tab-lost' };
+  const TABS = ['Lot','FB Marketplace','FB Ad','Website','Focus','Lost','Sold'];
+  const tabCls = { 'Focus':'tab-focus', 'Lost':'tab-lost', 'Sold':'tab-sold' };
   const tabsEl = document.getElementById('lead-type-tabs');
   if (tabsEl) {
     tabsEl.innerHTML = TABS.map(tab => {
@@ -3035,7 +3038,7 @@ function renderLeads(){
     const lName = capName(lead.lastName);
     const fullName = [fName, lName].filter(Boolean).join(' ') || '—';
     const phone = fmtPhone(lead.phone);
-    const srcBadge = (leadsTab === 'Focus' || leadsTab === 'Lost')
+    const srcBadge = (leadsTab === 'Focus' || leadsTab === 'Lost' || leadsTab === 'Sold')
       ? (() => { const src = getLeadSourceType(lead); const srcColors = {'Lot':'var(--blue)','FB Marketplace':'var(--purple)','FB Ad':'var(--amber)','Website':'var(--green)'}; return `<span style="font-size:10px;color:${srcColors[src]||'var(--text3)'};background:var(--bg3);padding:2px 7px;border-radius:4px;font-weight:600">${src}</span>`; })()
       : '';
     return `<tr class="${isSelected?'lead-selected':''}" onclick="openDrawerFromLead(${lead.rowIndex})" style="cursor:pointer">

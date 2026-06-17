@@ -209,7 +209,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
         type: 'object',
         properties: {
           rowIndex: { type: 'number', description: 'Lead row index from get_leads' },
-          pipeline: { type: 'string', description: 'Focus, Lost, or Active (Active returns it to its source tab)' }
+          pipeline: { type: 'string', description: 'Focus, Lost, Sold, or Active (Active returns it to its source tab)' }
         },
         required: ['rowIndex', 'pipeline']
       }
@@ -466,7 +466,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       case 'set_lead_pipeline': {
         const pipeline = args.pipeline;
         const rIdx = args.rowIndex;
-        if (pipeline === 'Focus' || pipeline === 'Lost') {
+        if (pipeline === 'Focus' || pipeline === 'Lost' || pipeline === 'Sold') {
           await callScript('updateLead', { rowIndex: rIdx, field: 'inFocus', value: pipeline });
           result = { ok: true, moved: pipeline };
         } else {
