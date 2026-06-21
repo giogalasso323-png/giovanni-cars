@@ -1599,6 +1599,11 @@ function buildLeadSectionHtml(lead, car){
       <div id="combo-first-dd" class="name-combo-dropdown"></div>
     </div>`;
 
+  const createdStr = lead.timestamp ? new Date(lead.timestamp).toLocaleDateString([],{month:'short',day:'numeric',year:'numeric',hour:'2-digit',minute:'2-digit'}) : null;
+  const lastEditStr = lead.lastEdited ? new Date(lead.lastEdited).toLocaleDateString([],{month:'short',day:'numeric',year:'numeric',hour:'2-digit',minute:'2-digit'}) : null;
+  const drawerDaysSince = lead.lastEdited ? Math.floor((Date.now()-new Date(lead.lastEdited))/86400000) : null;
+  const drawerDotColor = drawerDaysSince === null ? '' : drawerDaysSince <= 2 ? 'var(--green)' : drawerDaysSince <= 7 ? 'var(--amber)' : 'var(--red)';
+
   return `<div style="background:rgba(82,153,255,0.06);border:1px solid rgba(82,153,255,0.18);border-radius:var(--radius);padding:14px 16px;margin-bottom:16px">
 
     <!-- Contact Info: display + edit -->
@@ -1634,6 +1639,19 @@ function buildLeadSectionHtml(lead, car){
       <div style="display:flex;gap:8px">
         <button class="btn" style="font-size:12px;padding:5px 14px" onclick="saveContactEdit()">Save</button>
         <button class="mini-copy-btn" onclick="cancelContactEdit()">Cancel</button>
+      </div>
+    </div>
+
+    <!-- Timestamps -->
+    <div style="display:flex;gap:16px;margin-bottom:12px;padding:7px 10px;background:var(--bg3);border-radius:6px;flex-wrap:wrap">
+      <div style="display:flex;align-items:center;gap:5px">
+        <span style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:0.5px">Created</span>
+        <span style="font-size:11px;font-family:'DM Mono',monospace;color:var(--text2)">${createdStr||'—'}</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:5px">
+        ${drawerDotColor ? `<span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:${drawerDotColor};flex-shrink:0"></span>` : ''}
+        <span style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:0.5px">Last Edit</span>
+        <span style="font-size:11px;font-family:'DM Mono',monospace;color:var(--text2)">${lastEditStr||'—'}</span>
       </div>
     </div>
 
@@ -3005,6 +3023,11 @@ function renderLeads(){
 
   const rows = visibleLeads.map(lead=>{
     const date = lead.timestamp ? new Date(lead.timestamp).toLocaleDateString([],{month:'short',day:'numeric',year:'numeric'}) : '—';
+    const lastEditedDate = lead.lastEdited ? new Date(lead.lastEdited) : null;
+    const lastEditedStr = lastEditedDate ? lastEditedDate.toLocaleDateString([],{month:'short',day:'numeric',year:'numeric'}) : null;
+    const daysSinceEdit = lastEditedDate ? Math.floor((Date.now() - lastEditedDate) / 86400000) : null;
+    const staleColor = daysSinceEdit === null ? '' : daysSinceEdit <= 2 ? 'var(--green)' : daysSinceEdit <= 7 ? 'var(--amber)' : 'var(--red)';
+    const staleDot = staleColor ? `<span title="Last edited ${daysSinceEdit === 0 ? 'today' : daysSinceEdit + 'd ago'}" style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${staleColor};flex-shrink:0"></span>` : '';
     const status = lead.status || 'New';
     const cls = LEAD_STATUS_COLORS[status]||'s-new';
     // Table status dropdown excludes Sold and Lost — handled via pipeline status
@@ -3047,7 +3070,10 @@ function renderLeads(){
       : '';
     return `<tr class="${isSelected?'lead-selected':''}" onclick="openDrawerFromLead(${lead.rowIndex})" style="cursor:pointer">
       <td onclick="event.stopPropagation()"><input type="checkbox" ${isSelected?'checked':''} onchange="toggleLeadSelect(${lead.rowIndex},this)"></td>
-      <td style="color:var(--text3);font-family:'DM Mono',monospace;font-size:11px;white-space:nowrap">${date}</td>
+      <td style="font-family:'DM Mono',monospace;font-size:11px;white-space:nowrap">
+        <div style="display:flex;align-items:center;gap:5px;color:var(--text3)">${staleDot}${date}</div>
+        ${lastEditedStr ? `<div style="color:var(--text3);opacity:0.6;margin-top:2px">↻ ${lastEditedStr}</div>` : ''}
+      </td>
       <td class="td-main">
         <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
           <span style="font-size:13px;font-weight:600;color:var(--text)">${fullName}</span>

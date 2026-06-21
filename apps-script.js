@@ -28,7 +28,7 @@ const LEADS_COLUMNS = [
   'timestamp','firstName','lastName','phone','vehicle','vin',
   'timeframe','source','status','notes','followUpDate','vehicleList',
   'leadType','inFocus','turnedTo','vehicleNotAvailable','vehicleInterest','turnedToFirst',
-  'addedBy','calEventId'
+  'addedBy','calEventId','lastEdited'
 ];
 
 function doGet(e)     { return handleRequest(e); }
@@ -178,6 +178,10 @@ function updateLead(rowIndex, field, value) {
   var col = LEADS_COLUMNS.indexOf(field);
   if (col < 0) return { error: 'Unknown field: ' + field };
   sh.getRange(rowIndex, col + 1).setValue(value);
+  var lastEditedCol = LEADS_COLUMNS.indexOf('lastEdited');
+  if (lastEditedCol >= 0 && field !== 'lastEdited') {
+    sh.getRange(rowIndex, lastEditedCol + 1).setValue(new Date().toISOString());
+  }
   return { ok: true };
 }
 
