@@ -3041,6 +3041,10 @@ function renderLeads(){
     const srcBadge = (leadsTab === 'Focus' || leadsTab === 'Lost' || leadsTab === 'Sold')
       ? (() => { const src = getLeadSourceType(lead); const srcColors = {'Lot':'var(--blue)','FB Marketplace':'var(--purple)','FB Ad':'var(--amber)','Website':'var(--green)'}; return `<span style="font-size:10px;color:${srcColors[src]||'var(--text3)'};background:var(--bg3);padding:2px 7px;border-radius:4px;font-weight:600">${src}</span>`; })()
       : '';
+    const addedByColors = {'Giovanni':'var(--blue)','Cowork':'var(--amber)','Website':'var(--green)'};
+    const addedByBadge = lead.addedBy
+      ? `<span style="font-size:10px;color:${addedByColors[lead.addedBy]||'var(--text3)'};background:var(--bg3);padding:2px 7px;border-radius:4px;font-weight:600">${lead.addedBy}</span>`
+      : '';
     return `<tr class="${isSelected?'lead-selected':''}" onclick="openDrawerFromLead(${lead.rowIndex})" style="cursor:pointer">
       <td onclick="event.stopPropagation()"><input type="checkbox" ${isSelected?'checked':''} onchange="toggleLeadSelect(${lead.rowIndex},this)"></td>
       <td style="color:var(--text3);font-family:'DM Mono',monospace;font-size:11px;white-space:nowrap">${date}</td>
@@ -3049,7 +3053,7 @@ function renderLeads(){
           <span style="font-size:13px;font-weight:600;color:var(--text)">${fullName}</span>
           ${fullName !== '—' ? `<button class="mini-copy-btn" onclick="event.stopPropagation();copyText('${fullName.replace(/'/g,"\\'")}',this)">Copy</button>` : ''}
         </div>
-        <div style="display:flex;align-items:center;gap:4px;flex-wrap:wrap;margin-top:3px">${srcBadge}${turnedTo}</div>
+        <div style="display:flex;align-items:center;gap:4px;flex-wrap:wrap;margin-top:3px">${srcBadge}${addedByBadge}${turnedTo}</div>
       </td>
       <td style="white-space:nowrap">
         <span style="font-family:'DM Mono',monospace;font-size:12px;color:var(--text2)">${phone||'—'}</span>
