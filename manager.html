@@ -1082,8 +1082,12 @@ function applyFilters() {
     if(sortKey==='daysposted-desc') { const da=a.fbPostedDate?Math.floor((Date.now()-new Date(a.fbPostedDate))/86400000):0; const db=b.fbPostedDate?Math.floor((Date.now()-new Date(b.fbPostedDate))/86400000):0; return db-da; }
     if(sortKey==='daysposted-asc') { const da=a.fbPostedDate?Math.floor((Date.now()-new Date(a.fbPostedDate))/86400000):0; const db=b.fbPostedDate?Math.floor((Date.now()-new Date(b.fbPostedDate))/86400000):0; return da-db; }
     if(sortKey==='gross') { const ga=calcGrossData(a,0,0),gb=calcGrossData(b,0,0); return (gb?gb.topGross:-999999)-(ga?ga.topGross:-999999); }
-    // Upcoming tab default: newest addedDate first
-    if(activeFilter==='upcoming') return new Date(b.addedDate||0) - new Date(a.addedDate||0);
+    // Upcoming tab default: newest addedDate first, preserve import order within same date
+    if(activeFilter==='upcoming') {
+      const diff = new Date(b.addedDate||0) - new Date(a.addedDate||0);
+      if(diff !== 0) return diff;
+      return (a._importOrder||0) - (b._importOrder||0);
+    }
     // Live tab default: fewest days on lot first (newest cars at top)
     if(activeFilter==='live') return daysOnLot(a) - daysOnLot(b);
     return 0;
@@ -4364,7 +4368,7 @@ function showCostPreview(rows, fileName) {
     return '';
   };
 
-  pendingCostRecords = rows.map(row => {
+  pendingCostRecords = rows.map((row, idx) => {
     const rawStock   = String(findKey(row, 'stock') || '').trim();
     const rawVin     = String(findKey(row, 'vin')   || '').trim();
     const rawCost    = String(findKey(row, 'appraised', 'appraise') || '').replace(/[^0-9.]/g,'');
@@ -4390,6 +4394,7 @@ function showCostPreview(rows, fileName) {
       price:     parseFloat(rawPrice) || 0,
       appraiser: appraiserDisplay,
       addedDate: rawDate ? new Date(rawDate).toISOString() : new Date().toISOString(),
+      _importOrder: idx,
       _vehicle: rawVehicle,
     };
   }).filter(r => (r.vin || r.stock) && r.appraisedValue > 0);
@@ -4447,17 +4452,18 @@ async function doImportCost() {
       if (c) {
         c.appraisedValue = r.appraisedValue; c.certCost = r.certCost;
         let enriched = false;
-        if (!c.year  && r.year)    { c.year    = r.year;    enriched = true; }
-        if (!c.make  && r.make)    { c.make    = r.make;    enriched = true; }
-        if (!c.model && r.model)   { c.model   = r.model;   enriched = true; }
-        if (!c.mileage && r.mileage){ c.mileage = r.mileage; enriched = true; }
-        if (!c.price && r.price)   { c.price   = r.price;   enriched = true; }
+        if (!c.year      && r.year)      { c.year      = r.year;      enriched = true; }
+        if (!c.make      && r.make)      { c.make      = r.make;      enriched = true; }
+        if (!c.model     && r.model)     { c.model     = r.model;     enriched = true; }
+        if (!c.mileage   && r.mileage)   { c.mileage   = r.mileage;   enriched = true; }
+        if (!c.price     && r.price)     { c.price     = r.price;     enriched = true; }
+        if (!c.appraiser && r.appraiser) { c.appraiser = r.appraiser; enriched = true; }
         if (enriched) toEnrich.push(c);
       } else if (r.vin) {
         const stub = {
           vin: r.vin, stock: r.stock||'', year: r.year||'', make: r.make||'', model: r.model||'',
           mileage: r.mileage||0, price: r.price||0, appraisedValue: r.appraisedValue, certCost: r.certCost||0,
-          appraiser: r.appraiser||'', addedDate: r.addedDate||new Date().toISOString(), fbStatus:'unposted', websiteStatus:'',
+          appraiser: r.appraiser||'', addedDate: r.addedDate||new Date().toISOString(), _importOrder: r._importOrder||0, fbStatus:'unposted', websiteStatus:'',
         };
         inventory.push(stub);
         toEnrich.push(stub);
