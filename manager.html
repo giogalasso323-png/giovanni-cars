@@ -375,6 +375,7 @@
     <button class="filter-tab" data-filter="posted">FB Posted <span class="tab-count" id="cnt-posted">0</span></button>
     <button class="filter-tab" data-filter="unposted">Not Posted <span class="tab-count" id="cnt-unposted">0</span></button>
     <button class="filter-tab" data-filter="sold">Sold <span class="tab-count" id="cnt-sold">0</span></button>
+    <button class="filter-tab" data-filter="not-listed">Not Listed <span class="tab-count" id="cnt-not-listed">0</span></button>
     <button class="filter-tab" data-filter="leads">Leads <span class="tab-count" id="cnt-leads">0</span></button>
     <button class="filter-tab" data-filter="new-cars">New Cars <span class="tab-count" id="cnt-new">0</span></button>
     <button class="filter-tab" data-filter="floor">Floor <span class="tab-count" id="cnt-floor">0</span></button>
@@ -422,6 +423,7 @@
         <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
         Import CSV
       </button>
+      <button class="btn" id="btn-mark-all-sold" onclick="markNotListedAsSold()" style="display:none;color:var(--amber);border-color:var(--amber)">Mark All Sold</button>
       <div class="view-toggle">
         <button class="view-btn active" id="btn-table" onclick="setView('table')"><svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg></button>
         <button class="view-btn" id="btn-cards" onclick="setView('cards')"><svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg></button>
@@ -1045,6 +1047,7 @@ function applyFilters() {
     if(activeFilter==='posted') return c.fbStatus==='posted';
     if(activeFilter==='unposted') return c.fbStatus!=='posted'&&!(c.websiteStatus||'').toLowerCase().includes('sold');
     if(activeFilter==='sold') return (c.websiteStatus||'').toLowerCase().includes('sold')||c.fbStatus==='sold';
+    if(activeFilter==='not-listed') { const ws=(c.websiteStatus||''); return ws==='Not on Website'||ws.includes('Delist'); }
     return true;
   });
   // Show Days Posted column only on FB Posted tab
@@ -1086,10 +1089,22 @@ function applyFilters() {
 function render() {
   if(activeFilter==='leads' || activeFilter==='floor') return;
   applyFilters(); updateCounts(); updateHeaderStats(); updateSortHeaders();
+  document.getElementById('btn-mark-all-sold').style.display = activeFilter==='not-listed' ? '' : 'none';
   const has=inventory.length>0;
   document.getElementById('empty-state').style.display=has?'none':'flex';
   if(!has){ document.getElementById('table-view').style.display='none'; document.getElementById('card-view').style.display='none'; return; }
   currentView==='table' ? renderTable() : renderCards();
+}
+
+async function markNotListedAsSold() {
+  const toMark = filtered.filter(c=>{ const ws=c.websiteStatus||''; return ws==='Not on Website'||ws.includes('Delist'); });
+  if(!toMark.length){ showToast('Nothing to mark'); return; }
+  if(!confirm(`Mark ${toMark.length} unlisted car${toMark.length===1?'':'s'} as Sold?`)) return;
+  const now = new Date().toISOString();
+  toMark.forEach(c=>{ c.fbStatus='sold'; c.websiteStatus='Sold/Unavailable'; c.soldDate=now; });
+  render(); setSyncInfo('saving');
+  await apiPost('upsertMany',{cars:toMark});
+  setSyncInfo('ok'); showToast(toMark.length+' marked as Sold');
 }
 
 function renderTable() {
@@ -1156,6 +1171,7 @@ function updateCounts() {
   document.getElementById('cnt-posted').textContent=inventory.filter(c=>c.fbStatus==='posted').length;
   document.getElementById('cnt-unposted').textContent=inventory.filter(c=>c.fbStatus!=='posted'&&!(c.websiteStatus||'').toLowerCase().includes('sold')).length;
   document.getElementById('cnt-sold').textContent=inventory.filter(c=>(c.websiteStatus||'').toLowerCase().includes('sold')||c.fbStatus==='sold').length;
+  document.getElementById('cnt-not-listed').textContent=inventory.filter(c=>{ const ws=c.websiteStatus||''; return ws==='Not on Website'||ws.includes('Delist'); }).length;
 }
 function updateHeaderStats() {
   const live=inventory.filter(c=>(c.websiteStatus||'').toLowerCase().includes('live')).length;
