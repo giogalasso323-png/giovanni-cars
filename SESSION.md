@@ -9,45 +9,43 @@ _Nothing in progress. Ask Giovanni what to work on._
 
 ---
 
-## Apps Script — Deploy Reminder ⚠️
-**Still needs a NEW VERSION deployment.** New columns won't write server-side until this is done:
-- `addedBy`, `calEventId` (new this session)
-- `leadType`, `inFocus`, `turnedTo`, `vehicleNotAvailable`, `vehicleInterest`, `turnedToFirst` (from previous sessions)
+## Recently Completed (2026-06-22)
 
-Go to Apps Script editor → Deploy → Manage Deployments → New Version
+**New inventory organization tabs:**
+- **Not Listed tab** — shows cars where websiteStatus === 'Not on Website' after a scrape. Excludes 'Check FB — Delist' (those need one-at-a-time Facebook cleanup). Has "Mark All Sold" amber button that bulk-marks all visible cars as Sold/Unavailable.
+- **Upcoming tab** — shows pre-lot cars: `appraisedValue > 0 && !color`. The `!color` check is the key: cost import CSV never sets color, but regular used car CSV always sets it from the `Ext` column. When a CSV import enriches a stub, it gets a color and automatically exits Upcoming.
+- Upcoming tab default sort: newest inventory date first, preserving import file row order within the same date via `_importOrder` index.
+- Upcoming tab shows appraiser name in amber (both `Appraiser` and `Appr. Salesperson` columns joined with ` · `).
+
+**Cost import upgrades:**
+- `importCostData` in apps-script.js now creates stub rows for VINs not found in inventory (instead of silently skipping). Stub includes: vin, stock, year, make, model, mileage, price, appraisedValue, certCost, appraiser, addedDate.
+- Frontend parses these extra fields from the cost CSV: Vehicle (→ year/make/model), Odometer (→ mileage), Price, Inventory Date (→ addedDate), Appraiser + Appr. Salesperson (→ appraiser display).
+- Existing stubs get enriched on re-import: fills in missing year/make/model/mileage/price/appraiser via upsertMany.
+- Import preview now shows "X update existing / Y new → Upcoming tab" and labels each row as ✓ Match or + Upcoming.
+
+**`lastEdited` timestamping on leads (2026-06-21):**
+- `updateLead()` in apps-script.js auto-stamps `lastEdited` on every field update.
+- Leads table: staleness dot (green ≤2d, amber ≤7d, red >7d) + `↻ date` second line.
+- Lead drawer: Created + Last Edit bar with staleness dot.
+
+**Schema additions:**
+- `lastEdited` added to LEADS_COLUMNS
+- `appraiser` added to COLUMNS (used car inventory)
+- Both require the `appraiser` column header in the Google Sheet (added manually after last `certCost` column)
+- Apps Script new version deployed ✓
 
 ---
 
-## Recently Completed (2026-06-16)
-
-**Leads system overhaul:**
-- Fixed "lead trays stuck" bug — `lead.phone` came from Sheets as a number, `.replace()` crashed. Fixed with `String()` coerce.
-- Added `addedBy` + `calEventId` fields to LEADS_COLUMNS in manager.html and apps-script.js
-- Manual leads tagged `addedBy: 'Giovanni'`, MCP leads tagged `addedBy: 'Cowork'`, website form leads tagged `addedBy: 'Website'`
-- Added **Website tab** to leads (6 tabs total: Lot/FB Marketplace/FB Ad/Website/Focus/Lost), green color
-- Website form leads (index.html) now pass `leadType: 'Website'` and `addedBy: 'Website'`
-
-**MCP server upgrades:**
-- Added `import_cost_data` — single-call DMS XLS cost import via importCostData action
-- Added `import_used_cars` — bulk upsert used cars from parsed CSV/XLS
-- Added `import_new_cars` — bulk import new car CSV
-- Added `scrape_inventory` — website sync, paginated (25 cars/call, offset parameter), returns nextOffset so Cowork loops until done:true
-- Added `set_lead_pipeline` — moves lead to Focus/Lost/Active correctly
-- Updated `get_leads` — tab + status filters, _tab and _sourceType fields on each lead
-- Updated `add_lead` — leadType, addedBy fields added
-- Updated COWORK.md with full MCP tool list, lead schema, calendar sync instructions, note tagging convention
-
-**Cowork import session:**
-- Cowork successfully imported: 165 used cars updated, 487 cost records (batched), 407 new cars
-- Scrape ran (timed out on Cowork side but completed on Google's servers) — data updated in app
-- Scrape tool now paginated to avoid future timeouts
+## Future Features — Upcoming Tab
+1. **FB posting from Upcoming** — post to Facebook from the Upcoming tab, with the post carrying over continuity when the car goes live on the website (stock #, price, description preserved)
+2. **Search by appraiser name** — can't currently search/filter Upcoming by who took the trade
+3. **Cowork MCP tool** — `get_upcoming_inventory` so Cowork can search pre-lot cars for customer matches
 
 ---
 
 ## Known Issues / Next Up
-- Apps Script new version deployment (see above — still pending)
-- Google Drive "Lead Inbox" folder not yet created (for phone screenshot → lead workflow)
 - `scrape_inventory` MCP tool requires Cowork restart after each code push (local process)
+- Google Drive "Lead Inbox" folder not yet created (for phone screenshot → lead workflow)
 
 ---
 
