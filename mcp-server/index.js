@@ -231,6 +231,16 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
       inputSchema: { type: 'object', properties: {} }
     },
     {
+      name: 'get_upcoming_inventory',
+      description: 'Get pre-lot cars that have cost data but are not yet live on the website. These are trade-ins and acquisitions captured via cost import before they appear on dublintoyota.com. Useful for matching customers to incoming vehicles. Each car includes vin, stock, year, make, model, mileage, price, appraisedValue, appraiser, and addedDate. Optionally filter by a search query (year, make, model, or VIN substring).',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          query: { type: 'string', description: 'Optional search string — filters by year, make, model, or VIN (case-insensitive substring match).' }
+        }
+      }
+    },
+    {
       name: 'import_cost_data',
       description: 'Import cost/appraisal data from a parsed DMS XLS export. Updates appraisedValue and certCost on existing inventory cars matched by VIN or stock number. This is the same as the "Import Cost Data" button in the web app — use this instead of calling update_car_field per car.',
       inputSchema: {
@@ -484,6 +494,32 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       case 'get_new_inventory':
         result = await callScript('getNewInventory');
         break;
+
+      case 'get_upcoming_inventory': {
+        const all = await callScript('getAll');
+        if (!Array.isArray(all)) { result = all; break; }
+        let upcoming = all.filter(c => Number(c.appraisedValue || 0) > 0 && !c.color);
+        if (args.query) {
+          const q = args.query.toLowerCase();
+          upcoming = upcoming.filter(c =>
+            (c.year  && String(c.year).includes(q))  ||
+            (c.make  && c.make.toLowerCase().includes(q))  ||
+            (c.model && c.model.toLowerCase().includes(q)) ||
+            (c.vin   && c.vin.toLowerCase().includes(q))   ||
+            (c.stock && c.stock.toLowerCase().includes(q))
+          );
+        }
+        upcoming.sort((a, b) => new Date(b.addedDate || 0) - new Date(a.addedDate || 0));
+        result = {
+          count: upcoming.length,
+          cars: upcoming.map(c => ({
+            vin: c.vin, stock: c.stock, year: c.year, make: c.make, model: c.model,
+            mileage: c.mileage, price: c.price, appraisedValue: c.appraisedValue,
+            appraiser: c.appraiser, addedDate: c.addedDate
+          }))
+        };
+        break;
+      }
 
       case 'import_cost_data':
         if (!args.records || !args.records.length) { result = { error: 'No records provided' }; break; }
