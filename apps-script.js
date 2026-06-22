@@ -21,7 +21,7 @@ const COLUMNS = [
   'carfaxUrl','edmundsLabel','edmundsBelow','vehicleInfo',
   'vehicleHistory','features','certification','addedDate',
   'lastChecked','fbPostedDate','soldDate','websiteUrl','fbPostedPrice','priceDropped','dis','currentFbPrice','originalPrice','drivePhotoFolder','drivePhotoCount',
-  'appraisedValue','certCost'
+  'appraisedValue','certCost','appraiser'
 ];
 
 const LEADS_COLUMNS = [
@@ -861,7 +861,8 @@ function importCostData(records) {
       if (map['make']     !== undefined && rec.make)  stub[map['make']]     = rec.make;
       if (map['model']    !== undefined && rec.model) stub[map['model']]    = rec.model;
       if (map['mileage']  !== undefined && rec.mileage) stub[map['mileage']] = rec.mileage;
-      if (map['price']    !== undefined && rec.price) stub[map['price']]    = rec.price;
+      if (map['price']     !== undefined && rec.price)     stub[map['price']]     = rec.price;
+      if (map['appraiser'] !== undefined && rec.appraiser) stub[map['appraiser']] = rec.appraiser;
       if (map['addedDate'] !== undefined) stub[map['addedDate']] = rec.addedDate || new Date().toISOString();
       stubsToAdd.push(stub);
       stubbed++;
