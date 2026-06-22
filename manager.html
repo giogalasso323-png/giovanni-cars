@@ -4373,7 +4373,7 @@ function showCostPreview(rows, fileName) {
     const rawOdo     = String(findKey(row, 'odometer', 'mileage', 'miles') || '').replace(/[^0-9]/g,'');
     const rawPrice   = String(findKey(row, 'price') || '').replace(/[^0-9.]/g,'');
     const rawDate      = String(findKey(row, 'inventory') || '').trim();
-    const rawAppraiser = String(findKey(row, 'salesperson', 'appraiser') || '').trim();
+    const rawAppraiser = String(findKey(row, 'appraiser', 'salesperson') || '').trim();
     const vParts = rawVehicle.split(/\s+/);
     const year  = parseInt(vParts[0]) || 0;
     const make  = vParts[1] || '';
