@@ -840,8 +840,9 @@ function importCostData(records) {
     if (vin) vinIdx[vin] = i;
   });
 
-  var updated = 0, notFound = 0;
+  var updated = 0, stubbed = 0;
   var rowsToWrite = {};
+  var stubsToAdd = [];
 
   records.forEach(function(rec) {
     var vin = norm(String(rec.vin || ''));
@@ -849,7 +850,18 @@ function importCostData(records) {
     var rowIdx = -1;
     if (vin && vinIdx[vin] !== undefined) rowIdx = vinIdx[vin];
     else if (stock && stockIdx[stock] !== undefined) rowIdx = stockIdx[stock];
-    if (rowIdx < 0) { notFound++; return; }
+    if (rowIdx < 0) {
+      if (!vin) return;
+      var stub = new Array(numCols).fill('');
+      stub[map['vin']] = vin;
+      if (map['stock'] !== undefined && stock) stub[map['stock']] = stock;
+      stub[apprCol] = Number(rec.appraisedValue) || 0;
+      stub[certCol] = Number(rec.certCost) || 0;
+      if (map['addedDate'] !== undefined) stub[map['addedDate']] = new Date().toISOString();
+      stubsToAdd.push(stub);
+      stubbed++;
+      return;
+    }
     data[rowIdx][apprCol] = Number(rec.appraisedValue) || 0;
     data[rowIdx][certCol] = Number(rec.certCost) || 0;
     rowsToWrite[rowIdx] = true;
@@ -862,7 +874,11 @@ function importCostData(records) {
     sh.getRange(i + 2, certCol + 1).setValue(data[i][certCol]);
   });
 
-  return { updated: updated, notFound: notFound };
+  if (stubsToAdd.length) {
+    sh.getRange(sh.getLastRow() + 1, 1, stubsToAdd.length, numCols).setValues(stubsToAdd);
+  }
+
+  return { updated: updated, stubbed: stubbed };
 }
 
 function updateNewCar(vin, field, value) {
