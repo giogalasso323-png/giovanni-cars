@@ -1047,7 +1047,7 @@ function applyFilters() {
     if(activeFilter==='posted') return c.fbStatus==='posted';
     if(activeFilter==='unposted') return c.fbStatus!=='posted'&&!(c.websiteStatus||'').toLowerCase().includes('sold');
     if(activeFilter==='sold') return (c.websiteStatus||'').toLowerCase().includes('sold')||c.fbStatus==='sold';
-    if(activeFilter==='not-listed') { const ws=(c.websiteStatus||''); return ws==='Not on Website'||ws.includes('Delist'); }
+    if(activeFilter==='not-listed') return (c.websiteStatus||'')==='Not on Website';
     return true;
   });
   // Show Days Posted column only on FB Posted tab
@@ -1097,7 +1097,7 @@ function render() {
 }
 
 async function markNotListedAsSold() {
-  const toMark = filtered.filter(c=>{ const ws=c.websiteStatus||''; return ws==='Not on Website'||ws.includes('Delist'); });
+  const toMark = filtered.filter(c=>(c.websiteStatus||'')==='Not on Website');
   if(!toMark.length){ showToast('Nothing to mark'); return; }
   if(!confirm(`Mark ${toMark.length} unlisted car${toMark.length===1?'':'s'} as Sold?`)) return;
   const now = new Date().toISOString();
@@ -1171,7 +1171,7 @@ function updateCounts() {
   document.getElementById('cnt-posted').textContent=inventory.filter(c=>c.fbStatus==='posted').length;
   document.getElementById('cnt-unposted').textContent=inventory.filter(c=>c.fbStatus!=='posted'&&!(c.websiteStatus||'').toLowerCase().includes('sold')).length;
   document.getElementById('cnt-sold').textContent=inventory.filter(c=>(c.websiteStatus||'').toLowerCase().includes('sold')||c.fbStatus==='sold').length;
-  document.getElementById('cnt-not-listed').textContent=inventory.filter(c=>{ const ws=c.websiteStatus||''; return ws==='Not on Website'||ws.includes('Delist'); }).length;
+  document.getElementById('cnt-not-listed').textContent=inventory.filter(c=>(c.websiteStatus||'')==='Not on Website').length;
 }
 function updateHeaderStats() {
   const live=inventory.filter(c=>(c.websiteStatus||'').toLowerCase().includes('live')).length;
