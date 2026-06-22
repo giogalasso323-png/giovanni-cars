@@ -4363,15 +4363,28 @@ function showCostPreview(rows, fileName) {
   };
 
   pendingCostRecords = rows.map(row => {
-    const rawStock = String(findKey(row, 'stock') || '').trim();
-    const rawVin   = String(findKey(row, 'vin')   || '').trim();
-    const rawCost  = String(findKey(row, 'appraised', 'appraise') || findKey(row, 'cost') || '').replace(/[^0-9.]/g,'');
-    const rawCert  = String(findKey(row, 'cert') || '').replace(/[^0-9.]/g,'');
+    const rawStock   = String(findKey(row, 'stock') || '').trim();
+    const rawVin     = String(findKey(row, 'vin')   || '').trim();
+    const rawCost    = String(findKey(row, 'appraised', 'appraise') || '').replace(/[^0-9.]/g,'');
+    const rawCert    = String(findKey(row, 'cert') || '').replace(/[^0-9.]/g,'');
+    const rawVehicle = String(findKey(row, 'vehicle', 'description') || '').trim();
+    const rawOdo     = String(findKey(row, 'odometer', 'mileage', 'miles') || '').replace(/[^0-9]/g,'');
+    const rawPrice   = String(findKey(row, 'price') || '').replace(/[^0-9.]/g,'');
+    const rawDate    = String(findKey(row, 'inventory') || '').trim();
+    const vParts = rawVehicle.split(/\s+/);
+    const year  = parseInt(vParts[0]) || 0;
+    const make  = vParts[1] || '';
+    const model = vParts.slice(2).join(' ');
     return {
       stock: rawStock.replace(/^STK/i,'').trim(),
       vin:   normVin(rawVin),
       appraisedValue: parseFloat(rawCost) || 0,
       certCost:       parseFloat(rawCert) || 0,
+      year, make, model,
+      mileage:  parseInt(rawOdo) || 0,
+      price:    parseFloat(rawPrice) || 0,
+      addedDate: rawDate ? new Date(rawDate).toISOString() : new Date().toISOString(),
+      _vehicle: rawVehicle,
     };
   }).filter(r => (r.vin || r.stock) && r.appraisedValue > 0);
 
@@ -4384,35 +4397,35 @@ function showCostPreview(rows, fileName) {
     return;
   }
 
-  const matched = pendingCostRecords.filter(r =>
-    inventory.find(c => (r.vin && c.vin === r.vin) || (r.stock && c.stock === r.stock))
-  ).length;
+  const matched  = pendingCostRecords.filter(r => inventory.find(c => (r.vin && c.vin === r.vin) || (r.stock && c.stock === r.stock))).length;
+  const newStubs = pendingCostRecords.length - matched;
 
   preview.innerHTML = `
-    <div style="margin-bottom:10px">
-      <span style="color:var(--green)">✓</span> Found <strong style="color:var(--text)">${pendingCostRecords.length}</strong> records in <em>${fileName}</em> —
-      <span style="color:var(--text2)">${matched} match current inventory</span>
+    <div style="margin-bottom:10px;display:flex;gap:14px;flex-wrap:wrap">
+      <span><span style="color:var(--green)">✓</span> <strong style="color:var(--text)">${matched}</strong> update existing inventory</span>
+      ${newStubs ? `<span><span style="color:var(--amber)">+</span> <strong style="color:var(--amber)">${newStubs}</strong> new → Upcoming tab</span>` : ''}
     </div>
     <table style="width:100%;border-collapse:collapse;font-size:12px">
       <thead><tr>
         <th style="text-align:left;padding:4px 8px;color:var(--text3);border-bottom:1px solid var(--border)">Stock #</th>
-        <th style="text-align:left;padding:4px 8px;color:var(--text3);border-bottom:1px solid var(--border)">VIN</th>
+        <th style="text-align:left;padding:4px 8px;color:var(--text3);border-bottom:1px solid var(--border)">Vehicle</th>
         <th style="text-align:right;padding:4px 8px;color:var(--text3);border-bottom:1px solid var(--border)">Appraised</th>
         <th style="text-align:right;padding:4px 8px;color:var(--text3);border-bottom:1px solid var(--border)">Cert</th>
-        <th style="text-align:center;padding:4px 8px;color:var(--text3);border-bottom:1px solid var(--border)">Match</th>
+        <th style="text-align:center;padding:4px 8px;color:var(--text3);border-bottom:1px solid var(--border)">Status</th>
       </tr></thead>
       <tbody>${pendingCostRecords.map(r => {
         const inv = inventory.find(c => (r.vin && c.vin === r.vin) || (r.stock && c.stock === r.stock));
+        const vehicleName = r._vehicle || (inv ? [inv.year,inv.make,inv.model].filter(Boolean).join(' ') : '—');
         return `<tr>
           <td style="padding:4px 8px;font-family:'DM Mono',monospace;color:var(--text2)">${r.stock||'—'}</td>
-          <td style="padding:4px 8px;font-family:'DM Mono',monospace;font-size:10px;color:var(--text3)">${r.vin||'—'}</td>
+          <td style="padding:4px 8px;color:var(--text2)">${vehicleName}</td>
           <td style="padding:4px 8px;text-align:right;color:var(--text)">${r.appraisedValue?'$'+r.appraisedValue.toLocaleString():'—'}</td>
           <td style="padding:4px 8px;text-align:right;color:var(--text2)">${r.certCost?'$'+r.certCost.toLocaleString():'—'}</td>
-          <td style="padding:4px 8px;text-align:center">${inv?'<span style="color:var(--green)">✓</span>':'<span style="color:var(--text3)">—</span>'}</td>
+          <td style="padding:4px 8px;text-align:center">${inv?'<span style="color:var(--green)">✓ Match</span>':'<span style="color:var(--amber)">+ Upcoming</span>'}</td>
         </tr>`;
       }).join('')}</tbody>
     </table>`;
-  document.getElementById('cost-import-btn').disabled = matched === 0;
+  document.getElementById('cost-import-btn').disabled = false;
 }
 
 async function doImportCost() {
@@ -4422,13 +4435,22 @@ async function doImportCost() {
   try {
     const res = await apiPost('importCostData', { records: pendingCostRecords });
     if (res.error) throw new Error(res.error);
-    // Update local inventory from the records we sent (backend returns a count, not an array)
     pendingCostRecords.forEach(r => {
       const c = inventory.find(x => (r.vin && x.vin === r.vin) || (r.stock && x.stock === r.stock));
-      if (c) { c.appraisedValue = r.appraisedValue; c.certCost = r.certCost; }
+      if (c) {
+        c.appraisedValue = r.appraisedValue; c.certCost = r.certCost;
+      } else if (r.vin) {
+        inventory.push({
+          vin: r.vin, stock: r.stock||'', year: r.year||'', make: r.make||'', model: r.model||'',
+          mileage: r.mileage||0, price: r.price||0, appraisedValue: r.appraisedValue, certCost: r.certCost||0,
+          addedDate: r.addedDate||new Date().toISOString(), fbStatus:'unposted', websiteStatus:'',
+        });
+      }
     });
-    const count = typeof res.updated === 'number' ? res.updated : pendingCostRecords.length;
-    showToast(`✓ Updated ${count} vehicle${count!==1?'s':''}`);
+    const updated = typeof res.updated === 'number' ? res.updated : 0;
+    const stubbed = typeof res.stubbed === 'number' ? res.stubbed : 0;
+    const msg = [updated?`Updated ${updated}`:'', stubbed?`${stubbed} added to Upcoming`:''].filter(Boolean).join(', ');
+    showToast(`✓ ${msg||'Done'}`);
     closeCostImportModal();
     render();
   } catch(e) {

@@ -854,10 +854,15 @@ function importCostData(records) {
       if (!vin) return;
       var stub = new Array(numCols).fill('');
       stub[map['vin']] = vin;
-      if (map['stock'] !== undefined && stock) stub[map['stock']] = stock;
+      if (map['stock']    !== undefined && stock)     stub[map['stock']]    = stock;
       stub[apprCol] = Number(rec.appraisedValue) || 0;
       stub[certCol] = Number(rec.certCost) || 0;
-      if (map['addedDate'] !== undefined) stub[map['addedDate']] = new Date().toISOString();
+      if (map['year']     !== undefined && rec.year)  stub[map['year']]     = rec.year;
+      if (map['make']     !== undefined && rec.make)  stub[map['make']]     = rec.make;
+      if (map['model']    !== undefined && rec.model) stub[map['model']]    = rec.model;
+      if (map['mileage']  !== undefined && rec.mileage) stub[map['mileage']] = rec.mileage;
+      if (map['price']    !== undefined && rec.price) stub[map['price']]    = rec.price;
+      if (map['addedDate'] !== undefined) stub[map['addedDate']] = rec.addedDate || new Date().toISOString();
       stubsToAdd.push(stub);
       stubbed++;
       return;
