@@ -1044,12 +1044,12 @@ function applyFilters() {
     const ok=!q||sf.some(f=>f.includes(q));
     if(!ok) return false;
     if(sq && !String(c.stock||'').toLowerCase().startsWith(sq)) return false;
-    if(activeFilter==='upcoming') { const ws=(c.websiteStatus||'').toLowerCase(); return Number(c.appraisedValue||0)>0&&!c.color&&!ws.includes('live')&&!ws.includes('sold')&&!ws.includes('delist')&&ws!=='not on website'&&c.fbStatus!=='sold'; }
+    if(activeFilter==='upcoming') { const ws=(c.websiteStatus||'').toLowerCase(); return Number(c.appraisedValue||0)>0&&!c.color&&!ws.includes('live')&&!ws.includes('sold')&&!ws.includes('delist')&&c.fbStatus!=='sold'; }
     if(activeFilter==='live') return (c.websiteStatus||'').toLowerCase().includes('live');
     if(activeFilter==='posted') return c.fbStatus==='posted';
     if(activeFilter==='unposted') return c.fbStatus!=='posted'&&!(c.websiteStatus||'').toLowerCase().includes('sold');
     if(activeFilter==='sold') return (c.websiteStatus||'').toLowerCase().includes('sold')||c.fbStatus==='sold';
-    if(activeFilter==='not-listed') return (c.websiteStatus||'')==='Not on Website';
+    if(activeFilter==='not-listed') return (c.websiteStatus||'')==='Not on Website'&&!(Number(c.appraisedValue||0)>0&&!c.color);
     return true;
   });
   // Show Days Posted column only on FB Posted tab
@@ -1175,12 +1175,12 @@ function renderCards() {
 
 function updateCounts() {
   document.getElementById('cnt-all').textContent=inventory.length;
-  document.getElementById('cnt-upcoming').textContent=inventory.filter(c=>{ const ws=(c.websiteStatus||'').toLowerCase(); return Number(c.appraisedValue||0)>0&&!c.color&&!ws.includes('live')&&!ws.includes('sold')&&!ws.includes('delist')&&ws!=='not on website'&&c.fbStatus!=='sold'; }).length;
+  document.getElementById('cnt-upcoming').textContent=inventory.filter(c=>{ const ws=(c.websiteStatus||'').toLowerCase(); return Number(c.appraisedValue||0)>0&&!c.color&&!ws.includes('live')&&!ws.includes('sold')&&!ws.includes('delist')&&c.fbStatus!=='sold'; }).length;
   document.getElementById('cnt-live').textContent=inventory.filter(c=>(c.websiteStatus||'').toLowerCase().includes('live')).length;
   document.getElementById('cnt-posted').textContent=inventory.filter(c=>c.fbStatus==='posted').length;
   document.getElementById('cnt-unposted').textContent=inventory.filter(c=>c.fbStatus!=='posted'&&!(c.websiteStatus||'').toLowerCase().includes('sold')).length;
   document.getElementById('cnt-sold').textContent=inventory.filter(c=>(c.websiteStatus||'').toLowerCase().includes('sold')||c.fbStatus==='sold').length;
-  document.getElementById('cnt-not-listed').textContent=inventory.filter(c=>(c.websiteStatus||'')==='Not on Website').length;
+  document.getElementById('cnt-not-listed').textContent=inventory.filter(c=>(c.websiteStatus||'')==='Not on Website'&&!(Number(c.appraisedValue||0)>0&&!c.color)).length;
 }
 function updateHeaderStats() {
   const live=inventory.filter(c=>(c.websiteStatus||'').toLowerCase().includes('live')).length;
