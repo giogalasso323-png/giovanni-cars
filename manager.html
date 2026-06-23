@@ -1406,7 +1406,7 @@ async function startScrape(){
   const btn=document.getElementById('scrape-btn'); btn.disabled=true; btn.textContent='Running…';
   const log=document.getElementById('scrape-log'); log.style.display='block'; log.innerHTML='';
 
-  const toScrape=inventory.filter(c=>c.websiteStatus!=='Sold/Unavailable'&&c.fbStatus!=='sold');
+  const toScrape=inventory.filter(c=>c.websiteStatus!=='Sold/Unavailable'&&c.fbStatus!=='sold'&&!(Number(c.appraisedValue||0)>0&&!c.color));
 
   if(!toScrape.length){ btn.disabled=false; btn.textContent='Start Refresh'; showToast('No vehicles to refresh'); return; }
   scrapeRunning=true;
