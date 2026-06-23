@@ -498,7 +498,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       case 'get_upcoming_inventory': {
         const all = await callScript('getAll');
         if (!Array.isArray(all)) { result = all; break; }
-        let upcoming = all.filter(c => Number(c.appraisedValue || 0) > 0 && !c.color);
+        const ws = c => (c.websiteStatus || '').toLowerCase();
+        let upcoming = all.filter(c => Number(c.appraisedValue || 0) > 0 && !c.color && !ws(c).includes('live') && !ws(c).includes('sold') && !ws(c).includes('delist') && c.fbStatus !== 'sold');
         if (args.query) {
           const q = args.query.toLowerCase();
           upcoming = upcoming.filter(c =>
