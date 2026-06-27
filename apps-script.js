@@ -53,6 +53,7 @@ function handleRequest(e) {
       case 'deletePhotos':   result = deletePhotoFolder(body.vin);                 break;
       case 'submitLead':     result = submitLead(body);                            break;
       case 'getLeads':       result = getLeads();                                  break;
+      case 'searchLeads':    result = searchLeads(body);                           break;
       case 'updateLead':     result = updateLead(body.rowIndex, body.field, body.value); break;
       case 'deleteLead':       result = deleteLead(body.rowIndex);                      break;
       case 'getNewInventory':    result = getNewInventory();                               break;
@@ -170,6 +171,25 @@ function getLeads() {
     return obj;
   }).filter(function(l) { return l.firstName || l.lastName || l.phone; });
   return { leads: leads };
+}
+
+function searchLeads(data) {
+  var phone     = (data.phone     || '').replace(/\D/g, '');
+  var firstName = (data.firstName || '').toLowerCase().trim();
+  var lastName  = (data.lastName  || '').toLowerCase().trim();
+  if (!phone && !firstName && !lastName) return { leads: [] };
+  var all = getLeads().leads || [];
+  var matches = all.filter(function(l) {
+    if (phone.length >= 7) {
+      var lp = (l.phone || '').replace(/\D/g, '');
+      if (lp.slice(-10) === phone.slice(-10)) return true;
+    }
+    if (firstName && lastName) {
+      if ((l.firstName||'').toLowerCase() === firstName && (l.lastName||'').toLowerCase() === lastName) return true;
+    }
+    return false;
+  });
+  return { leads: matches };
 }
 
 function updateLead(rowIndex, field, value) {

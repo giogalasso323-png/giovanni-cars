@@ -1,7 +1,18 @@
 # Dublin Toyota Inventory Manager — Claude Code Context
 
 ## Session Start Instructions
-When Giovanni opens this project or asks to work on it, immediately read `SESSION.md` and give a short briefing (3–5 sentences max) covering: what the project is, current state, and what's in progress from SESSION.md. Do this automatically — don't wait to be asked.
+When Giovanni opens this project or asks to work on it, immediately read `SESSION.md` and give a briefing in this exact format — do this automatically, don't wait to be asked:
+
+**Project:** One sentence describing what this is.
+
+**Core Working Components:**
+- Bullet each major feature that is fully built and stable
+
+**New Additions:**
+- Bullet anything recently completed (pull from SESSION.md "Recently Completed")
+
+**Currently In Progress:**
+- Bullet any active work-in-progress (pull from SESSION.md "Current Work"), or state "Nothing in progress — ask Giovanni what to work on."
 
 ## Who This Is For
 Giovanni Galasso, salesperson at Dublin Toyota (Dublin, CA). Not a developer by trade — built this tool himself to manage inventory and Facebook Marketplace listings. He works with Claude Code to add features and fix bugs.
@@ -108,7 +119,32 @@ The backend (`apps-script.js`) handles these actions via GET/POST:
 | `ping` | Health check |
 | `importCostData` | Writes appraisedValue + certCost from DMS import |
 | `getLeads` | Returns all leads |
+| `searchLeads` | Search leads by phone or name — returns matches with rowIndex |
+| `submitLead` | Add a new lead row |
+| `updateLead` | Update a single field on a lead by rowIndex |
 | `importNewCars` | Imports new car inventory CSV |
+
+**Apps Script URL:**
+`https://script.google.com/macros/s/AKfycbwKodPA7tuxeblfpakHxSd0XFu5MkCguo7rIjBltynkiDEQZky3qCck6_C0sftzgF9Qhg/exec`
+
+**POST format:** Send JSON body `{"action": "actionName", ...fields}` with `Content-Type: application/json`.
+**GET format:** Append `?action=actionName` to the URL.
+
+---
+
+## Lead Inbox Workflow
+
+When Giovanni says **"check lead inbox"** or **"check leads folder"**:
+
+1. **Find files** — list contents of Google Drive folder "Leads" (ID: `1Mj0gQ14sAqA-wn_083kj3-ThqqG4EDa3`)
+2. **Read each file** — use `read_file_content` for images/docs. Extract: first name, last name, phone, vehicle interest, source (Text / FB Marketplace / FB Ad / Website), any notes or timeframe
+3. **Search for existing lead** — POST `searchLeads` with the phone number and name. Phone match is most reliable.
+4. **If match found** — show Giovanni the existing lead and the new info. Ask if he wants to update notes or vehicle interest (use `updateLead`). Do NOT create a duplicate.
+5. **If no match** — confirm the extracted details with Giovanni, then POST `submitLead` to create the lead.
+
+**submitLead fields:** `firstName`, `lastName`, `phone`, `vehicle` (vehicle interest text), `source`, `timeframe`, `notes`, `status` (default `"New"`), `addedBy` (use `"Giovanni"`)
+
+After processing a file, tell Giovanni it's been handled. A "Processed" subfolder for archiving is planned but not yet built.
 
 ## Data Fields Per Used Car
 `vin, year, make, model, trim, color, mileage, price, stock, fbStatus, websiteStatus, websitePrice, fbDescription, carfaxUrl, edmundsLabel, edmundsBelow, vehicleInfo, vehicleHistory, features, certification, addedDate, lastChecked, fbPostedDate, soldDate, websiteUrl, fbPostedPrice, priceDropped, dis, currentFbPrice, originalPrice, drivePhotoFolder, drivePhotoCount, appraisedValue, certCost`
