@@ -264,6 +264,7 @@
   .lead-type-tab.tab-focus.active { background: rgba(139,92,246,1); border-color: rgba(139,92,246,1); }
   .lead-type-tab.tab-lost.active { background: var(--red); border-color: var(--red); }
   .lead-type-tab.tab-sold.active { background: var(--green); border-color: var(--green); }
+  .lead-type-tab.tab-waiting.active { background: var(--amber); border-color: var(--amber); color: #000; }
   .origin-tag { display: inline-flex; align-items: center; padding: 1px 6px; border-radius: 3px; font-size: 10px; font-weight: 700; background: rgba(139,92,246,0.12); color: #a78bfa; margin-left: 5px; vertical-align: middle; }
   /* LEAD VEHICLE LIST in drawer */
   .lead-vehicle-item { display: flex; align-items: flex-start; justify-content: space-between; padding: 10px 12px; background: var(--bg3); border-radius: 6px; margin-bottom: 6px; gap: 10px; border: 1px solid transparent; }
@@ -2646,6 +2647,17 @@ function findMatchesForLead(lead, topN=5) {
   return results.slice(0, topN);
 }
 
+function isWaitingLead(l) {
+  const tab = getLeadTab(l);
+  if (tab === 'Lost' || tab === 'Sold') return false;
+  const hasPref = (l.prefModel||'').trim() ||
+    Number(l.priceMax||0) || Number(l.milMax||0) ||
+    parsePrefArray(l.trimPrefs).length || parsePrefArray(l.extColors).length ||
+    (l.vehicleInterest||'').trim();
+  if (!hasPref) return false;
+  return !(l._matches && l._matches.length > 0);
+}
+
 /**
  * Run matching for ALL open leads. Returns count of leads with matches.
  */
@@ -3015,19 +3027,21 @@ function renderLeads(){
   const subtitle = document.getElementById('leads-subtitle');
 
   // Render tab bar with counts
-  const TABS = ['Lot','FB Marketplace','FB Ad','Website','Focus','Lost','Sold'];
-  const tabCls = { 'Focus':'tab-focus', 'Lost':'tab-lost', 'Sold':'tab-sold' };
+  const TABS = ['Lot','FB Marketplace','FB Ad','Website','Focus','Lost','Sold','Waiting'];
+  const tabCls = { 'Focus':'tab-focus', 'Lost':'tab-lost', 'Sold':'tab-sold', 'Waiting':'tab-waiting' };
   const tabsEl = document.getElementById('lead-type-tabs');
   if (tabsEl) {
     tabsEl.innerHTML = TABS.map(tab => {
-      const count = leadsData.filter(l => getLeadTab(l) === tab).length;
+      const count = tab === 'Waiting' ? leadsData.filter(isWaitingLead).length : leadsData.filter(l => getLeadTab(l) === tab).length;
       const extra = tabCls[tab] ? ' '+tabCls[tab] : '';
       return `<button class="lead-type-tab${extra}${leadsTab===tab?' active':''}" data-tab="${tab}" onclick="setLeadsTab('${tab}')">${tab} <span style="opacity:0.6;font-weight:400">${count}</span></button>`;
     }).join('');
   }
 
   // Filter to current tab
-  let tabLeads = leadsData.filter(l => getLeadTab(l) === leadsTab);
+  let tabLeads = leadsTab === 'Waiting'
+    ? leadsData.filter(isWaitingLead)
+    : leadsData.filter(l => getLeadTab(l) === leadsTab);
 
   if(!tabLeads.length){
     if(subtitle) subtitle.textContent='';
@@ -3064,7 +3078,10 @@ function renderLeads(){
     const vList = Array.isArray(lead.vehicleList) ? lead.vehicleList : [];
     const firstV = vList[0] || null;
     const firstCar = firstV ? (inventory.find(c=>c.vin===firstV.vin) || null) : null;
-    const vehicleCell = firstCar
+    const waitingInterest = (lead.prefModel||lead.vehicleInterest||'').trim();
+    const vehicleCell = leadsTab === 'Waiting'
+      ? (waitingInterest ? `<span style="font-size:12px;color:var(--amber)">${waitingInterest}</span>` : `<span style="font-size:12px;color:var(--text3)">—</span>`)
+      : firstCar
       ? `<div class="lead-vehicle-match">
            <span style="font-size:12px;color:var(--text2)">${getTitle(firstCar)}</span>
            ${vList.length > 1 ? `<span style="font-size:10px;color:var(--text3);margin-left:4px">+${vList.length-1} more</span>` : ''}
@@ -3086,7 +3103,7 @@ function renderLeads(){
     const lName = capName(lead.lastName);
     const fullName = [fName, lName].filter(Boolean).join(' ') || '—';
     const phone = fmtPhone(lead.phone);
-    const srcBadge = (leadsTab === 'Focus' || leadsTab === 'Lost' || leadsTab === 'Sold')
+    const srcBadge = (leadsTab === 'Focus' || leadsTab === 'Lost' || leadsTab === 'Sold' || leadsTab === 'Waiting')
       ? (() => { const src = getLeadSourceType(lead); const srcColors = {'Lot':'var(--blue)','FB Marketplace':'var(--purple)','FB Ad':'var(--amber)','Website':'var(--green)'}; return `<span style="font-size:10px;color:${srcColors[src]||'var(--text3)'};background:var(--bg3);padding:2px 7px;border-radius:4px;font-weight:600">${src}</span>`; })()
       : '';
     const addedByColors = {'Giovanni':'var(--blue)','Cowork':'var(--amber)','Website':'var(--green)'};
