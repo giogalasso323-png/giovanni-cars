@@ -2650,12 +2650,7 @@ function findMatchesForLead(lead, topN=5) {
 function isWaitingLead(l) {
   const tab = getLeadTab(l);
   if (tab === 'Lost' || tab === 'Sold') return false;
-  const hasPref = (l.prefModel||'').trim() ||
-    Number(l.priceMax||0) || Number(l.milMax||0) ||
-    parsePrefArray(l.trimPrefs).length || parsePrefArray(l.extColors).length ||
-    (l.vehicleInterest||'').trim();
-  if (!hasPref) return false;
-  return !(l._matches && l._matches.length > 0);
+  return l.vehicleNotAvailable === true || l.vehicleNotAvailable === 'true';
 }
 
 /**
