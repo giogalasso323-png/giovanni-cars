@@ -568,6 +568,10 @@ app.post('/mcp', async (req, res) => {
       return;
     }
   }
+  // Ensure the Accept header satisfies the MCP SDK's requirement
+  if (!req.headers.accept || !req.headers.accept.includes('text/event-stream')) {
+    req.headers.accept = 'application/json, text/event-stream';
+  }
   try {
     const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
     const server = createMcpServer();
