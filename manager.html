@@ -318,46 +318,6 @@
 </div>
 
 <!-- SETUP SCREEN -->
-<div id="setup-screen" class="setup-screen" style="display:none">
-  <div class="setup-card">
-    <h1>Connect to Google Sheets</h1>
-    <p class="setup-sub">One-time setup — your inventory will live safely in your Google Drive, accessible from any computer.</p>
-
-    <div class="step">
-      <div class="step-num">1</div>
-      <div class="step-body">
-        <h3>Create a new Google Sheet</h3>
-        <p>Go to <strong>sheets.new</strong> in your browser. Name it <em>Dublin Toyota Inventory</em>.</p>
-      </div>
-    </div>
-    <div class="step">
-      <div class="step-num">2</div>
-      <div class="step-body">
-        <h3>Open Apps Script</h3>
-        <p>In the sheet, click <strong>Extensions → Apps Script</strong>. Delete everything in the editor. Paste in the code from <strong>apps-script.js</strong> (in your download). Click <strong>Save</strong> (floppy disk icon).</p>
-      </div>
-    </div>
-    <div class="step">
-      <div class="step-num">3</div>
-      <div class="step-body">
-        <h3>Deploy as a Web App</h3>
-        <p>Click <strong>Deploy → New deployment</strong>. Click the gear icon and choose <strong>Web app</strong>. Set <em>Execute as</em> → <strong>Me</strong>. Set <em>Who has access</em> → <strong>Only myself</strong>. Click <strong>Deploy</strong>, authorize when prompted, then copy the URL it gives you.</p>
-      </div>
-    </div>
-    <div class="step">
-      <div class="step-num">4</div>
-      <div class="step-body">
-        <h3>Paste your Web App URL here</h3>
-        <p>Looks like: <span class="mono">https://script.google.com/macros/s/…/exec</span></p>
-        <div class="url-row">
-          <input type="text" id="api-url-input" placeholder="https://script.google.com/macros/s/…/exec">
-          <button class="btn btn-primary" onclick="testAndSaveUrl()">Connect</button>
-        </div>
-        <div class="connect-status" id="connect-status"></div>
-      </div>
-    </div>
-  </div>
-</div>
 
 <!-- MAIN APP -->
 <div id="app" style="display:none">
@@ -366,7 +326,6 @@
     <div class="header-right">
       <div class="header-stats" id="header-stats"></div>
       <span class="sync-info" id="sync-info"></span>
-      <button class="btn" style="font-size:11px;padding:5px 10px;color:var(--text3)" onclick="resetSetup()">⚙ Reconnect</button>
     </div>
   </header>
 
@@ -837,9 +796,8 @@ async function checkPassword() {
 }
 
 // ── APP BOOT ───────────────────────────────────────────────
-const URL_KEY = 'dt_api_url_v1';
-const DEFAULT_API_URL = 'https://script.google.com/macros/s/AKfycbwKodPA7tuxeblfpakHxSd0XFu5MkCguo7rIjBltynkiDEQZky3qCck6_C0sftzgF9Qhg/exec';
-let API_URL = '', inventory = [], filtered = [];
+const API_URL = 'https://script.google.com/macros/s/AKfycbzl1VFO7DbmSfMq_tQnZDxygvdC5rpYFgGyCzbHurLdSSAlBtiPgc73WHGiVSK_SM0T/exec';
+let inventory = [], filtered = [];
 let currentView = 'table', activeFilter = 'all', sortKey = 'date-desc';
 let selectedVins = new Set(), pendingCsvData = null, currentVin = null, lastOpenedVin = null;
 let pendingPhotos = [];
@@ -862,30 +820,12 @@ function init() {
 }
 
 function bootApp() {
-  const saved = localStorage.getItem(URL_KEY) || DEFAULT_API_URL;
-  API_URL = saved;
-  localStorage.setItem(URL_KEY, saved);
   showApp();
   loadFromSheet();
   loadRepNames();
 }
 
-async function testAndSaveUrl() {
-  const val = document.getElementById('api-url-input').value.trim();
-  const st = document.getElementById('connect-status');
-  if (!val.includes('script.google.com')) { st.className='connect-status err'; st.textContent='That doesn\'t look like a valid Apps Script URL.'; return; }
-  localStorage.setItem(URL_KEY, val); API_URL = val;
-  st.className='connect-status ok'; st.textContent='✓ Saved! Loading your inventory…';
-  setTimeout(() => { showApp(); loadFromSheet(); }, 500);
-}
-
-function showApp() { document.getElementById('setup-screen').style.display='none'; document.getElementById('app').style.display='block'; }
-function resetSetup() {
-  if (!confirm('Disconnect? Your data stays safe in Google Sheets.')) return;
-  localStorage.removeItem(URL_KEY); API_URL=''; inventory=[];
-  document.getElementById('app').style.display='none';
-  document.getElementById('setup-screen').style.display='flex';
-}
+function showApp() { document.getElementById('app').style.display='block'; }
 
 // ── API ────────────────────────────────────────────────────
 // ===== SECTION: API / DATA LAYER =====
