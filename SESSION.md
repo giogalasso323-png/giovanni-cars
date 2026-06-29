@@ -9,6 +9,25 @@ _Nothing in progress. Ask Giovanni what to work on._
 
 ---
 
+## Recently Completed (2026-06-29)
+
+**Cloud portability upgrade (Option 2):**
+- New Google account created for project (separate from personal Gmail)
+- Apps Script redeployed on new account — same Sheet (shared), new URL now hardcoded in manager.html
+- Setup screen and localStorage URL override removed from manager.html — URL is baked in
+- MCP server converted from stdio → HTTP (StreamableHTTPServerTransport + Express)
+- MCP server deployed to Railway: `https://dublin-toyota-inventory-production.up.railway.app`
+- Claude.ai connected to Railway via Settings → Integrations
+- Cowork now works from phone, tablet, or any computer — no PC required
+- Image → lead workflow works directly in Claude.ai (attach photo → "add as lead")
+
+**Railway config:**
+- Repo: `giovanni-cars`, Root Directory: `mcp-server`, Port: 8080
+- Env var: `SCRIPT_URL` = new Apps Script deployment URL
+- Cost: ~$5/month
+
+---
+
 ## Recently Completed (2026-06-22)
 
 **New inventory organization tabs:**
@@ -28,24 +47,22 @@ _Nothing in progress. Ask Giovanni what to work on._
 - Leads table: staleness dot (green ≤2d, amber ≤7d, red >7d) + `↻ date` second line.
 - Lead drawer: Created + Last Edit bar with staleness dot.
 
-**Schema additions:**
-- `lastEdited` added to LEADS_COLUMNS
-- `appraiser` added to COLUMNS (used car inventory)
-- Both require the `appraiser` column header in the Google Sheet (added manually after last `certCost` column)
-- Apps Script new version deployed ✓
+---
+
+## Future Features
+1. **Claude.ai Project for Cowork** — load skill instructions automatically, no copy-paste each session
+2. **Daily scheduled agent** — morning inventory scrape + stale car report
+3. **Follow-up reminders** — surfaces leads with past-due follow-up dates each morning
+4. **Multi-rep Cowork** — other salespeople connect their own Claude.ai to same Railway server
+5. **FB posting from Upcoming** — post to Facebook from the Upcoming tab
+6. **Search by appraiser name** — filter Upcoming by who took the trade
+7. **Google Drive "Lead Inbox" folder** — not yet created (for phone screenshot → lead workflow — now less needed since Claude.ai handles it directly)
 
 ---
 
-## Future Features — Upcoming Tab
-1. **FB posting from Upcoming** — post to Facebook from the Upcoming tab, with the post carrying over continuity when the car goes live on the website (stock #, price, description preserved)
-2. **Search by appraiser name** — can't currently search/filter Upcoming by who took the trade
-3. **Cowork MCP tool** — `get_upcoming_inventory` so Cowork can search pre-lot cars for customer matches
-
----
-
-## Known Issues / Next Up
-- `scrape_inventory` MCP tool requires Cowork restart after each code push (local process)
-- Google Drive "Lead Inbox" folder not yet created (for phone screenshot → lead workflow)
+## Known Issues / Notes
+- `scrape_inventory` MCP tool requires Cowork restart after each code push (local process) — no longer relevant, Railway auto-restarts on push
+- No AUTH_TOKEN on Railway MCP server currently — security through obscurity (long URL). Add OAuth later if needed.
 
 ---
 
