@@ -19,14 +19,23 @@ const SCRIPT_URL  = process.env.SCRIPT_URL  || '';
 const AUTH_TOKEN  = process.env.AUTH_TOKEN  || '';
 const PORT        = process.env.PORT        || 3000;
 
-async function callScript(action, body = {}) {
+async function callScript(action, body = {}, attempt = 1) {
   const response = await fetch(`${SCRIPT_URL}?action=${action}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ action, ...body }),
     redirect: 'follow'
   });
-  return response.json();
+  const text = await response.text();
+  const contentType = response.headers.get('content-type') || '';
+  if (!response.ok || !contentType.includes('application/json')) {
+    if (attempt < 3) {
+      await new Promise(r => setTimeout(r, 500 * attempt));
+      return callScript(action, body, attempt + 1);
+    }
+    throw new Error(`Apps Script returned non-JSON (status ${response.status}) after ${attempt} attempts for action "${action}"`);
+  }
+  return JSON.parse(text);
 }
 
 function getMileageAdder(car) {
@@ -134,7 +143,8 @@ function createMcpServer() {
         inputSchema: {
           type: 'object',
           properties: {
-            days: { type: 'number', description: 'Days on lot threshold (default 45)' }
+            days: { type: 'number', description: 'Days on lot threshold (default 45)' },
+            limit: { type: 'number', description: 'Max results (default 30)' }
           }
         }
       },
@@ -419,7 +429,9 @@ function createMcpServer() {
             }))
             .filter(c => c.daysOnLot >= days)
             .sort((a, b) => b.daysOnLot - a.daysOnLot);
-          result = { count: cars.length, cars };
+          const staleTotal = cars.length;
+          const staleLimited = cars.slice(0, args.limit || 30);
+          result = { count: staleLimited.length, totalMatching: staleTotal, cars: staleLimited };
           break;
         }
 

@@ -4298,7 +4298,7 @@ function readCostXLS(file) {
   reader.onload = e => {
     try {
       const data = new Uint8Array(e.target.result);
-      const wb = XLSX.read(data, { type: 'array' });
+      const wb = XLSX.read(data, { type: 'array', cellDates: true });
       const ws = wb.Sheets[wb.SheetNames[0]];
       const rows = XLSX.utils.sheet_to_json(ws, { defval: '' });
       showCostPreview(rows, file.name);
@@ -4307,6 +4307,19 @@ function readCostXLS(file) {
     }
   };
   reader.readAsArrayBuffer(file);
+}
+
+function parseInventoryDate(raw) {
+  if (!raw) return new Date().toISOString();
+  if (raw instanceof Date && !isNaN(raw)) return raw.toISOString();
+  // Bare Excel serial day-number (e.g. a text-formatted date cell) — convert directly
+  // instead of letting `new Date(serial)` misread it as a year.
+  if (/^\d{4,6}(\.\d+)?$/.test(String(raw).trim())) {
+    const serial = parseFloat(raw);
+    return new Date(Date.UTC(1899, 11, 30) + serial * 86400000).toISOString();
+  }
+  const d = new Date(raw);
+  return isNaN(d) ? new Date().toISOString() : d.toISOString();
 }
 
 function showCostPreview(rows, fileName) {
@@ -4328,7 +4341,7 @@ function showCostPreview(rows, fileName) {
     const rawVehicle = String(findKey(row, 'vehicle', 'description') || '').trim();
     const rawOdo     = String(findKey(row, 'odometer', 'mileage', 'miles') || '').replace(/[^0-9]/g,'');
     const rawPrice   = String(findKey(row, 'price') || '').replace(/[^0-9.]/g,'');
-    const rawDate      = String(findKey(row, 'inventory') || '').trim();
+    const rawDate      = findKey(row, 'inventory');
     const rawAppraiser   = String(findKey(row, 'appraiser') || '').trim();
     const rawSalesperson = String(findKey(row, 'salesperson') || '').trim();
     const appraiserDisplay = [rawAppraiser, rawSalesperson].filter(Boolean).join(' · ');
@@ -4345,7 +4358,7 @@ function showCostPreview(rows, fileName) {
       mileage:   parseInt(rawOdo) || 0,
       price:     parseFloat(rawPrice) || 0,
       appraiser: appraiserDisplay,
-      addedDate: rawDate ? new Date(rawDate).toISOString() : new Date().toISOString(),
+      addedDate: parseInventoryDate(rawDate),
       _importOrder: idx,
       _vehicle: rawVehicle,
     };
