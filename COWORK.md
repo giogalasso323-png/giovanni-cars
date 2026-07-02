@@ -60,11 +60,15 @@ The MCP server (`dublin-toyota`) is connected and live. Tools available:
 - `vehicleList` — JSON array of vehicles attached to this lead
 - `turnedTo` / `turnedToFirst` — sales rep last/first name
 
-## Calendar Sync Logic (3-pass — owned by Cowork)
+## Calendar Sync Logic (3-pass — now automated, as of 2026-07-02)
+This used to be "owned by Cowork" and ran at the start of each conversation. **It's now handled by a scheduled cloud routine ("Dublin Toyota - Calendar Lead Sync") running hourly, 7am-9pm Pacific.** Do NOT run this sync yourself at conversation start anymore — doing so risks creating duplicate calendar events or racing the scheduled routine's writes to `calEventId`.
+
+If Giovanni asks you to check on a lead/appointment sync issue, read the current state (get_leads, calendar list_events) rather than re-running the sync logic. The 3 passes, for reference:
 - **Pass 1 (CRM → Calendar):** leads with `followUpDate` set + `calEventId` empty → create event in "Dublin Toyota Appts." → write `calEventId` back via `update_lead`
 - **Pass 2 (Calendar → CRM reschedules):** leads with `calEventId` → check event date → if changed, update `followUpDate` on lead + append note
-- **Pass 3 (Calendar → New Lead):** events in "Dublin Toyota Appts." with no matching `calEventId` on any lead → parse name/phone/description → create lead with `addedBy: 'Giovanni'` and `calEventId` set → if info missing, create placeholder lead flagged for completion
-- Run sync at the start of each conversation or on demand. Deliver a summary: what was pushed, rescheduled, new leads created, placeholders needing completion.
+- **Pass 3 (Calendar → New Lead):** events with no matching `calEventId` on any lead → parse name/phone/description → create lead
+
+There's also a daily inventory scrape routine ("Dublin Toyota - Daily Inventory Scrape") running 6am Pacific — no need to run `scrape_inventory` yourself each morning either, though it's still fine to run on demand if Giovanni asks for a fresh check mid-day.
 
 ## Note Tagging Convention
 - Cowork-added notes: prefix with `[CW YYYY-MM-DD]:` (e.g. `[CW 2026-06-16]: spoke on phone, still interested`)
