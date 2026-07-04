@@ -338,7 +338,6 @@ function createMcpServer() {
             delistCount += results.filter(r => (r.websiteStatus || '').includes('Delist')).length;
             if (results.length) await callScript('upsertMany', { cars: results });
           } catch (e) { errors++; errorMessages.push(e.message); }
-          }
 
           result = {
             scraped, delistCount, errors, errorMessages,
