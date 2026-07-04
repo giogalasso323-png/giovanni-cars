@@ -248,71 +248,89 @@ function getAllInventory() {
 // ── Upsert ────────────────────────────────────────────────────
 function upsertMany(cars) {
   if (!cars || !cars.length) return { added: 0, updated: 0 };
-  var sh      = getSheet();
-  var map     = getHeaderMap(sh);
-  var numCols = sh.getLastColumn();
-  var last    = sh.getLastRow();
 
-  var vinCol = map['vin'] + 1;
-  var vinIndex = {};
-  if (last >= 2) {
-    var vins = sh.getRange(2, vinCol, last - 1, 1).getValues();
-    vins.forEach(function(v, i) {
-      var vin = norm(v[0]);
-      if (vin) vinIndex[vin] = i + 2;
-    });
-  }
+  // Reads the full row, merges new values in memory, then writes the full row back --
+  // without a lock, a concurrent updateField()/upsertMany() call touching the same row
+  // between our read and write would get silently overwritten by our stale snapshot.
+  var lock = LockService.getScriptLock();
+  lock.waitLock(30000);
+  try {
+    var sh      = getSheet();
+    var map     = getHeaderMap(sh);
+    var numCols = sh.getLastColumn();
+    var last    = sh.getLastRow();
 
-  var toAppend = [];
-  var toUpdate = [];
-  var added = 0, updated = 0;
-
-  cars.forEach(function(car) {
-    var vin = norm(car.vin);
-    if (!vin) return;
-    var rowData = objToRow(car, map, numCols);
-    if (vinIndex[vin]) {
-      toUpdate.push({ rowNum: vinIndex[vin], rowData: rowData });
-      updated++;
-    } else {
-      toAppend.push(rowData);
-      vinIndex[vin] = last + toAppend.length;
-      added++;
+    var vinCol = map['vin'] + 1;
+    var vinIndex = {};
+    if (last >= 2) {
+      var vins = sh.getRange(2, vinCol, last - 1, 1).getValues();
+      vins.forEach(function(v, i) {
+        var vin = norm(v[0]);
+        if (vin) vinIndex[vin] = i + 2;
+      });
     }
-  });
 
-  toUpdate.forEach(function(item) {
-    var existing = sh.getRange(item.rowNum, 1, 1, numCols).getValues()[0];
-    item.rowData.forEach(function(val, i) {
-      if (val !== '' && val !== null && val !== undefined) existing[i] = val;
+    var toAppend = [];
+    var toUpdate = [];
+    var added = 0, updated = 0;
+
+    cars.forEach(function(car) {
+      var vin = norm(car.vin);
+      if (!vin) return;
+      var rowData = objToRow(car, map, numCols);
+      if (vinIndex[vin]) {
+        toUpdate.push({ rowNum: vinIndex[vin], rowData: rowData });
+        updated++;
+      } else {
+        toAppend.push(rowData);
+        vinIndex[vin] = last + toAppend.length;
+        added++;
+      }
     });
-    sh.getRange(item.rowNum, 1, 1, numCols).setValues([existing]);
-  });
 
-  if (toAppend.length) {
-    sh.getRange(sh.getLastRow() + 1, 1, toAppend.length, numCols).setValues(toAppend);
+    toUpdate.forEach(function(item) {
+      var existing = sh.getRange(item.rowNum, 1, 1, numCols).getValues()[0];
+      item.rowData.forEach(function(val, i) {
+        if (val !== '' && val !== null && val !== undefined) existing[i] = val;
+      });
+      sh.getRange(item.rowNum, 1, 1, numCols).setValues([existing]);
+    });
+
+    if (toAppend.length) {
+      sh.getRange(sh.getLastRow() + 1, 1, toAppend.length, numCols).setValues(toAppend);
+    }
+
+    return { added: added, updated: updated };
+  } finally {
+    lock.releaseLock();
   }
-
-  return { added: added, updated: updated };
 }
 
 // ── Update single field ───────────────────────────────────────
 function updateField(vin, field, value) {
   if (!vin || !field) return { error: 'Missing vin or field' };
-  var sh   = getSheet();
-  var map  = getHeaderMap(sh);
-  var last = sh.getLastRow();
-  if (last < 2) return { error: 'No data' };
-  var vins = sh.getRange(2, map['vin'] + 1, last - 1, 1).getValues();
-  for (var i = 0; i < vins.length; i++) {
-    if (norm(vins[i][0]) === norm(vin)) {
-      var col = map[field];
-      if (col === undefined) return { error: 'Unknown field: ' + field };
-      sh.getRange(i + 2, col + 1).setValue(value);
-      return { ok: true };
+  // Shares upsertMany()'s lock so a single-field edit can never land in the middle of
+  // upsertMany's read-modify-write cycle and get silently reverted by its stale snapshot.
+  var lock = LockService.getScriptLock();
+  lock.waitLock(30000);
+  try {
+    var sh   = getSheet();
+    var map  = getHeaderMap(sh);
+    var last = sh.getLastRow();
+    if (last < 2) return { error: 'No data' };
+    var vins = sh.getRange(2, map['vin'] + 1, last - 1, 1).getValues();
+    for (var i = 0; i < vins.length; i++) {
+      if (norm(vins[i][0]) === norm(vin)) {
+        var col = map[field];
+        if (col === undefined) return { error: 'Unknown field: ' + field };
+        sh.getRange(i + 2, col + 1).setValue(value);
+        return { ok: true };
+      }
     }
+    return { error: 'VIN not found: ' + vin };
+  } finally {
+    lock.releaseLock();
   }
-  return { error: 'VIN not found: ' + vin };
 }
 
 // ── Server-side scraping ──────────────────────────────────────
@@ -839,6 +857,12 @@ function importNewCars(cars, replace) {
 // ── Cost Data Import ──────────────────────────────────────────
 function importCostData(records) {
   if (!records || !records.length) return { updated: 0, notFound: 0 };
+  // Shares upsertMany()'s lock -- row identities (vinIdx/stockIdx) are read once up front
+  // and used to target writes later; a concurrent row insert/update in between would make
+  // those indexes stale.
+  var lock = LockService.getScriptLock();
+  lock.waitLock(30000);
+  try {
   var sh = getSheet();
   var map = getHeaderMap(sh);
   var last = sh.getLastRow();
@@ -905,6 +929,9 @@ function importCostData(records) {
   }
 
   return { updated: updated, stubbed: stubbed };
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 function updateNewCar(vin, field, value) {
