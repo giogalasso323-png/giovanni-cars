@@ -84,11 +84,11 @@ function createMcpServer() {
       },
       {
         name: 'scrape_inventory',
-        description: 'Sync inventory with dublintoyota.com — checks current prices, availability, and sold status, then updates the sheet. Run in chunks of 25 (default) to avoid timeouts. Call repeatedly with offset to cover all cars. Returns { scraped, delistCount, errors, total, done } — done:true means all cars covered.',
+        description: 'Sync inventory with dublintoyota.com — checks current prices, availability, and sold status, then updates the sheet. Run in chunks of 15 (default) to avoid timeouts — do not pass a larger limit, each call already does one full sitemap fetch. Call repeatedly with offset to cover all cars. Returns { scraped, delistCount, errors, errorMessages, total, done } — done:true means all cars covered.',
         inputSchema: {
           type: 'object',
           properties: {
-            limit:  { type: 'number', description: 'Cars to scrape per call (default 25)' },
+            limit:  { type: 'number', description: 'Cars to scrape per call (default 15, do not increase — see tool description)' },
             offset: { type: 'number', description: 'Start from this car index (default 0). Increment by limit each call to page through all inventory.' }
           }
         }
@@ -314,7 +314,7 @@ function createMcpServer() {
       switch (name) {
 
         case 'scrape_inventory': {
-          const limit  = args.limit  || 25;
+          const limit  = args.limit  || 15;
           const offset = args.offset || 0;
 
           const allData = await callScript('getAll');
@@ -325,19 +325,19 @@ function createMcpServer() {
           if (!vinsToScrape.length) { result = { scraped: 0, total: 0, done: true, message: 'No active vehicles' }; break; }
 
           const chunk = vinsToScrape.slice(offset, offset + limit);
-          const BATCH = 5;
           let scraped = 0, delistCount = 0, errors = 0;
           const errorMessages = [];
 
-          for (let i = 0; i < chunk.length; i += BATCH) {
-            const batch = chunk.slice(i, i + BATCH);
-            try {
-              const res = await callScript('scrapeVehicles', { vins: batch });
-              const results = (res.results || []).map(r => ({ ...r, lastChecked: new Date().toISOString() }));
-              scraped += results.length;
-              delistCount += results.filter(r => (r.websiteStatus || '').includes('Delist')).length;
-              if (results.length) await callScript('upsertMany', { cars: results });
-            } catch (e) { errors++; errorMessages.push(e.message); }
+          // One scrapeVehicles call per chunk (not sub-batched) — scrapeVehicles refetches
+          // the full site sitemap on every call, so sub-batching multiplied that redundant
+          // fetch 5x per request and was the cause of requests hanging past client timeouts.
+          try {
+            const res = await callScript('scrapeVehicles', { vins: chunk });
+            const results = (res.results || []).map(r => ({ ...r, lastChecked: new Date().toISOString() }));
+            scraped += results.length;
+            delistCount += results.filter(r => (r.websiteStatus || '').includes('Delist')).length;
+            if (results.length) await callScript('upsertMany', { cars: results });
+          } catch (e) { errors++; errorMessages.push(e.message); }
           }
 
           result = {
