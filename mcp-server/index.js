@@ -64,6 +64,18 @@ function calcGross(car) {
   return { topGross, bottomGross, totalCost, adder, status };
 }
 
+// A car counts as sold/gone if soldDate is set, fbStatus is 'sold' (real data stores this
+// lowercase -- the old per-call checks compared against 'Sold' and silently never matched),
+// or the website scrape confirms it's no longer listed/available. Cars that are gone from
+// the site but never formally marked sold in fbStatus were slipping through excludeSold
+// checks and could get recommended as available for lead matching.
+function isSoldOrGone(car) {
+  if (car.soldDate) return true;
+  if ((car.fbStatus || '').toLowerCase() === 'sold') return true;
+  const ws = (car.websiteStatus || '').toLowerCase();
+  return ws.includes('sold') || ws.includes('unavailable') || ws.includes('delist');
+}
+
 function slim(car) {
   const { fbDescription, features, vehicleInfo, vehicleHistory, carfaxUrl, websiteUrl, ...rest } = car;
   return rest;
@@ -376,7 +388,7 @@ function createMcpServer() {
           }
 
           if (args.fbStatus) cars = cars.filter(c => c.fbStatus === args.fbStatus);
-          if (args.excludeSold) cars = cars.filter(c => !c.soldDate && c.fbStatus !== 'Sold');
+          if (args.excludeSold) cars = cars.filter(c => !isSoldOrGone(c));
           if (args.minPrice) cars = cars.filter(c => Number(c.price) >= args.minPrice);
           if (args.maxPrice) cars = cars.filter(c => Number(c.price) <= args.maxPrice);
           if (args.minDaysOnLot) {
@@ -400,7 +412,7 @@ function createMcpServer() {
           const data = await callScript('getAll');
           let cars = data.cars || [];
           if (args.fbStatus) cars = cars.filter(c => c.fbStatus === args.fbStatus);
-          if (args.excludeSold) cars = cars.filter(c => !c.soldDate && c.fbStatus !== 'Sold');
+          if (args.excludeSold) cars = cars.filter(c => !isSoldOrGone(c));
           if (args.minPrice) cars = cars.filter(c => Number(c.price) >= args.minPrice);
           if (args.maxPrice) cars = cars.filter(c => Number(c.price) <= args.maxPrice);
           if (args.minDaysOnLot) {
@@ -418,7 +430,7 @@ function createMcpServer() {
         case 'get_high_gross_cars': {
           const data = await callScript('getAll');
           let cars = (data.cars || []).filter(c => Number(c.appraisedValue) > 0);
-          if (!args.includeSold) cars = cars.filter(c => !c.soldDate && c.fbStatus !== 'Sold');
+          if (!args.includeSold) cars = cars.filter(c => !isSoldOrGone(c));
           cars = cars.map(c => ({ ...slim(c), ...calcGross(c) }));
           if (args.minBottomGross) cars = cars.filter(c => c.bottomGross >= args.minBottomGross);
           cars.sort((a, b) => b.topGross - a.topGross);
@@ -432,7 +444,7 @@ function createMcpServer() {
           const data = await callScript('getAll');
           const now = Date.now();
           const cars = (data.cars || [])
-            .filter(c => c.addedDate && !c.soldDate && c.fbStatus !== 'Sold')
+            .filter(c => c.addedDate && !isSoldOrGone(c))
             .map(c => ({
               ...slim(c),
               daysOnLot: Math.floor((now - new Date(c.addedDate).getTime()) / 86400000)

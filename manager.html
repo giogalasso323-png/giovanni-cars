@@ -886,6 +886,11 @@ const daysOnLot = c => c.dis!=null && c.dis!=='' ? Number(c.dis)||0 : (c.addedDa
 const getTitle  = c => [c.year,c.make,c.model,c.trim].filter(Boolean).join(' ') || c.vin;
 const fmtPrice  = p => p ? '$'+Number(p).toLocaleString() : '—';
 const fmtMiles  = m => m ? Number(m).toLocaleString()+' mi' : '—';
+// Scrape-confirmed gone from the site AND never posted to FB -- no cleanup needed there,
+// just needs marking sold. This used to only exist as a badge display label ("Not on
+// Website") that was never actually written to websiteStatus, so the Not Listed tab
+// (which checked websiteStatus==='Not on Website') never matched anything.
+const isNotListed = c => (c.websiteStatus||'').toLowerCase().includes('delist') && c.fbStatus!=='posted';
 
 function statusBadge(c) {
   const s=(c.websiteStatus||'').toLowerCase();
@@ -1008,7 +1013,7 @@ function applyFilters() {
     if(activeFilter==='posted') return c.fbStatus==='posted';
     if(activeFilter==='unposted') return c.fbStatus!=='posted'&&!(c.websiteStatus||'').toLowerCase().includes('sold');
     if(activeFilter==='sold') return (c.websiteStatus||'').toLowerCase().includes('sold')||c.fbStatus==='sold';
-    if(activeFilter==='not-listed') return (c.websiteStatus||'')==='Not on Website'&&!(Number(c.appraisedValue||0)>0&&!c.color);
+    if(activeFilter==='not-listed') return isNotListed(c)&&!(Number(c.appraisedValue||0)>0&&!c.color);
     return true;
   });
   // Show Days Posted column only on FB Posted tab
@@ -1064,7 +1069,7 @@ function render() {
 }
 
 async function markNotListedAsSold() {
-  const toMark = filtered.filter(c=>(c.websiteStatus||'')==='Not on Website');
+  const toMark = filtered.filter(c=>isNotListed(c));
   if(!toMark.length){ showToast('Nothing to mark'); return; }
   if(!confirm(`Mark ${toMark.length} unlisted car${toMark.length===1?'':'s'} as Sold?`)) return;
   const now = new Date().toISOString();
@@ -1139,7 +1144,7 @@ function updateCounts() {
   document.getElementById('cnt-posted').textContent=inventory.filter(c=>c.fbStatus==='posted').length;
   document.getElementById('cnt-unposted').textContent=inventory.filter(c=>c.fbStatus!=='posted'&&!(c.websiteStatus||'').toLowerCase().includes('sold')).length;
   document.getElementById('cnt-sold').textContent=inventory.filter(c=>(c.websiteStatus||'').toLowerCase().includes('sold')||c.fbStatus==='sold').length;
-  document.getElementById('cnt-not-listed').textContent=inventory.filter(c=>(c.websiteStatus||'')==='Not on Website'&&!(Number(c.appraisedValue||0)>0&&!c.color)).length;
+  document.getElementById('cnt-not-listed').textContent=inventory.filter(c=>isNotListed(c)&&!(Number(c.appraisedValue||0)>0&&!c.color)).length;
 }
 function updateHeaderStats() {
   const live=inventory.filter(c=>(c.websiteStatus||'').toLowerCase().includes('live')).length;
