@@ -1358,8 +1358,6 @@ async function doImport(){
       showMatchBanner(matchedCount);
     }
   }
-
-  backgroundScrape(); // fire and forget -- refreshes website data without blocking the UI
 }
 
 // ── SCRAPE ─────────────────────────────────────────────────
@@ -4510,7 +4508,6 @@ async function doImportCost() {
     showToast(`✓ ${msg||'Done'}`);
     closeCostImportModal();
     render();
-    backgroundScrape(); // fire and forget -- refreshes website data without blocking the UI
   } catch(e) {
     showToast('Import failed: ' + e.message);
     btn.disabled = false; btn.textContent = 'Import';
