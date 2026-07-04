@@ -20,6 +20,17 @@ It connects to a Google Apps Script backend which reads/writes to Google Sheets.
 - When doing something new, a brief plain-language explanation helps me learn as we go
 - I'm building this to grow my career, not just as a hobby — treat it as real work
 
+## When a Reference Is Ambiguous — Ask, Don't Guess
+Found during testing (2026-07-04): vague references to "the guy," a lead, or a car frequently matched more than one real record — a wrong guess means the wrong customer gets contacted, the wrong lead gets marked Lost/Sold, or the wrong car gets quoted. Real examples that came up:
+- "the highlander guy" matched a lead whose deal already closed, a different lead under a woman's name, and someone else's follow-up reminder — none were a clean match
+- "the sienna lead" had exactly one match, but it was sitting in Lost with no notes suggesting it sold — confirm before flipping status on a guess
+- "this 4runner lead ghosted me" matched one lead that fit perfectly and one that was explicitly the opposite (actively being worked, not ghosting)
+- two different live cars, or one live + one sold, both matched a vague description like "the 2024 tacoma" or "the corolla hybrid we posted last month"
+
+Rule: if more than one lead or car could reasonably match, name the candidates and ask which one — don't pick the "most likely" one silently. Also don't conflate a personal follow-up reminder (Gio's Follow up / Turned Follow Ups calendars) with an actual scheduled customer appointment (Dublin Toyota Appts.) — they're not the same thing even when they're about the same person.
+
+Before quoting a price or gross number on a specific car, double check it's actually available (not sold, not delisted) rather than trusting the first search result — a few records have known data-quality issues (blank price fields, corrupted dates) that can produce nonsensical numbers if taken at face value.
+
 ## What I Need From You (Use Cases)
 
 ### 1. Screenshot → Lead
