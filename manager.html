@@ -890,7 +890,14 @@ const fmtMiles  = m => m ? Number(m).toLocaleString()+' mi' : '—';
 // just needs marking sold. This used to only exist as a badge display label ("Not on
 // Website") that was never actually written to websiteStatus, so the Not Listed tab
 // (which checked websiteStatus==='Not on Website') never matched anything.
-const isNotListed = c => (c.websiteStatus||'').toLowerCase().includes('delist') && c.fbStatus!=='posted';
+// fbStatus!=='sold' excludes cars already marked sold that just haven't had their stale
+// delisted flag cleared -- otherwise already-closed deals cluttered this tab as if they
+// still needed the bulk "Mark All Sold" action.
+const isNotListed = c => (c.websiteStatus||'').toLowerCase().includes('delist') && c.fbStatus!=='posted' && c.fbStatus!=='sold';
+// A cost-import stub is only still "Upcoming" if it has no website status at all yet --
+// once a scrape confirms Live/Delisted/etc, it's not pending anymore even if color is
+// still blank, so it shouldn't be silently excluded from every other tab too.
+const isUpcomingStub = c => Number(c.appraisedValue||0)>0 && !c.color && !c.websiteStatus;
 
 function statusBadge(c) {
   const s=(c.websiteStatus||'').toLowerCase();
@@ -991,7 +998,19 @@ function mergeImport(rows) {
   const map={}; inventory.forEach(c=>map[c.vin]=c);
   const toAdd=[], toUpdate=[], added_l=[], updated_l=[];
   rows.forEach(row=>{ const car=rowToCar(row); if(!car) return;
-    if(map[car.vin]){ const e=map[car.vin]; ['year','make','model','trim','color','mileage','price','stock','dis'].forEach(f=>{if(car[f]||car[f]===0)e[f]=car[f];}); toUpdate.push(e); updated_l.push(car.vin); }
+    if(map[car.vin]){
+      const e=map[car.vin];
+      // price/mileage are parsed as parseFloat(x)||0 -- a blank cell in this row
+      // becomes a literal 0, which used to overwrite a real existing value. 0 is
+      // never a legitimate real price or mileage, so only overwrite when truthy.
+      // dis (days in stock) legitimately can be 0 (car added today), so that one
+      // keeps allowing it.
+      ['year','make','model','trim','color','mileage','price','stock','dis'].forEach(f=>{
+        const meaningful = f==='dis' ? (car[f]||car[f]===0) : car[f];
+        if (meaningful) e[f]=car[f];
+      });
+      toUpdate.push(e); updated_l.push(car.vin);
+    }
     else { inventory.push(car); map[car.vin]=car; toAdd.push(car); added_l.push(car.vin); }
   });
   return { added:toAdd.length, updated:toUpdate.length, toAdd, toUpdate };
@@ -1013,7 +1032,7 @@ function applyFilters() {
     if(activeFilter==='posted') return c.fbStatus==='posted';
     if(activeFilter==='unposted') return c.fbStatus!=='posted'&&!(c.websiteStatus||'').toLowerCase().includes('sold');
     if(activeFilter==='sold') return (c.websiteStatus||'').toLowerCase().includes('sold')||c.fbStatus==='sold';
-    if(activeFilter==='not-listed') return isNotListed(c)&&!(Number(c.appraisedValue||0)>0&&!c.color);
+    if(activeFilter==='not-listed') return isNotListed(c)&&!isUpcomingStub(c);
     return true;
   });
   // Show Days Posted column only on FB Posted tab
@@ -1144,7 +1163,7 @@ function updateCounts() {
   document.getElementById('cnt-posted').textContent=inventory.filter(c=>c.fbStatus==='posted').length;
   document.getElementById('cnt-unposted').textContent=inventory.filter(c=>c.fbStatus!=='posted'&&!(c.websiteStatus||'').toLowerCase().includes('sold')).length;
   document.getElementById('cnt-sold').textContent=inventory.filter(c=>(c.websiteStatus||'').toLowerCase().includes('sold')||c.fbStatus==='sold').length;
-  document.getElementById('cnt-not-listed').textContent=inventory.filter(c=>isNotListed(c)&&!(Number(c.appraisedValue||0)>0&&!c.color)).length;
+  document.getElementById('cnt-not-listed').textContent=inventory.filter(c=>isNotListed(c)&&!isUpcomingStub(c)).length;
 }
 function updateHeaderStats() {
   const live=inventory.filter(c=>(c.websiteStatus||'').toLowerCase().includes('live')).length;
@@ -1379,7 +1398,7 @@ async function startScrape(){
   const btn=document.getElementById('scrape-btn'); btn.disabled=true; btn.textContent='Running…';
   const log=document.getElementById('scrape-log'); log.style.display='block'; log.innerHTML='';
 
-  const toScrape=inventory.filter(c=>c.websiteStatus!=='Sold/Unavailable'&&c.fbStatus!=='sold'&&!(Number(c.appraisedValue||0)>0&&!c.color));
+  const toScrape=inventory.filter(c=>c.websiteStatus!=='Sold/Unavailable'&&c.fbStatus!=='sold'&&!isUpcomingStub(c));
 
   if(!toScrape.length){ btn.disabled=false; btn.textContent='Start Refresh'; showToast('No vehicles to refresh'); return; }
   scrapeRunning=true;
@@ -1480,7 +1499,7 @@ function applyScrapeResult(car, result) {
 // visible "Start Refresh" button.
 async function backgroundScrape() {
   if (scrapeRunning) return;
-  const toScrape = inventory.filter(c=>c.websiteStatus!=='Sold/Unavailable'&&c.fbStatus!=='sold'&&!(Number(c.appraisedValue||0)>0&&!c.color));
+  const toScrape = inventory.filter(c=>c.websiteStatus!=='Sold/Unavailable'&&c.fbStatus!=='sold'&&!isUpcomingStub(c));
   if (!toScrape.length) return;
   scrapeRunning = true;
   const BATCH = 15;
