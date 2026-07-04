@@ -1358,6 +1358,8 @@ async function doImport(){
       showMatchBanner(matchedCount);
     }
   }
+
+  backgroundScrape(); // fire and forget -- refreshes website data without blocking the UI
 }
 
 // ── SCRAPE ─────────────────────────────────────────────────
@@ -1370,6 +1372,7 @@ function closeScrapeModal(){
 }
 
 async function startScrape(){
+  if(scrapeRunning){ showToast('A refresh is already running in the background — hang tight'); return; }
   const btn=document.getElementById('scrape-btn'); btn.disabled=true; btn.textContent='Running…';
   const log=document.getElementById('scrape-log'); log.style.display='block'; log.innerHTML='';
 
@@ -1381,8 +1384,10 @@ async function startScrape(){
   // Show starting message
   log.innerHTML='<div style="color:var(--text3);font-size:12px;padding:4px 0">Sending '+toScrape.length+' VINs to Google Apps Script for scraping…</div>';
 
-  // Send all VINs to Apps Script which does the actual fetching (no CORS issues)
-  const BATCH=5;
+  // Send all VINs to Apps Script which does the actual fetching (no CORS issues).
+  // BATCH is 15, not smaller -- scrapeVehicles() refetches the whole site sitemap on
+  // every call, so more/smaller batches means more redundant fetches and slower runs.
+  const BATCH=15;
   for(let i=0;i<toScrape.length;i+=BATCH){
     const batch=toScrape.slice(i,i+BATCH);
     const vins=batch.map(c=>c.vin);
@@ -1396,48 +1401,7 @@ async function startScrape(){
       (res.results||[]).forEach(result=>{
         const car=inventory.find(c=>c.vin===result.vin);
         if(!car) return;
-
-        const row=document.createElement('div');
-        row.className='scrape-row';
-
-        // Both status fields used depending on version
-        const ws = result.websiteStatus || result.status || '';
-        car.websiteStatus = ws;
-        car.lastChecked = new Date().toISOString();
-        if(ws.includes('Delist') || ws.includes('delist')){
-          car.websiteUrl='';
-          row.innerHTML=`<span style="color:var(--amber)">!</span><span class="scrape-vin">${car.vin}</span><span style="font-size:12px;color:var(--amber)">Not on site</span>`;
-        } else {
-          // Always update websiteStatus — even Fetch Error is better than stale dash
-          car.websiteStatus = result.websiteStatus || car.websiteStatus;
-          // Only update websiteUrl if we got a real one back
-          if(result.websiteUrl) car.websiteUrl=result.websiteUrl;
-          // On fetch error keep existing price, otherwise update
-          if(result.websitePrice) car.websitePrice=result.websitePrice;
-          if(result.stock)         car.stock=result.stock;
-          if(result.carfaxUrl)     car.carfaxUrl=result.carfaxUrl;
-          if(result.vehicleInfo)   car.vehicleInfo=result.vehicleInfo;
-          if(result.vehicleHistory)car.vehicleHistory=result.vehicleHistory;
-          if(result.features)      car.features=result.features;
-          if(result.certification) car.certification=result.certification;
-          car.lastChecked=new Date().toISOString();
-
-          // Set originalPrice on first scrape (never changes)
-          if(!car.originalPrice && car.websitePrice) car.originalPrice=car.websitePrice;
-          // Price drop: compare website price to currentFbPrice (what they posted)
-          if(car.currentFbPrice && car.websitePrice){
-            car.priceDropped = car.currentFbPrice !== car.websitePrice;
-          } else {
-            car.priceDropped = false;
-          }
-
-          car.fbDescription=buildFBDesc(car);
-
-          const priceNote=car.priceDropped
-            ?' ⬇ '+fmtPrice(car.fbPostedPrice)+'→'+fmtPrice(car.websitePrice)
-            :(car.websitePrice?' — '+fmtPrice(car.websitePrice):'');
-          row.innerHTML=`<span style="color:var(--green)">✓</span><span class="scrape-vin">${car.vin}</span><span style="font-size:12px;color:${car.priceDropped?'var(--red)':'var(--text2)'}">${car.websiteStatus||'Live'}${priceNote}</span>`;
-        }
+        const {row}=applyScrapeResult(car, result);
         log.appendChild(row);
         log.scrollTop=log.scrollHeight;
       });
@@ -1458,6 +1422,83 @@ async function startScrape(){
   scrapeRunning=false;
   render(); setSyncInfo('ok'); btn.disabled=false; btn.textContent='Done ✓';
   showToast('Refreshed '+toScrape.length+' vehicles');
+}
+
+// Applies one scrapeVehicles() result to its matching car in-place. Shared by the
+// visible "Start Refresh" button and the quiet post-import background scrape.
+// Returns a DOM row describing what happened, for callers that show a log.
+function applyScrapeResult(car, result) {
+  const row=document.createElement('div');
+  row.className='scrape-row';
+  const ws = result.websiteStatus || result.status || '';
+  car.websiteStatus = ws;
+  car.lastChecked = new Date().toISOString();
+  if(ws.includes('Delist') || ws.includes('delist')){
+    car.websiteUrl='';
+    row.innerHTML=`<span style="color:var(--amber)">!</span><span class="scrape-vin">${car.vin}</span><span style="font-size:12px;color:var(--amber)">Not on site</span>`;
+    return {row};
+  }
+  // Always update websiteStatus — even Fetch Error is better than stale dash
+  car.websiteStatus = result.websiteStatus || car.websiteStatus;
+  // Only update websiteUrl if we got a real one back
+  if(result.websiteUrl) car.websiteUrl=result.websiteUrl;
+  // On fetch error keep existing price, otherwise update
+  if(result.websitePrice) car.websitePrice=result.websitePrice;
+  if(result.stock)         car.stock=result.stock;
+  if(result.carfaxUrl)     car.carfaxUrl=result.carfaxUrl;
+  if(result.vehicleInfo)   car.vehicleInfo=result.vehicleInfo;
+  if(result.vehicleHistory)car.vehicleHistory=result.vehicleHistory;
+  if(result.features)      car.features=result.features;
+  if(result.certification) car.certification=result.certification;
+  car.lastChecked=new Date().toISOString();
+
+  // Set originalPrice on first scrape (never changes)
+  if(!car.originalPrice && car.websitePrice) car.originalPrice=car.websitePrice;
+  // Price drop: compare website price to currentFbPrice (what they posted)
+  if(car.currentFbPrice && car.websitePrice){
+    car.priceDropped = car.currentFbPrice !== car.websitePrice;
+  } else {
+    car.priceDropped = false;
+  }
+  car.fbDescription=buildFBDesc(car);
+
+  const priceNote=car.priceDropped
+    ?' ⬇ '+fmtPrice(car.fbPostedPrice)+'→'+fmtPrice(car.websitePrice)
+    :(car.websitePrice?' — '+fmtPrice(car.websitePrice):'');
+  row.innerHTML=`<span style="color:var(--green)">✓</span><span class="scrape-vin">${car.vin}</span><span style="font-size:12px;color:${car.priceDropped?'var(--red)':'var(--text2)'}">${car.websiteStatus||'Live'}${priceNote}</span>`;
+  return {row};
+}
+
+// Quiet version of startScrape() -- no modal, no log, doesn't block the UI. Fired
+// (not awaited) after CSV/cost imports so Giovanni isn't stuck behind a loading
+// screen. Shares the scrapeRunning flag so it never runs at the same time as the
+// visible "Start Refresh" button.
+async function backgroundScrape() {
+  if (scrapeRunning) return;
+  const toScrape = inventory.filter(c=>c.websiteStatus!=='Sold/Unavailable'&&c.fbStatus!=='sold'&&!(Number(c.appraisedValue||0)>0&&!c.color));
+  if (!toScrape.length) return;
+  scrapeRunning = true;
+  const BATCH = 15;
+  try {
+    for (let i=0; i<toScrape.length; i+=BATCH) {
+      if (!scrapeRunning) break;
+      const batch = toScrape.slice(i, i+BATCH);
+      const vins = batch.map(c=>c.vin);
+      try {
+        const res = await apiPost('scrapeVehicles', {vins});
+        if (res.error) continue;
+        (res.results||[]).forEach(result => {
+          const car = inventory.find(c=>c.vin===result.vin);
+          if (car) applyScrapeResult(car, result);
+        });
+        await apiPost('upsertMany', {cars: batch.map(v=>inventory.find(c=>c.vin===v.vin)).filter(Boolean)});
+      } catch (e) { /* one batch failing shouldn't stop the rest */ }
+      await new Promise(r=>setTimeout(r,300));
+    }
+    updateHeaderStats();
+  } finally {
+    scrapeRunning = false;
+  }
 }
 
 
@@ -4467,6 +4508,7 @@ async function doImportCost() {
     showToast(`✓ ${msg||'Done'}`);
     closeCostImportModal();
     render();
+    backgroundScrape(); // fire and forget -- refreshes website data without blocking the UI
   } catch(e) {
     showToast('Import failed: ' + e.message);
     btn.disabled = false; btn.textContent = 'Import';
