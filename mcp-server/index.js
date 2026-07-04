@@ -69,6 +69,15 @@ function calcGross(car) {
 // or the website scrape confirms it's no longer listed/available. Cars that are gone from
 // the site but never formally marked sold in fbStatus were slipping through excludeSold
 // checks and could get recommended as available for lead matching.
+// Prefers the DMS-sourced `dis` field (real days-in-stock) over computing from addedDate,
+// which only reflects when a cost-import batch ran -- cars imported in the same batch all
+// share one addedDate and were flattening to identical, often-wrong "days on lot" values.
+// Mirrors the daysOnLot() helper already used in manager.html.
+function daysOnLot(car) {
+  if (car.dis != null && car.dis !== '') return Number(car.dis) || 0;
+  return car.addedDate ? Math.floor((Date.now() - new Date(car.addedDate).getTime()) / 86400000) : 0;
+}
+
 function isSoldOrGone(car) {
   if (car.soldDate) return true;
   if ((car.fbStatus || '').toLowerCase() === 'sold') return true;
@@ -387,16 +396,12 @@ function createMcpServer() {
             );
           }
 
-          if (args.fbStatus) cars = cars.filter(c => c.fbStatus === args.fbStatus);
+          if (args.fbStatus) cars = cars.filter(c => (c.fbStatus||'').toLowerCase() === args.fbStatus.toLowerCase());
           if (args.excludeSold) cars = cars.filter(c => !isSoldOrGone(c));
           if (args.minPrice) cars = cars.filter(c => Number(c.price) >= args.minPrice);
           if (args.maxPrice) cars = cars.filter(c => Number(c.price) <= args.maxPrice);
           if (args.minDaysOnLot) {
-            const now = Date.now();
-            cars = cars.filter(c => {
-              if (!c.addedDate) return false;
-              return (now - new Date(c.addedDate).getTime()) / 86400000 >= args.minDaysOnLot;
-            });
+            cars = cars.filter(c => daysOnLot(c) >= args.minDaysOnLot);
           }
 
           cars = cars.slice(0, args.limit || 100).map(c => {
@@ -411,16 +416,12 @@ function createMcpServer() {
         case 'get_inventory': {
           const data = await callScript('getAll');
           let cars = data.cars || [];
-          if (args.fbStatus) cars = cars.filter(c => c.fbStatus === args.fbStatus);
+          if (args.fbStatus) cars = cars.filter(c => (c.fbStatus||'').toLowerCase() === args.fbStatus.toLowerCase());
           if (args.excludeSold) cars = cars.filter(c => !isSoldOrGone(c));
           if (args.minPrice) cars = cars.filter(c => Number(c.price) >= args.minPrice);
           if (args.maxPrice) cars = cars.filter(c => Number(c.price) <= args.maxPrice);
           if (args.minDaysOnLot) {
-            const now = Date.now();
-            cars = cars.filter(c => {
-              if (!c.addedDate) return false;
-              return (now - new Date(c.addedDate).getTime()) / 86400000 >= args.minDaysOnLot;
-            });
+            cars = cars.filter(c => daysOnLot(c) >= args.minDaysOnLot);
           }
           cars = cars.slice(0, args.limit || 100).map(slim);
           result = { count: cars.length, cars };
@@ -442,13 +443,9 @@ function createMcpServer() {
         case 'get_stale_inventory': {
           const days = args.days || 45;
           const data = await callScript('getAll');
-          const now = Date.now();
           const cars = (data.cars || [])
-            .filter(c => c.addedDate && !isSoldOrGone(c))
-            .map(c => ({
-              ...slim(c),
-              daysOnLot: Math.floor((now - new Date(c.addedDate).getTime()) / 86400000)
-            }))
+            .filter(c => (c.addedDate || (c.dis != null && c.dis !== '')) && !isSoldOrGone(c))
+            .map(c => ({ ...slim(c), daysOnLot: daysOnLot(c) }))
             .filter(c => c.daysOnLot >= days)
             .sort((a, b) => b.daysOnLot - a.daysOnLot);
           const staleTotal = cars.length;
