@@ -830,9 +830,9 @@ function showApp() { document.getElementById('app').style.display='block'; }
 
 // ── API ────────────────────────────────────────────────────
 // ===== SECTION: API / DATA LAYER =====
-async function apiFetch(url, action, body, attempt = 1) {
+async function apiFetch(url, action, body, timeoutMs = 20000, attempt = 1) {
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 20000);
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
   try {
     let r;
     if (!body) {
@@ -852,15 +852,15 @@ async function apiFetch(url, action, body, attempt = 1) {
   } catch (e) {
     if (attempt < 3) {
       await new Promise(res => setTimeout(res, 800 * attempt));
-      return apiFetch(url, action, body, attempt + 1);
+      return apiFetch(url, action, body, timeoutMs, attempt + 1);
     }
     throw new Error(e.name === 'AbortError' ? `Request to "${action}" timed out after 3 attempts` : e.message);
   } finally {
     clearTimeout(timeoutId);
   }
 }
-const apiGet  = (action)       => apiFetch(API_URL, action);
-const apiPost = (action, body) => apiFetch(API_URL, action, body);
+const apiGet  = (action, timeoutMs)       => apiFetch(API_URL, action, undefined, timeoutMs);
+const apiPost = (action, body, timeoutMs) => apiFetch(API_URL, action, body, timeoutMs);
 
 async function loadFromSheet() {
   setSyncInfo('loading');
@@ -1394,7 +1394,9 @@ async function startScrape(){
     btn.textContent='Refreshing… '+Math.min(i+BATCH,toScrape.length)+'/'+toScrape.length;
 
     try {
-      const res=await apiPost('scrapeVehicles',{vins});
+      // Longer timeout: scraping 15 VINs (sitemap fetch + 15 page fetches) reliably takes
+      // longer than the default 20s window used for normal read/write calls.
+      const res=await apiPost('scrapeVehicles',{vins},60000);
       if(res.error) throw new Error(res.error);
 
       // Process results
@@ -1485,7 +1487,7 @@ async function backgroundScrape() {
       const batch = toScrape.slice(i, i+BATCH);
       const vins = batch.map(c=>c.vin);
       try {
-        const res = await apiPost('scrapeVehicles', {vins});
+        const res = await apiPost('scrapeVehicles', {vins}, 60000);
         if (res.error) continue;
         (res.results||[]).forEach(result => {
           const car = inventory.find(c=>c.vin===result.vin);
