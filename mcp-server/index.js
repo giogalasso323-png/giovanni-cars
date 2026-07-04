@@ -327,20 +327,21 @@ function createMcpServer() {
           const chunk = vinsToScrape.slice(offset, offset + limit);
           const BATCH = 5;
           let scraped = 0, delistCount = 0, errors = 0;
+          const errorMessages = [];
 
           for (let i = 0; i < chunk.length; i += BATCH) {
             const batch = chunk.slice(i, i + BATCH);
             try {
               const res = await callScript('scrapeVehicles', { vins: batch });
-              const results = res.results || [];
+              const results = (res.results || []).map(r => ({ ...r, lastChecked: new Date().toISOString() }));
               scraped += results.length;
               delistCount += results.filter(r => (r.websiteStatus || '').includes('Delist')).length;
               if (results.length) await callScript('upsertMany', { cars: results });
-            } catch (e) { errors++; }
+            } catch (e) { errors++; errorMessages.push(e.message); }
           }
 
           result = {
-            scraped, delistCount, errors,
+            scraped, delistCount, errors, errorMessages,
             total: vinsToScrape.length,
             offset, limit,
             done: (offset + limit) >= vinsToScrape.length,
