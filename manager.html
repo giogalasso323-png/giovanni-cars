@@ -830,17 +830,34 @@ function showApp() { document.getElementById('app').style.display='block'; }
 
 // ── API ────────────────────────────────────────────────────
 // ===== SECTION: API / DATA LAYER =====
-async function apiFetch(url, action, body) {
-  if (!body) {
-    const r = await fetch(`${url}?action=${action}`, {redirect:'follow'});
-    return r.json();
+async function apiFetch(url, action, body, attempt = 1) {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 20000);
+  try {
+    let r;
+    if (!body) {
+      r = await fetch(`${url}?action=${action}`, {redirect:'follow', signal: controller.signal});
+    } else {
+      // Apps Script doesnt handle JSON POST well - use form-encoded instead
+      const params = new URLSearchParams();
+      params.append('action', action);
+      params.append('payload', JSON.stringify(body));
+      r = await fetch(url, { method:'POST', redirect:'follow', body: params, signal: controller.signal });
+    }
+    const contentType = r.headers.get('content-type') || '';
+    if (!r.ok || !contentType.includes('json')) {
+      throw new Error(`Apps Script returned a non-JSON response (status ${r.status})`);
+    }
+    return await r.json();
+  } catch (e) {
+    if (attempt < 3) {
+      await new Promise(res => setTimeout(res, 800 * attempt));
+      return apiFetch(url, action, body, attempt + 1);
+    }
+    throw new Error(e.name === 'AbortError' ? `Request to "${action}" timed out after 3 attempts` : e.message);
+  } finally {
+    clearTimeout(timeoutId);
   }
-  // Apps Script doesnt handle JSON POST well - use form-encoded instead
-  const params = new URLSearchParams();
-  params.append('action', action);
-  params.append('payload', JSON.stringify(body));
-  const r = await fetch(url, { method:'POST', redirect:'follow', body: params });
-  return r.json();
 }
 const apiGet  = (action)       => apiFetch(API_URL, action);
 const apiPost = (action, body) => apiFetch(API_URL, action, body);
