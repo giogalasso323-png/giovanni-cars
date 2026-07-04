@@ -325,6 +325,7 @@
     <div class="logo"><span class="logo-badge">DT</span> Inventory Manager</div>
     <div class="header-right">
       <div class="header-stats" id="header-stats"></div>
+      <span class="sync-info" id="last-scraped"></span>
       <span class="sync-info" id="sync-info"></span>
     </div>
   </header>
@@ -1131,6 +1132,14 @@ function updateHeaderStats() {
     <div class="stat-pill"><div class="dot" style="background:var(--green)"></div><strong>${live}</strong> Live</div>
     <div class="stat-pill"><div class="dot" style="background:var(--blue)"></div><strong>${posted}</strong> Posted</div>
     <div class="stat-pill"><div class="dot" style="background:var(--red)"></div><strong>${sold}</strong> Sold</div>`;
+
+  const checkedTimes = inventory.map(c=>c.lastChecked?new Date(c.lastChecked).getTime():0).filter(Boolean);
+  const lastScrapedEl = document.getElementById('last-scraped');
+  if (checkedTimes.length) {
+    lastScrapedEl.textContent = 'Last scraped: ' + new Date(Math.max(...checkedTimes)).toLocaleString([],{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'});
+  } else {
+    lastScrapedEl.textContent = 'Last scraped: never';
+  }
 }
 
 function setView(v) {
