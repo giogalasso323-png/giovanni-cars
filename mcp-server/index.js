@@ -84,7 +84,7 @@ function createMcpServer() {
       },
       {
         name: 'scrape_inventory',
-        description: 'Sync inventory with dublintoyota.com — checks current prices, availability, and sold status, then updates the sheet. Run in chunks of 15 (default) to avoid timeouts — do not pass a larger limit, each call already does one full sitemap fetch. Call repeatedly with offset to cover all cars. Returns { scraped, delistCount, errors, errorMessages, total, done } — done:true means all cars covered.',
+        description: 'Sync inventory with dublintoyota.com — checks current prices, availability, and sold status, then updates the sheet. Run in chunks of 15 (default) to avoid timeouts — do not pass a larger limit, each call already does one full sitemap fetch. Call repeatedly with offset to cover all cars. Returns { scraped, newDelistCount, errors, errorMessages, total, done } — newDelistCount is only vehicles newly flagged as delisted this run, not previously-known ones. done:true means all cars covered.',
         inputSchema: {
           type: 'object',
           properties: {
@@ -319,13 +319,19 @@ function createMcpServer() {
 
           const allData = await callScript('getAll');
           const allCars = allData.cars || [];
+          // scrapeVehicles() returns "Check FB — Delist" for any VIN not found in the
+          // sitemap -- including cars already flagged that way from a previous scrape.
+          // Track prior status so we only count NEW delistings, not daily reconfirmations
+          // of already-known ones (otherwise the count balloons with stale backlog).
+          const priorStatusByVin = {};
+          allCars.forEach(c => { if (c.vin) priorStatusByVin[c.vin] = c.websiteStatus || ''; });
           const vinsToScrape = allCars
             .filter(c => c.websiteStatus !== 'Sold/Unavailable' && c.fbStatus !== 'sold' && c.vin)
             .map(c => c.vin);
           if (!vinsToScrape.length) { result = { scraped: 0, total: 0, done: true, message: 'No active vehicles' }; break; }
 
           const chunk = vinsToScrape.slice(offset, offset + limit);
-          let scraped = 0, delistCount = 0, errors = 0;
+          let scraped = 0, newDelistCount = 0, errors = 0;
           const errorMessages = [];
 
           // One scrapeVehicles call per chunk (not sub-batched) — scrapeVehicles refetches
@@ -335,12 +341,16 @@ function createMcpServer() {
             const res = await callScript('scrapeVehicles', { vins: chunk });
             const results = (res.results || []).map(r => ({ ...r, lastChecked: new Date().toISOString() }));
             scraped += results.length;
-            delistCount += results.filter(r => (r.websiteStatus || '').includes('Delist')).length;
+            newDelistCount += results.filter(r => {
+              const isDelistedNow = (r.websiteStatus || '').includes('Delist');
+              const wasDelistedBefore = (priorStatusByVin[r.vin] || '').includes('Delist');
+              return isDelistedNow && !wasDelistedBefore;
+            }).length;
             if (results.length) await callScript('upsertMany', { cars: results });
           } catch (e) { errors++; errorMessages.push(e.message); }
 
           result = {
-            scraped, delistCount, errors, errorMessages,
+            scraped, newDelistCount, errors, errorMessages,
             total: vinsToScrape.length,
             offset, limit,
             done: (offset + limit) >= vinsToScrape.length,
