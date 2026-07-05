@@ -1070,6 +1070,17 @@ function applyFilters() {
       if(db) return 1;
       return daysOnLot(b) - daysOnLot(a);
     }
+    // Upcoming tab default: most recent import batch first, preserving that file's row order
+    // within it. importBatchTime/importRowOrder are persisted server-side and re-stamped on
+    // every re-import of a VIN (see importCostData in apps-script.js) -- addedDate/_importOrder
+    // don't survive a reload and reflect each car's own DMS inventory date, not import recency.
+    // Must be checked before the generic date-desc handler below, since sortKey defaults to
+    // 'date-desc' app-wide and would otherwise always intercept this tab's sort first.
+    if(activeFilter==='upcoming' && sortKey==='date-desc') {
+      const diff = new Date(b.importBatchTime||0) - new Date(a.importBatchTime||0);
+      if(diff !== 0) return diff;
+      return (a.importRowOrder!=null?a.importRowOrder:0) - (b.importRowOrder!=null?b.importRowOrder:0);
+    }
     if(sortKey==='date-desc') return new Date(b.addedDate)-new Date(a.addedDate);
     if(sortKey==='date-asc') return new Date(a.addedDate)-new Date(b.addedDate);
     if(sortKey==='price-desc') return (b.websitePrice||b.price||0)-(a.websitePrice||a.price||0);
@@ -1087,15 +1098,6 @@ function applyFilters() {
     if(sortKey==='daysposted-desc') { const da=a.fbPostedDate?Math.floor((Date.now()-new Date(a.fbPostedDate))/86400000):0; const db=b.fbPostedDate?Math.floor((Date.now()-new Date(b.fbPostedDate))/86400000):0; return db-da; }
     if(sortKey==='daysposted-asc') { const da=a.fbPostedDate?Math.floor((Date.now()-new Date(a.fbPostedDate))/86400000):0; const db=b.fbPostedDate?Math.floor((Date.now()-new Date(b.fbPostedDate))/86400000):0; return da-db; }
     if(sortKey==='gross') { const ga=calcGrossData(a,0,0),gb=calcGrossData(b,0,0); return (gb?gb.topGross:-999999)-(ga?ga.topGross:-999999); }
-    // Upcoming tab default: most recent import batch first, preserving that file's row order
-    // within it. importBatchTime/importRowOrder are persisted server-side and re-stamped on
-    // every re-import of a VIN (see importCostData in apps-script.js) -- addedDate/_importOrder
-    // don't survive a reload and reflect each car's own DMS inventory date, not import recency.
-    if(activeFilter==='upcoming') {
-      const diff = new Date(b.importBatchTime||0) - new Date(a.importBatchTime||0);
-      if(diff !== 0) return diff;
-      return (a.importRowOrder!=null?a.importRowOrder:0) - (b.importRowOrder!=null?b.importRowOrder:0);
-    }
     // Live tab default: fewest days on lot first (newest cars at top)
     if(activeFilter==='live') return daysOnLot(a) - daysOnLot(b);
     return 0;
