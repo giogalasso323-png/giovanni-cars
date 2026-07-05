@@ -386,6 +386,10 @@
         Import CSV
       </button>
       <button class="btn" id="btn-mark-all-sold" onclick="markNotListedAsSold()" style="display:none;color:var(--amber);border-color:var(--amber)">Mark All Sold</button>
+      <div id="upcoming-filters" style="display:none;align-items:center;gap:10px;font-size:12px;color:var(--text2)">
+        <label style="display:flex;align-items:center;gap:5px;cursor:pointer"><input type="checkbox" id="upcoming-priced-only" onchange="upcomingPricedOnly=this.checked;render()"> Price or Certified only</label>
+        <label style="display:flex;align-items:center;gap:5px">Last <input type="number" id="upcoming-days" value="90" min="1" style="width:48px;background:var(--bg3);border:1px solid var(--border);border-radius:4px;color:var(--text);padding:2px 4px" onchange="upcomingDays=parseInt(this.value)||90;render()"> days</label>
+      </div>
       <div class="view-toggle">
         <button class="view-btn active" id="btn-table" onclick="setView('table')"><svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg></button>
         <button class="view-btn" id="btn-cards" onclick="setView('cards')"><svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg></button>
@@ -800,6 +804,7 @@ async function checkPassword() {
 const API_URL = 'https://script.google.com/macros/s/AKfycbzl1VFO7DbmSfMq_tQnZDxygvdC5rpYFgGyCzbHurLdSSAlBtiPgc73WHGiVSK_SM0T/exec';
 let inventory = [], filtered = [];
 let currentView = 'table', activeFilter = 'all', sortKey = 'date-desc';
+let upcomingPricedOnly = false, upcomingDays = 90;
 let selectedVins = new Set(), pendingCsvData = null, currentVin = null, lastOpenedVin = null;
 let pendingPhotos = [];
 let currentLeadRowIndex = null;
@@ -1036,7 +1041,15 @@ function applyFilters() {
     const ok=!q||sf.some(f=>f.includes(q));
     if(!ok) return false;
     if(sq && !String(c.stock||'').toLowerCase().startsWith(sq)) return false;
-    if(activeFilter==='upcoming') return isUpcomingStub(c);
+    if(activeFilter==='upcoming') {
+      if (!isUpcomingStub(c)) return false;
+      if (upcomingPricedOnly && !(c.price>0 || c.apprCertified)) return false;
+      if (upcomingDays) {
+        const ageDays = c.addedDate ? (Date.now()-new Date(c.addedDate))/86400000 : Infinity;
+        if (ageDays > upcomingDays) return false;
+      }
+      return true;
+    }
     if(activeFilter==='live') return (c.websiteStatus||'').toLowerCase().includes('live');
     if(activeFilter==='posted') return c.fbStatus==='posted';
     if(activeFilter==='unposted') return c.fbStatus!=='posted'&&!(c.websiteStatus||'').toLowerCase().includes('sold');
@@ -1074,11 +1087,14 @@ function applyFilters() {
     if(sortKey==='daysposted-desc') { const da=a.fbPostedDate?Math.floor((Date.now()-new Date(a.fbPostedDate))/86400000):0; const db=b.fbPostedDate?Math.floor((Date.now()-new Date(b.fbPostedDate))/86400000):0; return db-da; }
     if(sortKey==='daysposted-asc') { const da=a.fbPostedDate?Math.floor((Date.now()-new Date(a.fbPostedDate))/86400000):0; const db=b.fbPostedDate?Math.floor((Date.now()-new Date(b.fbPostedDate))/86400000):0; return da-db; }
     if(sortKey==='gross') { const ga=calcGrossData(a,0,0),gb=calcGrossData(b,0,0); return (gb?gb.topGross:-999999)-(ga?ga.topGross:-999999); }
-    // Upcoming tab default: newest addedDate first, preserve import order within same date
+    // Upcoming tab default: most recent import batch first, preserving that file's row order
+    // within it. importBatchTime/importRowOrder are persisted server-side and re-stamped on
+    // every re-import of a VIN (see importCostData in apps-script.js) -- addedDate/_importOrder
+    // don't survive a reload and reflect each car's own DMS inventory date, not import recency.
     if(activeFilter==='upcoming') {
-      const diff = new Date(b.addedDate||0) - new Date(a.addedDate||0);
+      const diff = new Date(b.importBatchTime||0) - new Date(a.importBatchTime||0);
       if(diff !== 0) return diff;
-      return (a._importOrder||0) - (b._importOrder||0);
+      return (a.importRowOrder!=null?a.importRowOrder:0) - (b.importRowOrder!=null?b.importRowOrder:0);
     }
     // Live tab default: fewest days on lot first (newest cars at top)
     if(activeFilter==='live') return daysOnLot(a) - daysOnLot(b);
@@ -1090,10 +1106,11 @@ function render() {
   if(activeFilter==='leads' || activeFilter==='floor') return;
   applyFilters(); updateCounts(); updateHeaderStats(); updateSortHeaders();
   document.getElementById('btn-mark-all-sold').style.display = activeFilter==='not-listed' ? '' : 'none';
+  document.getElementById('upcoming-filters').style.display = activeFilter==='upcoming' ? 'flex' : 'none';
   const has=inventory.length>0;
   document.getElementById('empty-state').style.display=has?'none':'flex';
   if(!has){ document.getElementById('table-view').style.display='none'; document.getElementById('card-view').style.display='none'; return; }
-  currentView==='table' ? renderTable() : renderCards();
+  activeFilter==='upcoming' ? renderUpcomingCards() : (currentView==='table' ? renderTable() : renderCards());
 }
 
 async function markNotListedAsSold() {
@@ -1161,6 +1178,35 @@ function renderCards() {
       ${p?`<div class="card-price">${fmtPrice(p)}</div>`:''}
       <div class="card-meta">${c.mileage?`<span>${fmtMiles(c.mileage)}</span>`:''}${c.color?`<span>${c.color}</span>`:''}${c.stock?`<span>#${c.stock}</span>`:''}</div>
       <div class="card-footer"><span class="days-badge ${daysClass(d)}">${d}d on lot</span>${c.edmundsLabel?`<span style="font-size:11px;color:var(--green)">${c.edmundsLabel}</span>`:''}</div>
+    </div>`;
+  }).join('');
+}
+
+// Mirrors the DMS appraisal card layout (stock/vehicle header, then labeled rows) so Giovanni
+// can flip between this tab and the DMS and immediately recognize the same record. Disp/Status
+// are shown for context only -- neither is used to decide what counts as Upcoming (Disp in
+// particular is a manual, unreliable toggle in the DMS, confirmed 2026-07).
+function renderUpcomingCards() {
+  document.getElementById('table-view').style.display='none';
+  document.getElementById('card-view').style.display='grid';
+  const g=document.getElementById('card-view');
+  if(!filtered.length){ g.innerHTML='<div style="grid-column:1/-1;text-align:center;padding:40px;color:var(--text3)">No vehicles match</div>'; return; }
+  const row = (label, value, color) => value ? `<div style="display:flex;justify-content:space-between;font-size:12px;padding:2px 0"><span style="color:var(--text3)">${label}</span><span style="color:${color||'var(--text2)'}">${value}</span></div>` : '';
+  g.innerHTML=filtered.map(c=>{
+    const inventoryDate = c.addedDate ? new Date(c.addedDate).toLocaleDateString() : '—';
+    const dispColor = (c.disp||'').toLowerCase().includes('wholesale') ? 'var(--amber)' : 'var(--text2)';
+    return `<div class="card" onclick="openDrawer('${c.vin}')">
+      <div class="card-header"><div><div class="card-title">${c.stock||'—'}</div><div class="card-vin">${[c.year,c.make,c.model].filter(Boolean).join(' ')}</div></div></div>
+      <div class="card-vin" style="margin-bottom:6px">${c.vin}</div>
+      ${c.appraisedValue?`<div class="card-price">${fmtPrice(c.appraisedValue)} <span style="font-size:11px;color:var(--text3);font-weight:400">appraised</span></div>`:''}
+      ${row('Odometer', c.mileage?fmtMiles(c.mileage):'')}
+      ${row('Disp', c.disp, dispColor)}
+      ${row('Status', c.apprStatus)}
+      ${row('Appraiser', c.appraiser)}
+      ${row('Inventory Date', inventoryDate)}
+      ${row('Price', c.price?fmtPrice(c.price):'', 'var(--green)')}
+      ${row('Cert Cost', c.certCost?fmtPrice(c.certCost):'')}
+      ${c.apprCertified?'<div style="margin-top:4px"><span style="font-size:11px;color:var(--green);border:1px solid var(--green);border-radius:4px;padding:2px 6px">Certified</span></div>':''}
     </div>`;
   }).join('');
 }
@@ -4437,7 +4483,9 @@ function showCostPreview(rows, fileName) {
     const rawStock   = String(findKey(row, 'stock') || '').trim();
     const rawVin     = String(findKey(row, 'vin')   || '').trim();
     const rawCost    = String(findKey(row, 'appraised', 'appraise') || '').replace(/[^0-9.]/g,'');
-    const rawCert    = String(findKey(row, 'cert') || '').replace(/[^0-9.]/g,'');
+    // 'certcost' not just 'cert' -- a bare 'cert' search would ambiguously match either
+    // "Cert Costs" or the new "Certified" column depending on key order.
+    const rawCert    = String(findKey(row, 'certcost') || '').replace(/[^0-9.]/g,'');
     const rawVehicle = String(findKey(row, 'vehicle', 'description') || '').trim();
     const rawOdo     = String(findKey(row, 'odometer', 'mileage', 'miles') || '').replace(/[^0-9]/g,'');
     const rawPrice   = String(findKey(row, 'price') || '').replace(/[^0-9.]/g,'');
@@ -4445,6 +4493,13 @@ function showCostPreview(rows, fileName) {
     const rawAppraiser   = String(findKey(row, 'appraiser') || '').trim();
     const rawSalesperson = String(findKey(row, 'salesperson') || '').trim();
     const appraiserDisplay = [rawAppraiser, rawSalesperson].filter(Boolean).join(' · ');
+    // Disp/Status/Certified aren't used for any automated decision (Disp in particular is a
+    // manual, unreliable toggle) -- captured purely so Giovanni can see them for context,
+    // same as the DMS appraisal view.
+    const rawDisp        = String(findKey(row, 'disp') || '').trim();
+    const rawApprStatus  = String(findKey(row, 'status') || '').trim();
+    const rawCertifiedRaw = String(findKey(row, 'certified') || '').trim();
+    const apprCertified   = /^(y|yes|true|1|x)$/i.test(rawCertifiedRaw);
     const vParts = rawVehicle.split(/\s+/);
     const year  = parseInt(vParts[0]) || 0;
     const make  = vParts[1] || '';
@@ -4459,6 +4514,9 @@ function showCostPreview(rows, fileName) {
       price:     parseFloat(rawPrice) || 0,
       appraiser: appraiserDisplay,
       addedDate: parseInventoryDate(rawDate),
+      disp: rawDisp,
+      apprStatus: rawApprStatus,
+      apprCertified,
       _importOrder: idx,
       _vehicle: rawVehicle,
     };
