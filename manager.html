@@ -1169,6 +1169,7 @@ function renderTable() {
 function renderCards() {
   document.getElementById('table-view').style.display='none'; document.getElementById('card-view').style.display='grid';
   const g=document.getElementById('card-view');
+  g.style.gridTemplateColumns = ''; // reset any override left by renderUpcomingCards()
   if(!filtered.length){ g.innerHTML='<div style="grid-column:1/-1;text-align:center;padding:40px;color:var(--text3)">No vehicles match</div>'; return; }
   g.innerHTML=filtered.map(c=>{
     const d=daysOnLot(c), p=c.websitePrice||c.price;
@@ -1190,23 +1191,29 @@ function renderUpcomingCards() {
   document.getElementById('table-view').style.display='none';
   document.getElementById('card-view').style.display='grid';
   const g=document.getElementById('card-view');
-  if(!filtered.length){ g.innerHTML='<div style="grid-column:1/-1;text-align:center;padding:40px;color:var(--text3)">No vehicles match</div>'; return; }
-  const row = (label, value, color) => value ? `<div style="display:flex;justify-content:space-between;font-size:12px;padding:2px 0"><span style="color:var(--text3)">${label}</span><span style="color:${color||'var(--text2)'}">${value}</span></div>` : '';
+  // One car per row, full width -- overrides the multi-column grid used by every other tab's
+  // card view. renderCards() resets this back to the default when switching tabs.
+  g.style.gridTemplateColumns = '1fr';
+  if(!filtered.length){ g.innerHTML='<div style="text-align:center;padding:40px;color:var(--text3)">No vehicles match</div>'; return; }
+  const field = (label, value, color) => value ? `<div style="min-width:110px"><div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:0.03em">${label}</div><div style="font-size:13px;color:${color||'var(--text)'};margin-top:1px">${value}</div></div>` : '';
   g.innerHTML=filtered.map(c=>{
     const inventoryDate = c.addedDate ? new Date(c.addedDate).toLocaleDateString() : '—';
     const dispColor = (c.disp||'').toLowerCase().includes('wholesale') ? 'var(--amber)' : 'var(--text2)';
-    return `<div class="card" onclick="openDrawer('${c.vin}')">
-      <div class="card-header"><div><div class="card-title">${c.stock||'—'}</div><div class="card-vin">${[c.year,c.make,c.model].filter(Boolean).join(' ')}</div></div></div>
-      <div class="card-vin" style="margin-bottom:6px">${c.vin}</div>
-      ${c.appraisedValue?`<div class="card-price">${fmtPrice(c.appraisedValue)} <span style="font-size:11px;color:var(--text3);font-weight:400">appraised</span></div>`:''}
-      ${row('Odometer', c.mileage?fmtMiles(c.mileage):'')}
-      ${row('Disp', c.disp, dispColor)}
-      ${row('Status', c.apprStatus)}
-      ${row('Appraiser', c.appraiser)}
-      ${row('Inventory Date', inventoryDate)}
-      ${row('Price', c.price?fmtPrice(c.price):'', 'var(--green)')}
-      ${row('Cert Cost', c.certCost?fmtPrice(c.certCost):'')}
-      ${c.apprCertified?'<div style="margin-top:4px"><span style="font-size:11px;color:var(--green);border:1px solid var(--green);border-radius:4px;padding:2px 6px">Certified</span></div>':''}
+    return `<div class="card" style="display:flex;align-items:center;gap:20px;flex-wrap:wrap;padding:12px 16px" onclick="openDrawer('${c.vin}')">
+      <div style="min-width:180px">
+        <div class="card-title">${c.stock||'—'}</div>
+        <div class="card-vin">${[c.year,c.make,c.model].filter(Boolean).join(' ')}</div>
+        <div class="card-vin">${c.vin}</div>
+      </div>
+      ${field('Appraised', c.appraisedValue?fmtPrice(c.appraisedValue):'')}
+      ${field('Odometer', c.mileage?fmtMiles(c.mileage):'')}
+      ${field('Disp', c.disp, dispColor)}
+      ${field('Status', c.apprStatus)}
+      ${field('Appraiser', c.appraiser)}
+      ${field('Inventory Date', inventoryDate)}
+      ${field('Price', c.price?fmtPrice(c.price):'', 'var(--green)')}
+      ${field('Cert Cost', c.certCost?fmtPrice(c.certCost):'')}
+      ${c.apprCertified?'<span style="font-size:11px;color:var(--green);border:1px solid var(--green);border-radius:4px;padding:3px 8px;white-space:nowrap">Certified</span>':''}
     </div>`;
   }).join('');
 }
