@@ -346,8 +346,11 @@ function createMcpServer() {
           // of already-known ones (otherwise the count balloons with stale backlog).
           const priorStatusByVin = {};
           allCars.forEach(c => { if (c.vin) priorStatusByVin[c.vin] = c.websiteStatus || ''; });
+          // isUpcoming stubs (cost-import placeholders not yet matched to a real listing) have
+          // no real web address yet -- scraping them was the root cause of the tab-orphan bug,
+          // giving colorless stub cars a stray website status before they'd actually graduated.
           const vinsToScrape = allCars
-            .filter(c => c.websiteStatus !== 'Sold/Unavailable' && c.fbStatus !== 'sold' && c.vin)
+            .filter(c => c.websiteStatus !== 'Sold/Unavailable' && c.fbStatus !== 'sold' && c.vin && c.isUpcoming !== true)
             .map(c => c.vin);
           if (!vinsToScrape.length) { result = { scraped: 0, total: 0, done: true, message: 'No active vehicles' }; break; }
 
@@ -528,12 +531,10 @@ function createMcpServer() {
 
         case 'get_upcoming_inventory': {
           const data = await callScript('getAll');
-          const ws = c => (c.websiteStatus || '').toLowerCase();
-          let upcoming = (data.cars || []).filter(c =>
-            Number(c.appraisedValue || 0) > 0 && !c.color &&
-            !ws(c).includes('live') && !ws(c).includes('sold') &&
-            !ws(c).includes('delist') && c.fbStatus !== 'sold'
-          );
+          // isUpcoming is an explicit flag stamped by importCostData() on stub creation and
+          // cleared by the regular used-car CSV import once the VIN is matched/enriched --
+          // not inferred from color/websiteStatus, which was fragile.
+          let upcoming = (data.cars || []).filter(c => c.isUpcoming === true);
           if (args.query) {
             const q = args.query.toLowerCase();
             upcoming = upcoming.filter(c =>

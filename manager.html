@@ -897,7 +897,11 @@ const isNotListed = c => (c.websiteStatus||'').toLowerCase().includes('delist') 
 // A cost-import stub is only still "Upcoming" if it has no website status at all yet --
 // once a scrape confirms Live/Delisted/etc, it's not pending anymore even if color is
 // still blank, so it shouldn't be silently excluded from every other tab too.
-const isUpcomingStub = c => Number(c.appraisedValue||0)>0 && !c.color && !c.websiteStatus;
+// Explicit flag set by importCostData() on stub creation, cleared by mergeImport() when the
+// regular used-car CSV import matches and enriches the VIN. Not inferred from color/appraisedValue
+// -- that was fragile (a car could coincidentally have blank color for unrelated reasons, or a
+// stray website status from a scrape that shouldn't have touched a stub in the first place).
+const isUpcomingStub = c => c.isUpcoming === true;
 
 function statusBadge(c) {
   const s=(c.websiteStatus||'').toLowerCase();
@@ -992,7 +996,8 @@ function rowToCar(row) {
     fbStatus:'unposted', websiteStatus:'', websitePrice:0, fbDescription:'', drivePhotoFolder:'', drivePhotoCount:0,
     carfaxUrl:'', edmundsLabel:'', edmundsBelow:'', vehicleInfo:'',
     vehicleHistory:'', features:'', certification: vtype.includes('TCUV') ? 'Toyota Certified Used Vehicle' : '',
-    addedDate:new Date().toISOString(), dis:parseInt(findCol(row,['dis','days in stock','daysinstock'])||'0')||0, lastChecked:null, fbPostedDate:null, soldDate:null };
+    addedDate:new Date().toISOString(), dis:parseInt(findCol(row,['dis','days in stock','daysinstock'])||'0')||0, lastChecked:null, fbPostedDate:null, soldDate:null,
+    isUpcoming:false };
 }
 function mergeImport(rows) {
   const map={}; inventory.forEach(c=>map[c.vin]=c);
@@ -1009,6 +1014,10 @@ function mergeImport(rows) {
         const meaningful = f==='dis' ? (car[f]||car[f]===0) : car[f];
         if (meaningful) e[f]=car[f];
       });
+      // Being matched by the regular used-car CSV import is the graduation event --
+      // this VIN is now a real tracked listing, not just a cost-import stub, regardless
+      // of what isUpcoming was set to before.
+      e.isUpcoming = false;
       toUpdate.push(e); updated_l.push(car.vin);
     }
     else { inventory.push(car); map[car.vin]=car; toAdd.push(car); added_l.push(car.vin); }
@@ -1027,7 +1036,7 @@ function applyFilters() {
     const ok=!q||sf.some(f=>f.includes(q));
     if(!ok) return false;
     if(sq && !String(c.stock||'').toLowerCase().startsWith(sq)) return false;
-    if(activeFilter==='upcoming') { const ws=(c.websiteStatus||'').toLowerCase(); return Number(c.appraisedValue||0)>0&&!c.color&&!ws.includes('live')&&!ws.includes('sold')&&c.fbStatus!=='sold'; }
+    if(activeFilter==='upcoming') return isUpcomingStub(c);
     if(activeFilter==='live') return (c.websiteStatus||'').toLowerCase().includes('live');
     if(activeFilter==='posted') return c.fbStatus==='posted';
     if(activeFilter==='unposted') return c.fbStatus!=='posted'&&!(c.websiteStatus||'').toLowerCase().includes('sold');
@@ -1158,7 +1167,7 @@ function renderCards() {
 
 function updateCounts() {
   document.getElementById('cnt-all').textContent=inventory.length;
-  document.getElementById('cnt-upcoming').textContent=inventory.filter(c=>{ const ws=(c.websiteStatus||'').toLowerCase(); return Number(c.appraisedValue||0)>0&&!c.color&&!ws.includes('live')&&!ws.includes('sold')&&c.fbStatus!=='sold'; }).length;
+  document.getElementById('cnt-upcoming').textContent=inventory.filter(isUpcomingStub).length;
   document.getElementById('cnt-live').textContent=inventory.filter(c=>(c.websiteStatus||'').toLowerCase().includes('live')).length;
   document.getElementById('cnt-posted').textContent=inventory.filter(c=>c.fbStatus==='posted').length;
   document.getElementById('cnt-unposted').textContent=inventory.filter(c=>c.fbStatus!=='posted'&&!(c.websiteStatus||'').toLowerCase().includes('sold')).length;

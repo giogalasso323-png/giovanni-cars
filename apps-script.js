@@ -21,7 +21,7 @@ const COLUMNS = [
   'carfaxUrl','edmundsLabel','edmundsBelow','vehicleInfo',
   'vehicleHistory','features','certification','addedDate',
   'lastChecked','fbPostedDate','soldDate','websiteUrl','fbPostedPrice','priceDropped','dis','currentFbPrice','originalPrice','drivePhotoFolder','drivePhotoCount',
-  'appraisedValue','certCost','appraiser'
+  'appraisedValue','certCost','appraiser','isUpcoming'
 ];
 
 const LEADS_COLUMNS = [
@@ -908,6 +908,10 @@ function importCostData(records) {
       if (map['price']     !== undefined && rec.price)     stub[map['price']]     = rec.price;
       if (map['appraiser'] !== undefined && rec.appraiser) stub[map['appraiser']] = rec.appraiser;
       if (map['addedDate'] !== undefined) stub[map['addedDate']] = rec.addedDate || new Date().toISOString();
+      // Explicit flag for "not yet graduated to a real listing" -- cleared to false when the
+      // regular used-car CSV import later matches and enriches this VIN (see mergeImport() in
+      // manager.html). Deliberately not inferred from color being blank -- that was fragile.
+      if (map['isUpcoming'] !== undefined) stub[map['isUpcoming']] = true;
       stubsToAdd.push(stub);
       stubbed++;
       return;
