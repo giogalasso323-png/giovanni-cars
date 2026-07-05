@@ -1189,33 +1189,44 @@ function renderCards() {
 // particular is a manual, unreliable toggle in the DMS, confirmed 2026-07).
 function renderUpcomingCards() {
   document.getElementById('table-view').style.display='none';
-  document.getElementById('card-view').style.display='grid';
+  document.getElementById('card-view').style.display='block';
   const g=document.getElementById('card-view');
-  // One car per row, full width -- overrides the multi-column grid used by every other tab's
-  // card view. renderCards() resets this back to the default when switching tabs.
-  g.style.gridTemplateColumns = '1fr';
+  g.style.gridTemplateColumns = '';
   if(!filtered.length){ g.innerHTML='<div style="text-align:center;padding:40px;color:var(--text3)">No vehicles match</div>'; return; }
-  const field = (label, value, color) => value ? `<div style="min-width:110px"><div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:0.03em">${label}</div><div style="font-size:13px;color:${color||'var(--text)'};margin-top:1px">${value}</div></div>` : '';
-  g.innerHTML=filtered.map(c=>{
-    const inventoryDate = c.addedDate ? new Date(c.addedDate).toLocaleDateString() : '—';
-    const dispColor = (c.disp||'').toLowerCase().includes('wholesale') ? 'var(--amber)' : 'var(--text2)';
-    return `<div class="card" style="display:flex;align-items:center;gap:20px;flex-wrap:wrap;padding:12px 16px" onclick="openDrawer('${c.vin}')">
-      <div style="min-width:180px">
-        <div class="card-title">${c.stock||'—'}</div>
-        <div class="card-vin">${[c.year,c.make,c.model].filter(Boolean).join(' ')}</div>
-        <div class="card-vin">${c.vin}</div>
-      </div>
-      ${field('Appraised', c.appraisedValue?fmtPrice(c.appraisedValue):'')}
-      ${field('Odometer', c.mileage?fmtMiles(c.mileage):'')}
-      ${field('Disp', c.disp, dispColor)}
-      ${field('Status', c.apprStatus)}
-      ${field('Appraiser', c.appraiser)}
-      ${field('Inventory Date', inventoryDate)}
-      ${field('Price', c.price?fmtPrice(c.price):'', 'var(--green)')}
-      ${field('Cert Cost', c.certCost?fmtPrice(c.certCost):'')}
-      ${c.apprCertified?'<span style="font-size:11px;color:var(--green);border:1px solid var(--green);border-radius:4px;padding:3px 8px;white-space:nowrap">Certified</span>':''}
-    </div>`;
-  }).join('');
+  const lbl = (label, value, color) => value ? `<div style="font-size:12px;margin-bottom:2px"><span style="color:var(--text3)">${label}: </span><span style="color:${color||'var(--text)'}">${value}</span></div>` : '';
+  const td = 'padding:10px 12px;vertical-align:top;border-bottom:1px solid var(--border)';
+  g.innerHTML=`<table style="width:100%;border-collapse:collapse;font-size:13px">
+    <thead><tr style="background:var(--bg3)">
+      <th style="text-align:left;padding:8px 12px;color:var(--text3);font-size:11px;text-transform:uppercase">Stock #</th>
+      <th style="text-align:left;padding:8px 12px;color:var(--text3);font-size:11px;text-transform:uppercase">Make/Model</th>
+      <th style="text-align:left;padding:8px 12px;color:var(--text3);font-size:11px;text-transform:uppercase">Details</th>
+      <th style="text-align:left;padding:8px 12px;color:var(--text3);font-size:11px;text-transform:uppercase">Appraisal Values</th>
+    </tr></thead>
+    <tbody>${filtered.map((c,i)=>{
+      const inventoryDate = c.addedDate ? new Date(c.addedDate).toLocaleDateString() : '—';
+      const dispColor = (c.disp||'').toLowerCase().includes('wholesale') ? 'var(--amber)' : 'var(--text2)';
+      return `<tr style="cursor:pointer;background:${i%2?'var(--bg2)':'transparent'}" onclick="openDrawer('${c.vin}')">
+        <td style="${td};color:var(--text3);font-family:'DM Mono',monospace">${c.stock||'—'}</td>
+        <td style="${td}">
+          <div class="card-title" style="margin-bottom:4px">${[c.year,c.make,c.model].filter(Boolean).join(' ')}</div>
+          ${lbl('VIN', c.vin)}
+          ${lbl('Odometer', c.mileage?fmtMiles(c.mileage):'')}
+          ${lbl('Disp', c.disp, dispColor)}
+        </td>
+        <td style="${td}">
+          ${lbl('Status', c.apprStatus, 'var(--green)')}
+          ${lbl('Appraiser', c.appraiser)}
+          ${lbl('Inventory Date', inventoryDate)}
+        </td>
+        <td style="${td}">
+          ${lbl('Appraised Value', c.appraisedValue?fmtPrice(c.appraisedValue):'')}
+          ${lbl('Price', c.price?fmtPrice(c.price):'', 'var(--green)')}
+          ${lbl('Cert Cost', c.certCost?fmtPrice(c.certCost):'')}
+          ${c.apprCertified?'<span style="font-size:11px;color:var(--green);border:1px solid var(--green);border-radius:4px;padding:2px 7px">Certified</span>':''}
+        </td>
+      </tr>`;
+    }).join('')}</tbody>
+  </table>`;
 }
 
 function updateCounts() {
