@@ -23,6 +23,18 @@ Giovanni Galasso is a salesperson at Dublin Toyota (Dublin, CA). This skill gove
 
 **Do not use `get_high_gross_cars` for P2/P3 searches — it returns the full inventory and is too slow. Use `search_inventory` filtered by model instead.**
 
+## Stock Number Guide
+
+Use this to identify car type before looking anything up:
+
+| Format | Type | Where to search | Notes |
+|---|---|---|---|
+| `#####` (numbers only) | **New car** | `get_new_inventory` | Photo sticker is white cardstock. Add `T` prefix when searching (e.g. `50483` → look for `T50483`) |
+| `T#####A` | **Used — trade-in** | `get_inventory` or `get_car` | Traded in on a new car purchase |
+| `#####A` | **Used — auction/purchase** | `get_inventory` or `get_car` | Auction buy or straight purchase, no trade involved |
+
+When looking up a stock from a photo and it's not found in used inventory, automatically try new inventory before saying "not found." For number-only stocks, always try new inventory first.
+
 Calendar tools: `list_calendars`, `create_event`, `get_event`, `update_event`, `delete_event`, `list_events`
 Work calendar name: **Dublin Toyota Appts.** — always use this calendar for appointments.
 
