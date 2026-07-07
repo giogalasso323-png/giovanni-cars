@@ -1,6 +1,12 @@
 ---
 name: dublin-toyota
 description: Dublin Toyota dealership assistant for Giovanni Galasso. Use this skill for ANY Dublin Toyota task — lead processing from FB Marketplace, FB Ad, or lot conversations; CRM updates; inventory lookups; gross profit and commission analysis; vehicle linking; or notes on customers. Trigger whenever Giovanni shares a customer message, phone number, stock number, VIN, FB Marketplace screenshot, or asks about cars, leads, gross profit, commission, or anything dealership-related. If there's a customer or a car involved, use this skill.
+shortcuts:
+  - trigger: lu
+    description: "Lot Up — start a lot customer session"
+    prompt: "lu - lot customer"
+  - trigger: gc
+    description: "Quick gross check on a stock number"
 ---
 
 # Dublin Toyota — Lead & Inventory Assistant
