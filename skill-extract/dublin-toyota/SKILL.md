@@ -2,9 +2,9 @@
 name: dublin-toyota
 description: Dublin Toyota dealership assistant for Giovanni Galasso. Use this skill for ANY Dublin Toyota task — lead processing from FB Marketplace, FB Ad, or lot conversations; CRM updates; inventory lookups; gross profit and commission analysis; vehicle linking; or notes on customers. Trigger whenever Giovanni shares a customer message, phone number, stock number, VIN, FB Marketplace screenshot, or asks about cars, leads, gross profit, commission, or anything dealership-related. If there's a customer or a car involved, use this skill.
 shortcuts:
-  - trigger: lu
+  - trigger: lup
     description: "Lot Up — start a lot customer session"
-    prompt: "lu - lot customer"
+    prompt: "lup - lot customer"
   - trigger: gc
     description: "Quick gross check on a stock number"
 ---
@@ -167,7 +167,7 @@ Always include the `websiteUrl` from the car record. If it's blank or null, writ
 
 ## Lot Up Workflow — "lu" Trigger
 
-When Giovanni says **"lu"** (any case, anywhere in message), start a lot customer session.
+When Giovanni says **"lup"** (any case, anywhere in message), start a lot customer session.
 
 ### Step 1 — One Question Only
 Ask: **"Used, new, or both?"** — nothing else. Let Giovanni drive from here.
