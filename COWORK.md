@@ -20,6 +20,17 @@ It connects to a Google Apps Script backend which reads/writes to Google Sheets.
 - When doing something new, a brief plain-language explanation helps me learn as we go
 - I'm building this to grow my career, not just as a hobby — treat it as real work
 
+## When a Reference Is Ambiguous — Ask, Don't Guess
+Found during testing (2026-07-04): vague references to "the guy," a lead, or a car frequently matched more than one real record — a wrong guess means the wrong customer gets contacted, the wrong lead gets marked Lost/Sold, or the wrong car gets quoted. Real examples that came up:
+- "the highlander guy" matched a lead whose deal already closed, a different lead under a woman's name, and someone else's follow-up reminder — none were a clean match
+- "the sienna lead" had exactly one match, but it was sitting in Lost with no notes suggesting it sold — confirm before flipping status on a guess
+- "this 4runner lead ghosted me" matched one lead that fit perfectly and one that was explicitly the opposite (actively being worked, not ghosting)
+- two different live cars, or one live + one sold, both matched a vague description like "the 2024 tacoma" or "the corolla hybrid we posted last month"
+
+Rule: if more than one lead or car could reasonably match, name the candidates and ask which one — don't pick the "most likely" one silently. Also don't conflate a personal follow-up reminder (Gio's Follow up / Turned Follow Ups calendars) with an actual scheduled customer appointment (Dublin Toyota Appts.) — they're not the same thing even when they're about the same person.
+
+Before quoting a price or gross number on a specific car, double check it's actually available (not sold, not delisted) rather than trusting the first search result — a few records have known data-quality issues (blank price fields, corrupted dates) that can produce nonsensical numbers if taken at face value.
+
 ## What I Need From You (Use Cases)
 
 ### 1. Screenshot → Lead
@@ -60,11 +71,15 @@ The MCP server (`dublin-toyota`) is connected and live. Tools available:
 - `vehicleList` — JSON array of vehicles attached to this lead
 - `turnedTo` / `turnedToFirst` — sales rep last/first name
 
-## Calendar Sync Logic (3-pass — owned by Cowork)
+## Calendar Sync Logic (3-pass — now automated, as of 2026-07-02)
+This used to be "owned by Cowork" and ran at the start of each conversation. **It's now handled by a scheduled cloud routine ("Dublin Toyota - Calendar Lead Sync") running hourly, 7am-9pm Pacific.** Do NOT run this sync yourself at conversation start anymore — doing so risks creating duplicate calendar events or racing the scheduled routine's writes to `calEventId`.
+
+If Giovanni asks you to check on a lead/appointment sync issue, read the current state (get_leads, calendar list_events) rather than re-running the sync logic. The 3 passes, for reference:
 - **Pass 1 (CRM → Calendar):** leads with `followUpDate` set + `calEventId` empty → create event in "Dublin Toyota Appts." → write `calEventId` back via `update_lead`
 - **Pass 2 (Calendar → CRM reschedules):** leads with `calEventId` → check event date → if changed, update `followUpDate` on lead + append note
-- **Pass 3 (Calendar → New Lead):** events in "Dublin Toyota Appts." with no matching `calEventId` on any lead → parse name/phone/description → create lead with `addedBy: 'Giovanni'` and `calEventId` set → if info missing, create placeholder lead flagged for completion
-- Run sync at the start of each conversation or on demand. Deliver a summary: what was pushed, rescheduled, new leads created, placeholders needing completion.
+- **Pass 3 (Calendar → New Lead):** events with no matching `calEventId` on any lead → parse name/phone/description → create lead
+
+There's also a daily inventory scrape routine ("Dublin Toyota - Daily Inventory Scrape") running 6am Pacific — no need to run `scrape_inventory` yourself each morning either, though it's still fine to run on demand if Giovanni asks for a fresh check mid-day.
 
 ## Note Tagging Convention
 - Cowork-added notes: prefix with `[CW YYYY-MM-DD]:` (e.g. `[CW 2026-06-16]: spoke on phone, still interested`)

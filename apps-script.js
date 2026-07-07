@@ -23,7 +23,8 @@ const COLUMNS = [
   'carfaxUrl','edmundsLabel','edmundsBelow','vehicleInfo',
   'vehicleHistory','features','certification','addedDate',
   'lastChecked','fbPostedDate','soldDate','websiteUrl','fbPostedPrice','priceDropped','dis','currentFbPrice','originalPrice','drivePhotoFolder','drivePhotoCount',
-  'appraisedValue','certCost','appraiser'
+  'appraisedValue','certCost','appraiser','isUpcoming',
+  'disp','apprStatus','apprCertified','importBatchTime','importRowOrder'
 ];
 
 const LEADS_COLUMNS = [
@@ -250,71 +251,89 @@ function getAllInventory() {
 // ── Upsert ────────────────────────────────────────────────────
 function upsertMany(cars) {
   if (!cars || !cars.length) return { added: 0, updated: 0 };
-  var sh      = getSheet();
-  var map     = getHeaderMap(sh);
-  var numCols = sh.getLastColumn();
-  var last    = sh.getLastRow();
 
-  var vinCol = map['vin'] + 1;
-  var vinIndex = {};
-  if (last >= 2) {
-    var vins = sh.getRange(2, vinCol, last - 1, 1).getValues();
-    vins.forEach(function(v, i) {
-      var vin = norm(v[0]);
-      if (vin) vinIndex[vin] = i + 2;
-    });
-  }
+  // Reads the full row, merges new values in memory, then writes the full row back --
+  // without a lock, a concurrent updateField()/upsertMany() call touching the same row
+  // between our read and write would get silently overwritten by our stale snapshot.
+  var lock = LockService.getScriptLock();
+  lock.waitLock(30000);
+  try {
+    var sh      = getSheet();
+    var map     = getHeaderMap(sh);
+    var numCols = sh.getLastColumn();
+    var last    = sh.getLastRow();
 
-  var toAppend = [];
-  var toUpdate = [];
-  var added = 0, updated = 0;
-
-  cars.forEach(function(car) {
-    var vin = norm(car.vin);
-    if (!vin) return;
-    var rowData = objToRow(car, map, numCols);
-    if (vinIndex[vin]) {
-      toUpdate.push({ rowNum: vinIndex[vin], rowData: rowData });
-      updated++;
-    } else {
-      toAppend.push(rowData);
-      vinIndex[vin] = last + toAppend.length;
-      added++;
+    var vinCol = map['vin'] + 1;
+    var vinIndex = {};
+    if (last >= 2) {
+      var vins = sh.getRange(2, vinCol, last - 1, 1).getValues();
+      vins.forEach(function(v, i) {
+        var vin = norm(v[0]);
+        if (vin) vinIndex[vin] = i + 2;
+      });
     }
-  });
 
-  toUpdate.forEach(function(item) {
-    var existing = sh.getRange(item.rowNum, 1, 1, numCols).getValues()[0];
-    item.rowData.forEach(function(val, i) {
-      if (val !== '' && val !== null && val !== undefined) existing[i] = val;
+    var toAppend = [];
+    var toUpdate = [];
+    var added = 0, updated = 0;
+
+    cars.forEach(function(car) {
+      var vin = norm(car.vin);
+      if (!vin) return;
+      var rowData = objToRow(car, map, numCols);
+      if (vinIndex[vin]) {
+        toUpdate.push({ rowNum: vinIndex[vin], rowData: rowData });
+        updated++;
+      } else {
+        toAppend.push(rowData);
+        vinIndex[vin] = last + toAppend.length;
+        added++;
+      }
     });
-    sh.getRange(item.rowNum, 1, 1, numCols).setValues([existing]);
-  });
 
-  if (toAppend.length) {
-    sh.getRange(sh.getLastRow() + 1, 1, toAppend.length, numCols).setValues(toAppend);
+    toUpdate.forEach(function(item) {
+      var existing = sh.getRange(item.rowNum, 1, 1, numCols).getValues()[0];
+      item.rowData.forEach(function(val, i) {
+        if (val !== '' && val !== null && val !== undefined) existing[i] = val;
+      });
+      sh.getRange(item.rowNum, 1, 1, numCols).setValues([existing]);
+    });
+
+    if (toAppend.length) {
+      sh.getRange(sh.getLastRow() + 1, 1, toAppend.length, numCols).setValues(toAppend);
+    }
+
+    return { added: added, updated: updated };
+  } finally {
+    lock.releaseLock();
   }
-
-  return { added: added, updated: updated };
 }
 
 // ── Update single field ───────────────────────────────────────
 function updateField(vin, field, value) {
   if (!vin || !field) return { error: 'Missing vin or field' };
-  var sh   = getSheet();
-  var map  = getHeaderMap(sh);
-  var last = sh.getLastRow();
-  if (last < 2) return { error: 'No data' };
-  var vins = sh.getRange(2, map['vin'] + 1, last - 1, 1).getValues();
-  for (var i = 0; i < vins.length; i++) {
-    if (norm(vins[i][0]) === norm(vin)) {
-      var col = map[field];
-      if (col === undefined) return { error: 'Unknown field: ' + field };
-      sh.getRange(i + 2, col + 1).setValue(value);
-      return { ok: true };
+  // Shares upsertMany()'s lock so a single-field edit can never land in the middle of
+  // upsertMany's read-modify-write cycle and get silently reverted by its stale snapshot.
+  var lock = LockService.getScriptLock();
+  lock.waitLock(30000);
+  try {
+    var sh   = getSheet();
+    var map  = getHeaderMap(sh);
+    var last = sh.getLastRow();
+    if (last < 2) return { error: 'No data' };
+    var vins = sh.getRange(2, map['vin'] + 1, last - 1, 1).getValues();
+    for (var i = 0; i < vins.length; i++) {
+      if (norm(vins[i][0]) === norm(vin)) {
+        var col = map[field];
+        if (col === undefined) return { error: 'Unknown field: ' + field };
+        sh.getRange(i + 2, col + 1).setValue(value);
+        return { ok: true };
+      }
     }
+    return { error: 'VIN not found: ' + vin };
+  } finally {
+    lock.releaseLock();
   }
-  return { error: 'VIN not found: ' + vin };
 }
 
 // ── Server-side scraping ──────────────────────────────────────
@@ -841,6 +860,12 @@ function importNewCars(cars, replace) {
 // ── Cost Data Import ──────────────────────────────────────────
 function importCostData(records) {
   if (!records || !records.length) return { updated: 0, notFound: 0 };
+  // Shares upsertMany()'s lock -- row identities (vinIdx/stockIdx) are read once up front
+  // and used to target writes later; a concurrent row insert/update in between would make
+  // those indexes stale.
+  var lock = LockService.getScriptLock();
+  lock.waitLock(30000);
+  try {
   var sh = getSheet();
   var map = getHeaderMap(sh);
   var last = sh.getLastRow();
@@ -865,8 +890,18 @@ function importCostData(records) {
   var updated = 0, stubbed = 0;
   var rowsToWrite = {};
   var stubsToAdd = [];
+  // One shared timestamp for every record in this call -- lets the Upcoming tab sort by
+  // "most recent import batch first, then row order preserved within it" (see mergeImport-
+  // adjacent sort logic in manager.html). Re-stamped on every re-import of a VIN, including
+  // ones that already exist, so a car re-appearing in a fresh export (e.g. it was just
+  // modified in the DMS) jumps back to the top rather than staying stuck under its original
+  // import date.
+  var batchTime = new Date().toISOString();
+  var extraCols = ['disp', 'apprStatus', 'apprCertified', 'importBatchTime', 'importRowOrder'];
+  var extraColIdx = {};
+  extraCols.forEach(function(f) { extraColIdx[f] = map[f]; });
 
-  records.forEach(function(rec) {
+  records.forEach(function(rec, idx) {
     var vin = norm(String(rec.vin || ''));
     var stock = String(rec.stock || '').toUpperCase().replace(/\s/g,'').replace(/^STK/,'');
     var rowIdx = -1;
@@ -886,12 +921,26 @@ function importCostData(records) {
       if (map['price']     !== undefined && rec.price)     stub[map['price']]     = rec.price;
       if (map['appraiser'] !== undefined && rec.appraiser) stub[map['appraiser']] = rec.appraiser;
       if (map['addedDate'] !== undefined) stub[map['addedDate']] = rec.addedDate || new Date().toISOString();
+      // Explicit flag for "not yet graduated to a real listing" -- cleared to false when the
+      // regular used-car CSV import later matches and enriches this VIN (see mergeImport() in
+      // manager.html). Deliberately not inferred from color being blank -- that was fragile.
+      if (map['isUpcoming'] !== undefined) stub[map['isUpcoming']] = true;
+      if (extraColIdx.disp !== undefined)        stub[extraColIdx.disp] = rec.disp || '';
+      if (extraColIdx.apprStatus !== undefined)  stub[extraColIdx.apprStatus] = rec.apprStatus || '';
+      if (extraColIdx.apprCertified !== undefined) stub[extraColIdx.apprCertified] = !!rec.apprCertified;
+      if (extraColIdx.importBatchTime !== undefined) stub[extraColIdx.importBatchTime] = batchTime;
+      if (extraColIdx.importRowOrder !== undefined)  stub[extraColIdx.importRowOrder] = idx;
       stubsToAdd.push(stub);
       stubbed++;
       return;
     }
     data[rowIdx][apprCol] = Number(rec.appraisedValue) || 0;
     data[rowIdx][certCol] = Number(rec.certCost) || 0;
+    if (extraColIdx.disp !== undefined)        data[rowIdx][extraColIdx.disp] = rec.disp || '';
+    if (extraColIdx.apprStatus !== undefined)  data[rowIdx][extraColIdx.apprStatus] = rec.apprStatus || '';
+    if (extraColIdx.apprCertified !== undefined) data[rowIdx][extraColIdx.apprCertified] = !!rec.apprCertified;
+    if (extraColIdx.importBatchTime !== undefined) data[rowIdx][extraColIdx.importBatchTime] = batchTime;
+    if (extraColIdx.importRowOrder !== undefined)  data[rowIdx][extraColIdx.importRowOrder] = idx;
     rowsToWrite[rowIdx] = true;
     updated++;
   });
@@ -900,6 +949,9 @@ function importCostData(records) {
     var i = parseInt(idxStr);
     sh.getRange(i + 2, apprCol + 1).setValue(data[i][apprCol]);
     sh.getRange(i + 2, certCol + 1).setValue(data[i][certCol]);
+    extraCols.forEach(function(f) {
+      if (extraColIdx[f] !== undefined) sh.getRange(i + 2, extraColIdx[f] + 1).setValue(data[i][extraColIdx[f]]);
+    });
   });
 
   if (stubsToAdd.length) {
@@ -907,6 +959,9 @@ function importCostData(records) {
   }
 
   return { updated: updated, stubbed: stubbed };
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 function updateNewCar(vin, field, value) {

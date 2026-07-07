@@ -19,14 +19,23 @@ const SCRIPT_URL  = process.env.SCRIPT_URL  || '';
 const AUTH_TOKEN  = process.env.AUTH_TOKEN  || '';
 const PORT        = process.env.PORT        || 3000;
 
-async function callScript(action, body = {}) {
+async function callScript(action, body = {}, attempt = 1) {
   const response = await fetch(`${SCRIPT_URL}?action=${action}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ action, ...body }),
     redirect: 'follow'
   });
-  return response.json();
+  const text = await response.text();
+  const contentType = response.headers.get('content-type') || '';
+  if (!response.ok || !contentType.includes('application/json')) {
+    if (attempt < 3) {
+      await new Promise(r => setTimeout(r, 500 * attempt));
+      return callScript(action, body, attempt + 1);
+    }
+    throw new Error(`Apps Script returned non-JSON (status ${response.status}) after ${attempt} attempts for action "${action}"`);
+  }
+  return JSON.parse(text);
 }
 
 function getMileageAdder(car) {
@@ -55,6 +64,27 @@ function calcGross(car) {
   return { topGross, bottomGross, totalCost, adder, status };
 }
 
+// A car counts as sold/gone if soldDate is set, fbStatus is 'sold' (real data stores this
+// lowercase -- the old per-call checks compared against 'Sold' and silently never matched),
+// or the website scrape confirms it's no longer listed/available. Cars that are gone from
+// the site but never formally marked sold in fbStatus were slipping through excludeSold
+// checks and could get recommended as available for lead matching.
+// Prefers the DMS-sourced `dis` field (real days-in-stock) over computing from addedDate,
+// which only reflects when a cost-import batch ran -- cars imported in the same batch all
+// share one addedDate and were flattening to identical, often-wrong "days on lot" values.
+// Mirrors the daysOnLot() helper already used in manager.html.
+function daysOnLot(car) {
+  if (car.dis != null && car.dis !== '') return Number(car.dis) || 0;
+  return car.addedDate ? Math.floor((Date.now() - new Date(car.addedDate).getTime()) / 86400000) : 0;
+}
+
+function isSoldOrGone(car) {
+  if (car.soldDate) return true;
+  if ((car.fbStatus || '').toLowerCase() === 'sold') return true;
+  const ws = (car.websiteStatus || '').toLowerCase();
+  return ws.includes('sold') || ws.includes('unavailable') || ws.includes('delist');
+}
+
 function slim(car) {
   const { fbDescription, features, vehicleInfo, vehicleHistory, carfaxUrl, websiteUrl, ...rest } = car;
   return rest;
@@ -75,11 +105,11 @@ function createMcpServer() {
       },
       {
         name: 'scrape_inventory',
-        description: 'Sync inventory with dublintoyota.com — checks current prices, availability, and sold status, then updates the sheet. Run in chunks of 25 (default) to avoid timeouts. Call repeatedly with offset to cover all cars. Returns { scraped, delistCount, errors, total, done } — done:true means all cars covered.',
+        description: 'Sync inventory with dublintoyota.com — checks current prices, availability, and sold status, then updates the sheet. Run in chunks of 15 (default) to avoid timeouts — do not pass a larger limit, each call already does one full sitemap fetch. Call repeatedly with offset to cover all cars. Returns { scraped, newDelistCount, errors, errorMessages, total, done } — newDelistCount is only vehicles newly flagged as delisted this run, not previously-known ones. done:true means all cars covered.',
         inputSchema: {
           type: 'object',
           properties: {
-            limit:  { type: 'number', description: 'Cars to scrape per call (default 25)' },
+            limit:  { type: 'number', description: 'Cars to scrape per call (default 15, do not increase — see tool description)' },
             offset: { type: 'number', description: 'Start from this car index (default 0). Increment by limit each call to page through all inventory.' }
           }
         }
@@ -134,7 +164,8 @@ function createMcpServer() {
         inputSchema: {
           type: 'object',
           properties: {
-            days: { type: 'number', description: 'Days on lot threshold (default 45)' }
+            days: { type: 'number', description: 'Days on lot threshold (default 45)' },
+            limit: { type: 'number', description: 'Max results (default 30)' }
           }
         }
       },
@@ -304,33 +335,46 @@ function createMcpServer() {
       switch (name) {
 
         case 'scrape_inventory': {
-          const limit  = args.limit  || 25;
+          const limit  = args.limit  || 15;
           const offset = args.offset || 0;
 
           const allData = await callScript('getAll');
           const allCars = allData.cars || [];
+          // scrapeVehicles() returns "Check FB — Delist" for any VIN not found in the
+          // sitemap -- including cars already flagged that way from a previous scrape.
+          // Track prior status so we only count NEW delistings, not daily reconfirmations
+          // of already-known ones (otherwise the count balloons with stale backlog).
+          const priorStatusByVin = {};
+          allCars.forEach(c => { if (c.vin) priorStatusByVin[c.vin] = c.websiteStatus || ''; });
+          // isUpcoming stubs (cost-import placeholders not yet matched to a real listing) have
+          // no real web address yet -- scraping them was the root cause of the tab-orphan bug,
+          // giving colorless stub cars a stray website status before they'd actually graduated.
           const vinsToScrape = allCars
-            .filter(c => c.websiteStatus !== 'Sold/Unavailable' && c.fbStatus !== 'sold' && c.vin)
+            .filter(c => c.websiteStatus !== 'Sold/Unavailable' && c.fbStatus !== 'sold' && c.vin && c.isUpcoming !== true)
             .map(c => c.vin);
           if (!vinsToScrape.length) { result = { scraped: 0, total: 0, done: true, message: 'No active vehicles' }; break; }
 
           const chunk = vinsToScrape.slice(offset, offset + limit);
-          const BATCH = 5;
-          let scraped = 0, delistCount = 0, errors = 0;
+          let scraped = 0, newDelistCount = 0, errors = 0;
+          const errorMessages = [];
 
-          for (let i = 0; i < chunk.length; i += BATCH) {
-            const batch = chunk.slice(i, i + BATCH);
-            try {
-              const res = await callScript('scrapeVehicles', { vins: batch });
-              const results = res.results || [];
-              scraped += results.length;
-              delistCount += results.filter(r => (r.websiteStatus || '').includes('Delist')).length;
-              if (results.length) await callScript('upsertMany', { cars: results });
-            } catch (e) { errors++; }
-          }
+          // One scrapeVehicles call per chunk (not sub-batched) — scrapeVehicles refetches
+          // the full site sitemap on every call, so sub-batching multiplied that redundant
+          // fetch 5x per request and was the cause of requests hanging past client timeouts.
+          try {
+            const res = await callScript('scrapeVehicles', { vins: chunk });
+            const results = (res.results || []).map(r => ({ ...r, lastChecked: new Date().toISOString() }));
+            scraped += results.length;
+            newDelistCount += results.filter(r => {
+              const isDelistedNow = (r.websiteStatus || '').includes('Delist');
+              const wasDelistedBefore = (priorStatusByVin[r.vin] || '').includes('Delist');
+              return isDelistedNow && !wasDelistedBefore;
+            }).length;
+            if (results.length) await callScript('upsertMany', { cars: results });
+          } catch (e) { errors++; errorMessages.push(e.message); }
 
           result = {
-            scraped, delistCount, errors,
+            scraped, newDelistCount, errors, errorMessages,
             total: vinsToScrape.length,
             offset, limit,
             done: (offset + limit) >= vinsToScrape.length,
@@ -355,16 +399,12 @@ function createMcpServer() {
             );
           }
 
-          if (args.fbStatus) cars = cars.filter(c => c.fbStatus === args.fbStatus);
-          if (args.excludeSold) cars = cars.filter(c => !c.soldDate && c.fbStatus !== 'Sold');
+          if (args.fbStatus) cars = cars.filter(c => (c.fbStatus||'').toLowerCase() === args.fbStatus.toLowerCase());
+          if (args.excludeSold) cars = cars.filter(c => !isSoldOrGone(c));
           if (args.minPrice) cars = cars.filter(c => Number(c.price) >= args.minPrice);
           if (args.maxPrice) cars = cars.filter(c => Number(c.price) <= args.maxPrice);
           if (args.minDaysOnLot) {
-            const now = Date.now();
-            cars = cars.filter(c => {
-              if (!c.addedDate) return false;
-              return (now - new Date(c.addedDate).getTime()) / 86400000 >= args.minDaysOnLot;
-            });
+            cars = cars.filter(c => daysOnLot(c) >= args.minDaysOnLot);
           }
 
           cars = cars.slice(0, args.limit || 100).map(c => {
@@ -379,16 +419,12 @@ function createMcpServer() {
         case 'get_inventory': {
           const data = await callScript('getAll');
           let cars = data.cars || [];
-          if (args.fbStatus) cars = cars.filter(c => c.fbStatus === args.fbStatus);
-          if (args.excludeSold) cars = cars.filter(c => !c.soldDate && c.fbStatus !== 'Sold');
+          if (args.fbStatus) cars = cars.filter(c => (c.fbStatus||'').toLowerCase() === args.fbStatus.toLowerCase());
+          if (args.excludeSold) cars = cars.filter(c => !isSoldOrGone(c));
           if (args.minPrice) cars = cars.filter(c => Number(c.price) >= args.minPrice);
           if (args.maxPrice) cars = cars.filter(c => Number(c.price) <= args.maxPrice);
           if (args.minDaysOnLot) {
-            const now = Date.now();
-            cars = cars.filter(c => {
-              if (!c.addedDate) return false;
-              return (now - new Date(c.addedDate).getTime()) / 86400000 >= args.minDaysOnLot;
-            });
+            cars = cars.filter(c => daysOnLot(c) >= args.minDaysOnLot);
           }
           cars = cars.slice(0, args.limit || 100).map(slim);
           result = { count: cars.length, cars };
@@ -398,7 +434,7 @@ function createMcpServer() {
         case 'get_high_gross_cars': {
           const data = await callScript('getAll');
           let cars = (data.cars || []).filter(c => Number(c.appraisedValue) > 0);
-          if (!args.includeSold) cars = cars.filter(c => !c.soldDate && c.fbStatus !== 'Sold');
+          if (!args.includeSold) cars = cars.filter(c => !isSoldOrGone(c));
           cars = cars.map(c => ({ ...slim(c), ...calcGross(c) }));
           if (args.minBottomGross) cars = cars.filter(c => c.bottomGross >= args.minBottomGross);
           cars.sort((a, b) => b.topGross - a.topGross);
@@ -410,16 +446,14 @@ function createMcpServer() {
         case 'get_stale_inventory': {
           const days = args.days || 45;
           const data = await callScript('getAll');
-          const now = Date.now();
           const cars = (data.cars || [])
-            .filter(c => c.addedDate && !c.soldDate && c.fbStatus !== 'Sold')
-            .map(c => ({
-              ...slim(c),
-              daysOnLot: Math.floor((now - new Date(c.addedDate).getTime()) / 86400000)
-            }))
+            .filter(c => (c.addedDate || (c.dis != null && c.dis !== '')) && !isSoldOrGone(c))
+            .map(c => ({ ...slim(c), daysOnLot: daysOnLot(c) }))
             .filter(c => c.daysOnLot >= days)
             .sort((a, b) => b.daysOnLot - a.daysOnLot);
-          result = { count: cars.length, cars };
+          const staleTotal = cars.length;
+          const staleLimited = cars.slice(0, args.limit || 30);
+          result = { count: staleLimited.length, totalMatching: staleTotal, cars: staleLimited };
           break;
         }
 
@@ -497,12 +531,10 @@ function createMcpServer() {
 
         case 'get_upcoming_inventory': {
           const data = await callScript('getAll');
-          const ws = c => (c.websiteStatus || '').toLowerCase();
-          let upcoming = (data.cars || []).filter(c =>
-            Number(c.appraisedValue || 0) > 0 && !c.color &&
-            !ws(c).includes('live') && !ws(c).includes('sold') &&
-            !ws(c).includes('delist') && c.fbStatus !== 'sold'
-          );
+          // isUpcoming is an explicit flag stamped by importCostData() on stub creation and
+          // cleared by the regular used-car CSV import once the VIN is matched/enriched --
+          // not inferred from color/websiteStatus, which was fragile.
+          let upcoming = (data.cars || []).filter(c => c.isUpcoming === true);
           if (args.query) {
             const q = args.query.toLowerCase();
             upcoming = upcoming.filter(c =>
