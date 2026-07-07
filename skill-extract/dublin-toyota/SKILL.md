@@ -117,22 +117,121 @@ If the lead comes with an appointment date/time:
 
 ### 9. Report Back
 
-Always use this format after adding a lead:
+Always use this format after adding a lead. Each car gets its own card. All comments go in one block at the bottom — never mixed into the car cards.
 
 ```
 ✅ [First Last] | [Source] | First contact: Giovanni (assumed — let me know if wrong)
 
-P1: [Year Make Model] · [Stock] · $[Price]
-    [🔴/🟡/🟢] Top $X / Bottom $X · Commission ~$X
-P2: [Year Make Model] · [Stock] · $[Price]
-    [🔴/🟡/🟢] Top $X / Bottom $X · Commission ~$X
-P3: [Year Make Model] · [Stock] · $[Price]
-    [🔴/🟡/🟢] Top $X / Bottom $X · Commission ~$X
+P1 · Stock [XXXXX]
+[Year Make Model] · [Color] · [Miles] mi
+$[Price] · GP: $[topGross] top / $[bottomGross] bottom · ~$[commission] commission [🔴/🟡/🟢]
+[websiteUrl — or "not listed yet" if blank]
 
-💡 [Handling suggestion]
-📝 Notes saved: [summary]
-📅 Appointment: [date/time] — calendar event created ✓  (or: no appointment set)
+P2 · Stock [XXXXX]
+[Year Make Model] · [Color] · [Miles] mi
+$[Price] · GP: $[topGross] top / $[bottomGross] bottom · ~$[commission] commission [🔴/🟡/🟢]
+[websiteUrl — or "not listed yet" if blank]
+
+P3 · Stock [XXXXX]
+[Year Make Model] · [Color] · [Miles] mi
+$[Price] · GP: $[topGross] top / $[bottomGross] bottom · ~$[commission] commission [🔴/🟡/🟢]
+[websiteUrl — or "not listed yet" if blank]
+
+──────────
+💡 [Handling suggestion — read urgency, budget, gross signals, recommend which car to lead with]
+📝 Notes saved: [what was captured]
+📅 Appointment: [date/time] ✓  (or: no appointment set)
 ```
+
+Always include the `websiteUrl` from the car record. If it's blank or null, write "not listed yet."
+
+---
+
+## Lot Up Workflow — "lu" Trigger
+
+When Giovanni says **"lu"** (any case, anywhere in message), start a lot customer session.
+
+### Step 1 — One Question Only
+Ask: **"Used, new, or both?"** — nothing else. Let Giovanni drive from here.
+
+### Step 2 — Car Shopping (as he walks the lot)
+Giovanni will send stock photos or type stock numbers as he looks at cars. For each one:
+1. Call `get_car` to pull the record
+2. Run gross calc + note days on lot
+3. Return the quick card format (same as gc shortcut) — no lead questions, no workflow
+
+Build up the list silently. No commitment yet — just information as he goes.
+
+### Step 3 — Test Drive / Focus
+When Giovanni says **"focus"** or sends a screenshot of a focus entry:
+- Extract first name, last name, phone from what he gives you
+- Ask for lead source if not clear (FB Marketplace, FB Ad, or Lot)
+- Create the lead with all cars looked at so far linked as vehicleList (first car = P1)
+- Set `inFocus: true` on the lead
+
+### Step 4 — Resolution
+
+**"sold"** → mark the lead sold, done. Report confirmation.
+
+**"bb"** → Be Back flow:
+1. Ask Giovanni for closing notes — one prompt:
+   > "Closing notes: What do they want specifically, timeframe, when are they coming back, who else needs to be involved?"
+2. Save closing notes to lead with `[CW YYYY-MM-DD]:` prefix
+3. Draft the BB text immediately (see below) — Giovanni copies and sends as the customer walks out
+4. Close the session
+
+**"no car"** → set `vehicleNotAvailable: true`, save what they wanted to notes (model, year, price range, mileage, color, powertrain), close session
+
+---
+
+### Be Back Text Template
+
+After closing a `bb`, always draft this text for Giovanni to send:
+
+```
+Hey [First]! Great meeting you today at Dublin Toyota.
+
+Here's a quick summary of what we talked about — and my contact info so you have it.
+
+🚗 We looked at: [car(s) from vehicleList — Year Make Model, color]
+📋 What you're looking for: [summary of their wants from closing notes]
+📅 [Timeframe / when coming back if mentioned]
+
+Reach out anytime — I'm here to help make it easy.
+
+Giovanni Galasso
+Dublin Toyota
+(925) 577-7034
+```
+
+Label it clearly: **"Text to send [First]:"** so Giovanni knows to copy and send it.
+
+---
+
+## Quick Gross Check — "gc" Shortcut
+
+When Giovanni's message contains **"gc"** (anywhere, any case) along with one or more stock numbers or VINs, skip the entire lead workflow and run a quick gross check only.
+
+Triggers (all equivalent):
+- `gc T50647A`
+- `T50647A gc`
+- `gc T50647A 31660A 31673A` (multiple)
+- `GC t50647a`
+
+For each stock number / VIN:
+1. Call `get_car` to pull the record
+2. Calculate gross using the standard formula
+3. Return one card per car, nothing else — no lead questions, no P2/P3, no handling suggestions
+
+**Card format:**
+```
+Stock [XXXXX]
+[Year Make Model] · [Color] · [Miles] mi
+$[Price] · GP: $[topGross] top / $[bottomGross] bottom · ~$[commission] commission [🔴/🟡/🟢]
+[websiteUrl — or "not listed yet" if blank]
+```
+
+If `appraisedValue` is missing or 0, return: `GP: no cost data`
 
 ---
 
