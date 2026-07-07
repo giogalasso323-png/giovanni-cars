@@ -5,8 +5,14 @@
 ---
 
 ## Current Work
-_Hermes Agent setup on Railway — paused mid-setup, blocked by upstream bugs (not our config). Picking back up: see status below before touching it again._
+_Self-hosted AI agent (Hermes / OpenClaw) attempts on Railway — both paused mid-setup, both blocked by real upstream bugs (not our config). Two platforms, two blocking bugs, same night — see status below before trying a third._
 - _"Command Center" — unified dashboard aggregating inventory/leads/calendar + a shared activity feed that Hermes/Cowork/scheduled routines could all write into. Naming settled ("Command Center"), scope not finalized — a separate conversation on the laptop proposed a different phasing (Gmail/Calendar MCP → chat in manager.html → Hermes hub) that hasn't been reconciled with this one yet. Ask Giovanni which framing to run with before building either._
+
+### OpenClaw setup on Railway — also paused 2026-07-07, blocked on a template bug
+Tried right after shelving Hermes (see below), using the `codetitlan/openclaw-railway-template` one-click Railway template (separate new project, `openclaw-production-36f8.up.railway.app`). Progress made: deployed fine, logged into the setup wizard (note: username field is ignored/decorative, only `SETUP_PASSWORD` matters — and the password typed into Railway's pre-deploy config screen didn't actually save, had to pull the real auto-generated value from Railway's Variables tab instead), picked Anthropic as provider, model `anthropic/claude-sonnet-5`, entered the same Telegram bot token.
+**Blocked on**: clicking "Run Setup" crashes with `Error: Cannot find module '/app/node'` (`MODULE_NOT_FOUND`, `[setup] Onboarding exit=1 configured=false`). Root cause looks like this specific template's `OPENCLAW_ENTRY` env var is misconfigured — it's set to the literal string `"node"`, and the startup script appears to do something like `require('/app/' + OPENCLAW_ENTRY)` instead of using it as "run with the node interpreter," so it tries to load a nonexistent module path. This looks like a bug in this particular community-maintained template, not OpenClaw itself — several other OpenClaw Railway templates exist from different maintainers (arjunkomath, vignesh07, bb-claw, derekcheungsa, Dovekey) that weren't tried.
+**Decision point for next time**: try a different OpenClaw template, or fix `OPENCLAW_ENTRY` by hand (needs checking this template's actual source repo for the correct entry file path — not yet investigated).
+**Cost note**: this `openclaw` Railway service is still deployed and running right now, same as the Hermes one — if not picking this back up soon, worth pausing/deleting both services in Railway so they're not quietly accruing usage cost while idle.
 
 ### Hermes Agent on Railway — paused 2026-07-07, blocked on upstream bugs
 Deployed via Railway's official template (`railway.com/deploy/hermes-agent-nousresearch`), new separate project from the MCP server. Progress made:
