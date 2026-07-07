@@ -5,6 +5,8 @@
 
 const SHEET_NAME = 'Inventory';
 const NEW_INV_SHEET = 'New Inventory';
+const SPREADSHEET_ID = '1j0UuQEmmctzNPS3mQoLQGv2lNXlDCVb3Pjh3Q0dJQ30';
+function getSpreadsheet() { return SpreadsheetApp.openById(SPREADSHEET_ID); }
 
 const NEW_INV_COLUMNS = [
   'vin','year','modelName','modelCode','stock','category',
@@ -86,7 +88,7 @@ function jsonResponse(data) {
 
 // ── Leads Sheet ───────────────────────────────────────────────
 function getLeadsSheet() {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var ss = getSpreadsheet();
   var sh = ss.getSheetByName('Leads');
   if (!sh) {
     sh = ss.insertSheet('Leads');
@@ -121,7 +123,7 @@ function deleteLead(rowIndex) {
 
 // ── Settings Sheet ────────────────────────────────────────────
 function getSettingsSheet() {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var ss = getSpreadsheet();
   var sh = ss.getSheetByName('Settings');
   if (!sh) {
     sh = ss.insertSheet('Settings');
@@ -207,7 +209,7 @@ function updateLead(rowIndex, field, value) {
 
 // ── Inventory Sheet ───────────────────────────────────────────
 function getSheet() {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var ss = getSpreadsheet();
   var sh = ss.getSheetByName(SHEET_NAME);
   if (!sh) {
     sh = ss.insertSheet(SHEET_NAME);
@@ -785,7 +787,7 @@ function parseNewVehiclePage(html, vehicleUrl) {
 }
 
 function getNewInventory() {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var ss = getSpreadsheet();
   var sh = ss.getSheetByName(NEW_INV_SHEET);
   if (!sh) return { cars: [] };
   var last = sh.getLastRow();
@@ -811,7 +813,7 @@ function getNewInventory() {
 
 function importNewCars(cars, replace) {
   if (!cars || !cars.length) return { imported: 0 };
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var ss = getSpreadsheet();
   var sh = ss.getSheetByName(NEW_INV_SHEET);
   if (!sh) {
     sh = ss.insertSheet(NEW_INV_SHEET);
@@ -911,7 +913,7 @@ function updateNewCar(vin, field, value) {
   if (!vin || !field) return { error: 'Missing vin or field' };
   var col = NEW_INV_COLUMNS.indexOf(field);
   if (col < 0) return { error: 'Unknown field: ' + field };
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var ss = getSpreadsheet();
   var sh = ss.getSheetByName(NEW_INV_SHEET);
   if (!sh) return { error: 'Sheet not found' };
   var last = sh.getLastRow();
