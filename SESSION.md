@@ -35,6 +35,20 @@ Deployed via Railway's official template (`railway.com/deploy/hermes-agent-nousr
 
 ---
 
+## Recently Completed (2026-07-07 — laptop session)
+
+**Cross-machine sync resolved:**
+- Laptop had been behind since 2026-06-29 (22 commits on origin it didn't have). Committed the local `getSpreadsheet()` fix + `dublin-toyota.skill` + `facebook-posts-2026-06-23.md`, fetched, merged cleanly (no conflicts), pushed. Desktop and laptop are now fully in sync at `3ceb801`.
+
+**Research session (no code changes):**
+- Hermes Agent — researched in depth: persistent memory (3-layer), YOLO mode for permissions, Railway deployment templates, local Ollama setup on 5070 Ti (Mistral Small 24B recommended). Confirmed RTX 5070 Ti = 16GB VRAM, fits Mistral 24B at Q4.
+- Cross-machine building: established that Railway-hosted Hermes is edit-from-anywhere via git (same as MCP server), whereas local Hermes requires Tailscale to reach from laptop/phone.
+- Claude Managed Agents — Anthropic's native equivalent (persistent memory, cron scheduling, "Dreaming" self-improving memory). Public beta April 2026. API-level/platform product, not on $20 Pro plan.
+- GoHighLevel — full CRM/marketing platform, automotive dealership templates, official MCP server (21 tools, roadmap 250+). $97/month minimum + SMS usage. Powerful for automated follow-ups + two-way texting but expensive for one salesperson.
+- Unified dashboard ("Command Center") — three-phase approach proposed from laptop: (1) Gmail + Google Calendar MCP into Cowork, (2) AI chat panel embedded in manager.html, (3) Hermes dashboard as long-term hub. Not yet reconciled with the desktop's framing — see Current Work above.
+
+---
+
 ## Recently Completed (2026-07-05 to 07-07)
 
 **isUpcoming migration + Upcoming tab overhaul:**
