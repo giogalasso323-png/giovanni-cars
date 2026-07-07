@@ -5,9 +5,25 @@
 ---
 
 ## Current Work
-_Nothing in progress. Two open threads under discussion (not started building):_
-- _Whether to stand up Hermes Agent (self-hosted, Nous Research) for SMS/Telegram/WhatsApp access to the same MCP tools, powered by Claude via a separate Anthropic API key. Researched, not decided._
-- _A "Command Center" — unified dashboard aggregating inventory/leads/calendar + a shared activity feed that Hermes/Cowork/scheduled routines could all write into. Naming settled ("Command Center"), scope not finalized — a separate conversation on the laptop proposed a different phasing (Gmail/Calendar MCP → chat in manager.html → Hermes hub) that hasn't been reconciled with this one yet. Ask Giovanni which framing to run with before building either._
+_Hermes Agent setup on Railway — paused mid-setup, blocked by upstream bugs (not our config). Picking back up: see status below before touching it again._
+- _"Command Center" — unified dashboard aggregating inventory/leads/calendar + a shared activity feed that Hermes/Cowork/scheduled routines could all write into. Naming settled ("Command Center"), scope not finalized — a separate conversation on the laptop proposed a different phasing (Gmail/Calendar MCP → chat in manager.html → Hermes hub) that hasn't been reconciled with this one yet. Ask Giovanni which framing to run with before building either._
+
+### Hermes Agent on Railway — paused 2026-07-07, blocked on upstream bugs
+Deployed via Railway's official template (`railway.com/deploy/hermes-agent-nousresearch`), new separate project from the MCP server. Progress made:
+- Dashboard username/password set, deployed successfully, public URL live at `hermes-agent-production-ce01.up.railway.app`
+- Anthropic API key added (separate ~$20 prepaid credit, own billing, not tied to claude.ai subscription) and confirmed saved
+- Model set to `claude-sonnet-5` via Anthropic (both in dashboard Settings and via CLI `hermes model`)
+- Telegram bot created via @BotFather, token entered, channel shows "2 of 31 configured"
+- `GATEWAY_ALLOW_ALL_USERS` left at its template default (`true`) — **not yet locked down to Giovanni's Telegram user ID only**, worth fixing before this goes live for real, since anyone finding the bot's username could currently use it against dealership data
+
+**Three real upstream bugs hit in a row (confirmed via GitHub issues, not our misconfiguration):**
+1. Hermes dashboard crashes (`NotImplementedError: BasicAuthProvider is password-only`) on any admin action (Restart Gateway, Save channel config) when using basic username/password auth on a non-loopback (remote/Railway) deployment. Known, unfixed upstream (GitHub #57294 + 5 duplicate issues). Workaround found: use Railway's own service-level Restart (Deployments tab → ⋮ → Restart) instead of Hermes's in-dashboard button — that bypasses the buggy code path.
+2. Tried pinning an older Docker image tag (`v2026.6.19`) hoping to dodge bug #1 — made things worse (container now gets SIGTERM'd by Railway almost immediately after boot, total failure). Reverted back to `latest`, which returned to the "mostly works, specific actions crash" state from bug #1.
+3. **Currently blocking**: sending a Telegram message returns "provider authentication failed." Root cause confirmed via request debug dump: when Hermes can't cleanly resolve the Anthropic credential on the direct-Anthropic adapter, it silently falls back to a broken OpenAI-style request (`POST https://api.anthropic.com/chat/completions` instead of the real `/v1/messages`, with `Authorization: Bearer None`) instead of erroring clearly. Known, unfixed upstream (GitHub #12905, #54206) — a related PR (#54221) exists but its merge status is unclear, no fix timeline found. **Confirmed this bug is deployment-agnostic — it would also hit a local/desktop Hermes install, not just Railway**, since it's a credential-resolution bug in request-building, not a network/binding issue (unlike bug #1, which specifically requires non-loopback binding).
+
+**Not yet tried:** switching the provider from direct Anthropic to **OpenRouter** (a real OpenAI-style `/chat/completions` API) and selecting Claude through that instead — since bug #3 is specifically about the direct-Anthropic adapter using the wrong endpoint shape, routing through OpenRouter (which genuinely uses that endpoint shape) would likely sidestep it entirely. Requires a separate OpenRouter account/API key/billing. This is the most promising next step if picking this back up.
+
+**Decision point for next time:** try the OpenRouter route, wait for upstream fixes to bugs #1/#3 and retry direct Anthropic, or shelve Hermes entirely. Not decided — Giovanni paused here after hitting three real bugs in one sitting, reasonably frustrated with the state of the software tonight.
 
 **Cross-machine note:** Giovanni works from this desktop and a separate work laptop, each with its own independent git clone AND its own independent Claude Code memory — memory does not sync between machines, only this file (and code) does via git. `git pull` before starting work on either machine; update this file before ending a session that had real changes.
 
