@@ -5,14 +5,25 @@
 ---
 
 ## Current Work
-_Self-hosted AI agent (Hermes / OpenClaw) attempts on Railway — both paused mid-setup, both blocked by real upstream bugs (not our config). Two platforms, two blocking bugs, same night — see status below before trying a third._
-- _"Command Center" — unified dashboard aggregating inventory/leads/calendar + a shared activity feed that Hermes/Cowork/scheduled routines could all write into. Naming settled ("Command Center"), scope not finalized — a separate conversation on the laptop proposed a different phasing (Gmail/Calendar MCP → chat in manager.html → Hermes hub) that hasn't been reconciled with this one yet. Ask Giovanni which framing to run with before building either._
+_Nothing in progress — OpenClaw is live as of 2026-07-07. Test calendar `calEventId` write-back (creates event + writes ID back to lead) and confirm it works end-to-end before relying on it._
 
-### OpenClaw setup on Railway — also paused 2026-07-07, blocked on a template bug
-Tried right after shelving Hermes (see below), using the `codetitlan/openclaw-railway-template` one-click Railway template (separate new project, `openclaw-production-36f8.up.railway.app`). Progress made: deployed fine, logged into the setup wizard (note: username field is ignored/decorative, only `SETUP_PASSWORD` matters — and the password typed into Railway's pre-deploy config screen didn't actually save, had to pull the real auto-generated value from Railway's Variables tab instead), picked Anthropic as provider, model `anthropic/claude-sonnet-5`, entered the same Telegram bot token.
-**Blocked on**: clicking "Run Setup" crashes with `Error: Cannot find module '/app/node'` (`MODULE_NOT_FOUND`, `[setup] Onboarding exit=1 configured=false`). Root cause looks like this specific template's `OPENCLAW_ENTRY` env var is misconfigured — it's set to the literal string `"node"`, and the startup script appears to do something like `require('/app/' + OPENCLAW_ENTRY)` instead of using it as "run with the node interpreter," so it tries to load a nonexistent module path. This looks like a bug in this particular community-maintained template, not OpenClaw itself — several other OpenClaw Railway templates exist from different maintainers (arjunkomath, vignesh07, bb-claw, derekcheungsa, Dovekey) that weren't tried.
-**Decision point for next time**: try a different OpenClaw template, or fix `OPENCLAW_ENTRY` by hand (needs checking this template's actual source repo for the correct entry file path — not yet investigated).
-**Cost note**: this `openclaw` Railway service is still deployed and running right now, same as the Hermes one — if not picking this back up soon, worth pausing/deleting both services in Railway so they're not quietly accruing usage cost while idle.
+### OpenClaw on Railway — LIVE 2026-07-07 ✓
+Fully working Telegram bot connected to Dublin Toyota MCP server + full Cowork skill installed.
+- URL: `openclaw-production-36f8.up.railway.app`
+- Telegram bot: token `8826631621:AAGfdu9ivfm0PD1C9KjDFwGqhhaRgwa7sbU`
+- Model: `anthropic/claude-sonnet-4-6`
+- MCP server: `https://dublin-toyota-inventory-production.up.railway.app/mcp` (18 tools, streamable-http)
+- Skill: `dublin-toyota` installed at `/data/workspace/skills/dublin-toyota`
+- Access control: approval-based (users must request access, Giovanni approves via `openclaw pairing approve telegram <code>`)
+
+**Setup bugs worked around (for reference if re-deploying):**
+1. `OPENCLAW_ENTRY` env var set to `"node"` by template → delete it entirely from Railway Variables
+2. Setup wizard writes wrong model prefix (`openai/claude-sonnet-4-6`) → fix with `openclaw config set agents.defaults.model.primary anthropic/claude-sonnet-4-6`
+3. Setup wizard adds invalid `streamMode` to Telegram config → use `openclaw channels add --channel telegram --token <token>` instead
+4. Skill install: `.skill` file is a ZIP → download + unzip + `openclaw skills install /tmp/dublin-toyota --as dublin-toyota`
+5. Web Control UI doesn't work from browser (gateway bound to loopback) → expected, use Telegram instead
+
+**Still to verify:** calendar `calEventId` write-back (create event + write ID to lead in one flow)
 
 ### Hermes Agent on Railway — paused 2026-07-07, blocked on upstream bugs
 Deployed via Railway's official template (`railway.com/deploy/hermes-agent-nousresearch`), new separate project from the MCP server. Progress made:
