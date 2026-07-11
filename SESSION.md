@@ -5,16 +5,36 @@
 ---
 
 ## Current Work
-_Nothing in progress — OpenClaw is live as of 2026-07-07. Test calendar `calEventId` write-back (creates event + writes ID back to lead) and confirm it works end-to-end before relying on it._
 
-### OpenClaw on Railway — LIVE 2026-07-07 ✓
-Fully working Telegram bot connected to Dublin Toyota MCP server + full Cowork skill installed.
-- URL: `openclaw-production-36f8.up.railway.app`
+### Discord Bot — SCOPED, NOT BUILT YET
+Next build: Discord bot on always-on home PC that relays messages to Claude Code.
+- Different Discord channels = different agent contexts (#cowork, #briefing, #alerts, #inventory)
+- No timeout issue (Discord message listener uses persistent WebSocket, unlike Telegram's 60s webhook)
+- Uses Pro subscription (flat rate), not Anthropic API key — no per-token cost
+- Bot runs locally on PC alongside Claude Code, no Railway needed
+- Long responses split into chunks (Discord 2000 char limit per message)
+- **Not started** — scope the build next session on desktop
+
+### OpenClaw — BACK BURNERED 2026-07-11
+Paused due to API cost ($10/day testing). Plan: revisit when running a local model (Mistral Small 24B on RTX 5070 Ti gaming PC). For now, Cowork stays on Claude.ai web.
+- URL: `openclaw-production-36f8.up.railway.app` (still deployed, just not actively used)
 - Telegram bot: token `8826631621:AAGfdu9ivfm0PD1C9KjDFwGqhhaRgwa7sbU`
-- Model: `anthropic/claude-sonnet-4-6`
+- Model: `anthropic/claude-sonnet-4-6` ← must stay Sonnet; Haiku does not follow skill instructions reliably
 - MCP server: `https://dublin-toyota-inventory-production.up.railway.app/mcp` (18 tools, streamable-http)
 - Skill: `dublin-toyota` installed at `/data/workspace/skills/dublin-toyota`
 - Access control: approval-based (users must request access, Giovanni approves via `openclaw pairing approve telegram <code>`)
+
+**Skill update process (when SKILL.md changes):**
+1. Edit `skill-extract/dublin-toyota/SKILL.md` locally
+2. `MSYS_NO_PATHCONV=1 railway volume files -v openclaw-volume upload ./skill-extract/dublin-toyota/SKILL.md /workspace/skills/dublin-toyota/SKILL.md --overwrite`
+3. `railway redeploy --service openclaw --yes`
+(No need to repackage the .skill zip — upload directly to the volume)
+
+**lup trigger — how it works:**
+- Skill description includes "lup" as a keyword so the skill activates on it
+- Shortcut `lup` fires and sends an explicit prompt so Sonnet knows exactly what to do
+- Do NOT use `/lup` (Telegram slash command format) — it creates a session conflict in OpenClaw
+- Do NOT switch to Haiku — it ignores skill instructions
 
 **Setup bugs worked around (for reference if re-deploying):**
 1. `OPENCLAW_ENTRY` env var set to `"node"` by template → delete it entirely from Railway Variables
@@ -43,6 +63,33 @@ Deployed via Railway's official template (`railway.com/deploy/hermes-agent-nousr
 **Decision point for next time:** try the OpenRouter route, wait for upstream fixes to bugs #1/#3 and retry direct Anthropic, or shelve Hermes entirely. Not decided — Giovanni paused here after hitting three real bugs in one sitting, reasonably frustrated with the state of the software tonight.
 
 **Cross-machine note:** Giovanni works from this desktop and a separate work laptop, each with its own independent git clone AND its own independent Claude Code memory — memory does not sync between machines, only this file (and code) does via git. `git pull` before starting work on either machine; update this file before ending a session that had real changes.
+
+---
+
+## Recently Completed (2026-07-11 — desktop session)
+
+**Claude.ai project instructions fully rebuilt:**
+- Merged OpenClaw SKILL.md changes into Claude.ai project instructions
+- Added: Stock Number Guide, lup workflow, gc trigger, Be Back text template, appointment rescheduling, inventory matching with linking + follow-up draft
+- Added: Car Availability Rules — "Check FB — Delist" = 99% sold, never recommend. Upcoming = flag as "coming soon" not P2/P3. Always pass `excludeSold: true` for P2/P3 searches.
+- Added: Non-Toyota make fallback — if brand search returns 0, search by model name; if still 0, search "other"
+- Updated P2/P3 report cards to show ✅ On Lot / ⏳ Coming Soon label
+- Removed get_high_gross_cars from tools list (use search_inventory by model instead)
+- Desktop instructions saved to `new-project-instructions.txt` on Desktop for reference
+
+**MCP server fixes (deployed to Railway):**
+- Raised search_inventory + get_inventory default limit from 100 → 2000 — was silently missing cars beyond position 100
+- Simulation confirmed: Outback search by model name now works, brand name search returns 0 as expected (make = "Other" is a DMS data issue, not fixable here)
+
+**Architecture decisions:**
+- OpenClaw back-burnered — API costs too high ($10/day). Cowork stays on Claude.ai web.
+- Local model (Mistral 24B on 5070 Ti) ruled out for skill-following tasks — same reliability as Haiku, which already fails skill instructions
+- Claude Pro flat rate beats API key for cost. Always-on PC + Claude Code = scheduled automation; Claude.ai mobile = interactive use on the lot.
+- Discord bot concept scoped as next build — channels as agent contexts, no timeout issue, no API costs
+
+**Memories saved:**
+- `project_new_inventory_roadmap.md` — CSV upload stale, future = website scrape
+- `project_battle_station.md` — daily dashboard concept, channel ideas, subagent architecture notes
 
 ---
 
