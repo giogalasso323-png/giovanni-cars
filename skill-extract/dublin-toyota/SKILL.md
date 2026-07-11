@@ -49,6 +49,25 @@ Work calendar name: **Dublin Toyota Appts.** — always use this calendar for ap
 
 Inventory responses are large — always filter by model/status in your reasoning rather than reading raw output directly.
 
+## Car Availability Rules
+
+Always apply these rules before recommending any car. Never recommend a car that is sold or unavailable.
+
+| Signal | Meaning | What to do |
+|---|---|---|
+| `websiteStatus` = "Live" | On the lot, for sale right now | ✅ Recommend freely |
+| `isUpcoming` = true | Pre-lot — appraised but not on the website yet | ⏳ Flag as "coming soon" — not available today |
+| `websiteStatus` includes "Delist" | Off website — 99% sold by another rep, pending Facebook cleanup | ❌ Treat as sold — never recommend |
+| `fbStatus` = "sold" / "Sold" | Confirmed sold | ❌ Never recommend |
+| `soldDate` is set | Confirmed sold | ❌ Never recommend |
+| `websiteStatus` includes "sold" or "unavailable" | Confirmed sold/gone | ❌ Never recommend |
+
+**Always pass `excludeSold: true`** when calling `search_inventory` or `get_inventory` for P2/P3 or any availability check. This filters out sold, delisted, and unavailable cars at the server level.
+
+After filtering, further prioritize by:
+1. `websiteStatus` = "Live" → on the lot now, safest recommendation
+2. `isUpcoming` = true → mention separately as "coming soon, not on lot yet"
+
 ---
 
 ## Lead Processing Workflow
@@ -93,17 +112,20 @@ Look up the car that brought this customer in:
 
 **MANDATORY — do not call `add_lead` until this is done.**
 
-Call `search_inventory` with the model name as the query. From the results, filter out sold cars and pick the one with the highest top gross (price − appraisedValue − $2,500 recon/detail − certCost).
+Call `search_inventory` with the model name as the query and `excludeSold: true`. From the results:
+- Prefer cars where `websiteStatus` = "Live" — these are confirmed on the lot
+- Pick the one with the highest top gross (price − appraisedValue − $2,500 recon/detail − certCost)
+- If the best gross option is an Upcoming car (`isUpcoming` = true), note it separately — don't use it as P2, flag it as "coming soon"
 
 The goal is to upsell: same model family, best money in stock — that's Position 2.
 
-Example: Position 1 is a 2021 RAV4 Hybrid → call `search_inventory` for "RAV4" → pick the highest-gross available RAV4.
+Example: Position 1 is a 2021 RAV4 Hybrid → call `search_inventory` for "RAV4" with `excludeSold: true` → prefer Live cars → pick highest-gross available RAV4.
 
 ### 6. Find Position 3 — Best Profit, Closest Match
 
 **MANDATORY — do not call `add_lead` until this is done.**
 
-From the same `search_inventory` results, find the car that most closely matches Position 1 but has more gross than Position 1.
+From the same `search_inventory` results (same call, `excludeSold: true`), find the Live car that most closely matches Position 1 but has more gross than Position 1.
 
 Match priority (in order):
 1. Same model family
@@ -113,6 +135,8 @@ Match priority (in order):
 5. Same color or trim level
 
 If no close match with better gross exists, use the closest match available and note it. Always fill all three positions before proceeding.
+
+**If an Upcoming car is a strong match:** don't put it in P2/P3, but add a note at the bottom of the report: "⏳ Coming soon: [Stock] [Year Make Model] — not on lot yet, could be a fit."
 
 ### 7. Add the Lead
 
@@ -148,12 +172,12 @@ P1 · Stock [XXXXX]
 $[Price] · GP: $[topGross] top / $[bottomGross] bottom · ~$[commission] commission [🔴/🟡/🟢]
 [websiteUrl — or "not listed yet" if blank]
 
-P2 · Stock [XXXXX]
+P2 · Stock [XXXXX] · [✅ On Lot / ⏳ Coming Soon]
 [Year Make Model] · [Color] · [Miles] mi
 $[Price] · GP: $[topGross] top / $[bottomGross] bottom · ~$[commission] commission [🔴/🟡/🟢]
 [websiteUrl — or "not listed yet" if blank]
 
-P3 · Stock [XXXXX]
+P3 · Stock [XXXXX] · [✅ On Lot / ⏳ Coming Soon]
 [Year Make Model] · [Color] · [Miles] mi
 $[Price] · GP: $[topGross] top / $[bottomGross] bottom · ~$[commission] commission [🔴/🟡/🟢]
 [websiteUrl — or "not listed yet" if blank]
@@ -162,9 +186,11 @@ $[Price] · GP: $[topGross] top / $[bottomGross] bottom · ~$[commission] commis
 💡 [Handling suggestion — read urgency, budget, gross signals, recommend which car to lead with]
 📝 Notes saved: [what was captured]
 📅 Appointment: [date/time] ✓  (or: no appointment set)
+⏳ Coming soon: [Stock] [Year Make Model] — not on lot yet, could be a fit (only if applicable)
 ```
 
 Always include the `websiteUrl` from the car record. If it's blank or null, write "not listed yet."
+Availability label on P2/P3: "✅ On Lot" if `websiteStatus` = "Live", "⏳ Coming Soon" if `isUpcoming` = true.
 
 ---
 
