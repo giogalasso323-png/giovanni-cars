@@ -127,7 +127,7 @@ function createMcpServer() {
             maxPrice: { type: 'number' },
             minDaysOnLot: { type: 'number' },
             withGross: { type: 'boolean', description: 'Set true to include gross profit calculation for each car' },
-            limit: { type: 'number', description: 'Max results (default 100)' }
+            limit: { type: 'number', description: 'Max results (default 2000 — returns full inventory)' }
           }
         }
       },
@@ -142,7 +142,7 @@ function createMcpServer() {
             minPrice: { type: 'number' },
             maxPrice: { type: 'number' },
             minDaysOnLot: { type: 'number', description: 'Cars sitting at least this many days' },
-            limit: { type: 'number', description: 'Max results (default 100)' }
+            limit: { type: 'number', description: 'Max results (default 2000 — returns full inventory)' }
           }
         }
       },
@@ -407,7 +407,7 @@ function createMcpServer() {
             cars = cars.filter(c => daysOnLot(c) >= args.minDaysOnLot);
           }
 
-          cars = cars.slice(0, args.limit || 100).map(c => {
+          cars = cars.slice(0, args.limit || 2000).map(c => {
             const s = slim(c);
             return args.withGross && Number(c.appraisedValue) > 0 ? { ...s, ...calcGross(c) } : s;
           });
@@ -426,7 +426,7 @@ function createMcpServer() {
           if (args.minDaysOnLot) {
             cars = cars.filter(c => daysOnLot(c) >= args.minDaysOnLot);
           }
-          cars = cars.slice(0, args.limit || 100).map(slim);
+          cars = cars.slice(0, args.limit || 2000).map(slim);
           result = { count: cars.length, cars };
           break;
         }
