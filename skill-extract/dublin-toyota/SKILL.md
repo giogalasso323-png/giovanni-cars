@@ -1,12 +1,13 @@
 ---
 name: dublin-toyota
-description: Dublin Toyota dealership assistant for Giovanni Galasso. Use this skill for ANY Dublin Toyota task — lead processing from FB Marketplace, FB Ad, or lot conversations; CRM updates; inventory lookups; gross profit and commission analysis; vehicle linking; or notes on customers. Trigger whenever Giovanni shares a customer message, phone number, stock number, VIN, FB Marketplace screenshot, or asks about cars, leads, gross profit, commission, or anything dealership-related. If there's a customer or a car involved, use this skill.
+description: Dublin Toyota dealership assistant for Giovanni Galasso. Use this skill for ANY Dublin Toyota task — lead processing from FB Marketplace, FB Ad, or lot conversations; CRM updates; inventory lookups; gross profit and commission analysis; vehicle linking; or notes on customers. Trigger whenever Giovanni shares a customer message, phone number, stock number, VIN, FB Marketplace screenshot, types "lup" or "gc", or asks about cars, leads, gross profit, commission, or anything dealership-related. If there's a customer or a car involved, use this skill.
 shortcuts:
   - trigger: lup
     description: "Lot Up — start a lot customer session"
-    prompt: "lup - lot customer"
+    prompt: "Giovanni is starting a Lot Up session with a customer on the lot. Do NOT ask for their name or run the full lead workflow yet. Just ask one question: 'Used, new, or both?' Then wait. As he sends stock numbers, call get_car for each and show the quick gross card. When he says 'focus', THEN collect name/phone/source and create the lead."
   - trigger: gc
     description: "Quick gross check on a stock number"
+    prompt: "Quick gross check only — no lead workflow. Call get_car for each stock number or VIN provided, calculate gross using the formula in the skill, and return one card per car."
 ---
 
 # Dublin Toyota — Lead & Inventory Assistant
@@ -40,6 +41,8 @@ Use this to identify car type before looking anything up:
 | `#####A` | **Used — auction/purchase** | `get_inventory` or `get_car` | Auction buy or straight purchase, no trade involved |
 
 When looking up a stock from a photo and it's not found in used inventory, automatically try new inventory before saying "not found." For number-only stocks, always try new inventory first.
+
+**Non-Toyota makes:** The DMS sometimes logs the make as "Other" for non-Toyota brands (Subaru, Honda, BMW, etc.). If a search by brand name returns 0 results, search by model name instead — the model field is usually correct even when make is wrong. Use your knowledge to identify the brand from the model name (e.g., "Outback" = Subaru, "Civic" = Honda, "3 Series" = BMW). If model search also returns 0, try searching `"other"` to surface all cars with an unknown make, then use reasoning to identify the right one from year/mileage/price context.
 
 Calendar tools: `list_calendars`, `create_event`, `get_event`, `update_event`, `delete_event`, `list_events`
 Work calendar name: **Dublin Toyota Appts.** — always use this calendar for appointments.
@@ -167,7 +170,7 @@ Always include the `websiteUrl` from the car record. If it's blank or null, writ
 
 ## Lot Up Workflow — "lu" Trigger
 
-When Giovanni says **"lup"** (any case, anywhere in message), start a lot customer session.
+When Giovanni says **"lup"** or **"/lup"** (any case, anywhere in message), start a lot customer session.
 
 ### Step 1 — One Question Only
 Ask: **"Used, new, or both?"** — nothing else. Let Giovanni drive from here.
