@@ -265,6 +265,26 @@
   .lead-type-tab.tab-lost.active { background: var(--red); border-color: var(--red); }
   .lead-type-tab.tab-sold.active { background: var(--green); border-color: var(--green); }
   .lead-type-tab.tab-waiting.active { background: var(--amber); border-color: var(--amber); color: #000; }
+
+  /* LEADS BOARD (Kanban) */
+  .leads-board { display: flex; gap: 12px; padding: 16px 28px; overflow-x: auto; align-items: flex-start; }
+  .board-column { flex: 0 0 260px; width: 260px; background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius-lg); display: flex; flex-direction: column; max-height: calc(100vh - 220px); }
+  .board-column.board-col-dragover { border-color: var(--accent); background: var(--bg3); }
+  .board-column-header { display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; border-bottom: 1px solid var(--border); font-size: 12px; font-weight: 700; color: var(--text2); text-transform: uppercase; letter-spacing: 0.5px; position: sticky; top: 0; background: var(--bg2); border-radius: var(--radius-lg) var(--radius-lg) 0 0; }
+  .board-column-count { color: var(--text3); font-weight: 600; }
+  .board-column-body { padding: 8px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; }
+  .board-column-empty { text-align: center; color: var(--text3); font-size: 12px; padding: 16px 0; }
+  .board-card { background: var(--bg3); border: 1px solid var(--border); border-radius: var(--radius); padding: 10px; cursor: pointer; transition: border-color 0.15s; }
+  .board-card:hover { border-color: var(--border2); }
+  .board-card-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; gap: 6px; }
+  .board-rank-badge { font-family: 'DM Mono', monospace; font-size: 11px; font-weight: 700; color: var(--text); background: var(--bg4); padding: 2px 6px; border-radius: 4px; }
+  .board-src-badge { font-size: 10px; font-weight: 600; color: var(--text3); background: var(--bg4); padding: 2px 6px; border-radius: 4px; white-space: nowrap; }
+  .board-card-name { font-size: 13px; font-weight: 700; color: var(--text); margin-bottom: 4px; }
+  .board-card-row { display: flex; align-items: center; justify-content: space-between; gap: 6px; font-size: 12px; font-family: 'DM Mono', monospace; color: var(--text2); margin-bottom: 3px; }
+  .board-copy-btn { padding: 2px 6px; font-size: 10px; }
+  .board-card-interest { font-size: 11px; color: var(--text3); margin: 4px 0; line-height: 1.35; }
+  .board-card-bottom { display: flex; align-items: center; gap: 6px; margin-top: 6px; font-size: 10px; color: var(--text3); }
+  .board-stale-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
   .origin-tag { display: inline-flex; align-items: center; padding: 1px 6px; border-radius: 3px; font-size: 10px; font-weight: 700; background: rgba(139,92,246,0.12); color: #a78bfa; margin-left: 5px; vertical-align: middle; }
   /* LEAD VEHICLE LIST in drawer */
   .lead-vehicle-item { display: flex; align-items: flex-start; justify-content: space-between; padding: 10px 12px; background: var(--bg3); border-radius: 6px; margin-bottom: 6px; gap: 10px; border: 1px solid transparent; }
@@ -1675,8 +1695,11 @@ function buildLeadSectionHtml(lead, car){
 
   const SOURCE_STYLE = {
     'Lot':            { color:'var(--blue)',  border:'rgba(82,153,255,0.3)' },
+    'Phone Call':      { color:'var(--red)',   border:'rgba(240,90,90,0.3)' },
     'FB Marketplace': { color:'#a78bfa',      border:'rgba(167,139,250,0.3)' },
+    'Internet Lead':  { color:'#a78bfa',      border:'rgba(167,139,250,0.3)' },
     'FB Ad':          { color:'var(--amber)', border:'rgba(240,160,48,0.3)' },
+    'FB Organic':     { color:'var(--amber)', border:'rgba(240,160,48,0.3)' },
     'Website':        { color:'var(--green)', border:'rgba(52,211,153,0.3)' }
   };
   const ss = SOURCE_STYLE[sourceType] || { color:'var(--text2)', border:'var(--border)' };
@@ -1730,6 +1753,15 @@ function buildLeadSectionHtml(lead, car){
         onblur="closeNameComboDelayed('combo-first-dd');saveTurnedFirstFromInput()">
       <div id="combo-first-dd" class="name-combo-dropdown"></div>
     </div>`;
+
+  const rankStr = lead.leadRank || '';
+  const rankPos1 = rankStr[0] || '';
+  const rankPos2 = rankStr[1] || '';
+  const rankPos3 = rankStr[2] || '';
+  const rankSuffix = rankStr.slice(3);
+  const rankT = rankSuffix.indexOf('T') >= 0;
+  const rankD = rankSuffix.indexOf('D') >= 0;
+  const rankSelStyle = `background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:5px 6px;border-radius:6px;font-family:'DM Mono',monospace;font-size:13px;outline:none`;
 
   const createdStr = lead.timestamp ? new Date(lead.timestamp).toLocaleDateString([],{month:'short',day:'numeric',year:'numeric',hour:'2-digit',minute:'2-digit'}) : null;
   const lastEditStr = lead.lastEdited ? new Date(lead.lastEdited).toLocaleDateString([],{month:'short',day:'numeric',year:'numeric',hour:'2-digit',minute:'2-digit'}) : null;
@@ -1799,8 +1831,11 @@ function buildLeadSectionHtml(lead, car){
       <div id="lead-type-edit" style="display:none;margin-top:6px">
         <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:4px">
           ${mkSrcBtn('Lot','Lot')}
+          ${mkSrcBtn('Phone Call','Phone Call')}
           ${mkSrcBtn('FB Marketplace','FB Marketplace')}
+          ${mkSrcBtn('Internet Lead','Internet Lead')}
           ${mkSrcBtn('FB Ad','FB Ad')}
+          ${mkSrcBtn('FB Organic','FB Organic')}
           ${mkSrcBtn('Website','Website')}
         </div>
         <button class="mini-copy-btn" onclick="toggleLeadTypeEdit()" style="margin-top:2px">Cancel</button>
@@ -1815,6 +1850,40 @@ function buildLeadSectionHtml(lead, car){
         ${mkPipeBtn('Focus','Focus','var(--purple)')}
         ${mkPipeBtn('Lost','Lost','var(--red)')}
         ${mkPipeBtn('Sold','Sold','var(--green)')}
+      </div>
+    </div>
+
+    <!-- Customer Grade (leadRank) -->
+    <div style="margin-bottom:12px">
+      <div class="field-label" style="margin-bottom:6px">Customer Grade</div>
+      <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+        <select id="rank-pos1" style="${rankSelStyle}" onchange="updateLeadRankFromDrawer()" title="Connection">
+          <option value=""${rankPos1===''?' selected':''}>–</option>
+          <option value="A"${rankPos1==='A'?' selected':''}>A</option>
+          <option value="B"${rankPos1==='B'?' selected':''}>B</option>
+          <option value="C"${rankPos1==='C'?' selected':''}>C</option>
+          <option value="0"${rankPos1==='0'?' selected':''}>0</option>
+        </select>
+        <select id="rank-pos2" style="${rankSelStyle}" onchange="updateLeadRankFromDrawer()" title="Timing">
+          <option value=""${rankPos2===''?' selected':''}>–</option>
+          <option value="1"${rankPos2==='1'?' selected':''}>1</option>
+          <option value="2"${rankPos2==='2'?' selected':''}>2</option>
+          <option value="3"${rankPos2==='3'?' selected':''}>3</option>
+          <option value="0"${rankPos2==='0'?' selected':''}>0</option>
+        </select>
+        <select id="rank-pos3" style="${rankSelStyle}" onchange="updateLeadRankFromDrawer()" title="Profit potential">
+          <option value=""${rankPos3===''?' selected':''}>–</option>
+          <option value="A"${rankPos3==='A'?' selected':''}>A</option>
+          <option value="B"${rankPos3==='B'?' selected':''}>B</option>
+          <option value="C"${rankPos3==='C'?' selected':''}>C</option>
+          <option value="0"${rankPos3==='0'?' selected':''}>0</option>
+        </select>
+        <label style="display:flex;align-items:center;gap:4px;font-size:12px;color:var(--text2);cursor:pointer" title="Better turned to another rep">
+          <input type="checkbox" id="rank-turn"${rankT?' checked':''} onchange="updateLeadRankFromDrawer()" style="width:14px;height:14px;cursor:pointer">T
+        </label>
+        <label style="display:flex;align-items:center;gap:4px;font-size:12px;color:var(--text2);cursor:pointer" title="Dead lead">
+          <input type="checkbox" id="rank-dead"${rankD?' checked':''} onchange="updateLeadRankFromDrawer()" style="width:14px;height:14px;cursor:pointer">D
+        </label>
       </div>
     </div>
 
@@ -2798,6 +2867,10 @@ function viewMatchedLeads() {
 
 let leadsFilter = 'all'; // 'all' | 'matched'
 let leadsTab = 'Lot'; // 'Lot' | 'FB Marketplace' | 'FB Ad' | 'Website' | 'Focus' | 'Lost' | 'Sold'
+let leadsViewMode = 'table'; // 'table' | 'board'
+let leadsGroupBy = 'stage'; // 'stage' | 'recency' | 'new' | 'turned' | 'quality'
+let leadsShowClosed = false; // show Sold/Lost (stage) or Unranked/Dead (quality) columns
+let _boardDragRowIndex = null;
 
 function getLeadTab(lead) {
   const ip = lead.inFocus || '';
@@ -3088,11 +3161,23 @@ async function loadLeads(){
       <h2>Leads <span id="leads-subtitle" style="font-size:13px;font-weight:400;color:var(--text3)"></span></h2>
       <div class="leads-toolbar-right">
         <button class="btn ${leadsFilter==='matched'?'btn-primary':''}" id="btn-filter-matched" onclick="toggleMatchedFilter()" style="font-size:12px"><span style="color:var(--green)">●</span> Matched Only</button>
+        <select id="leads-groupby-sel" onchange="setLeadsGroupBy(this.value)" style="display:${leadsViewMode==='board'?'inline-block':'none'};background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:6px;font-family:'Inter',sans-serif;font-size:12px;outline:none">
+          <option value="stage"${leadsGroupBy==='stage'?' selected':''}>Group: Stage</option>
+          <option value="recency"${leadsGroupBy==='recency'?' selected':''}>Group: Recency</option>
+          <option value="new"${leadsGroupBy==='new'?' selected':''}>Group: New</option>
+          <option value="turned"${leadsGroupBy==='turned'?' selected':''}>Group: Turned</option>
+          <option value="quality"${leadsGroupBy==='quality'?' selected':''}>Group: Quality</option>
+        </select>
+        <button class="btn" id="btn-show-closed" onclick="toggleLeadsShowClosed()" style="display:${leadsViewMode==='board'?'inline-flex':'none'};font-size:12px">${leadsShowClosed?'Hide':'Show'} Closed</button>
+        <div class="view-toggle">
+          <button class="view-btn${leadsViewMode==='table'?' active':''}" id="btn-leads-table" onclick="setLeadsViewMode('table')" title="Table view"><svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg></button>
+          <button class="view-btn${leadsViewMode==='board'?' active':''}" id="btn-leads-board" onclick="setLeadsViewMode('board')" title="Board view"><svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="5" height="16"/><rect x="10" y="4" width="5" height="10"/><rect x="17" y="4" width="5" height="13"/></svg></button>
+        </div>
         <button class="btn" onclick="loadLeads()"><svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M4 4v5h5"/><path d="M20 20v-5h-5"/><path d="M4 9a9 9 0 0115.47-3.47"/><path d="M20 15a9 9 0 01-15.47 3.47"/></svg> Refresh</button>
         <button class="btn btn-primary" onclick="openAddLeadModal()"><svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> Add Lead</button>
       </div>
     </div>
-    <div class="lead-type-tabs" id="lead-type-tabs"></div>
+    <div class="lead-type-tabs" id="lead-type-tabs" style="display:${leadsViewMode==='board'?'none':''}"></div>
     <div class="leads-action-bar" id="leads-action-bar">
       <span id="leads-selected-count" style="font-size:13px">0 selected</span>
       <button class="btn" onclick="refreshSelectedLeadVehicles()"><svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M4 4v5h5"/><path d="M20 20v-5h-5"/><path d="M4 9a9 9 0 0115.47-3.47"/><path d="M20 15a9 9 0 01-15.47 3.47"/></svg> Refresh Vehicles</button>
@@ -3124,6 +3209,7 @@ function toggleMatchedFilter() {
 }
 
 function renderLeads(){
+  if (leadsViewMode === 'board') { renderLeadsBoard(); return; }
   const content = document.getElementById('leads-content');
   const subtitle = document.getElementById('leads-subtitle');
 
@@ -3243,6 +3329,157 @@ function renderLeads(){
     <th style="width:32px"><input type="checkbox" onchange="toggleAllLeads(this)"></th>
     <th>Date</th><th>Name</th><th>Phone</th><th>Vehicle</th><th>Timeframe</th><th>Status</th><th></th>
   </tr></thead><tbody>${rows}</tbody></table></div>`;
+}
+
+// ── Leads Board (Kanban) ────────────────────────────────────────
+function setLeadsViewMode(mode){
+  leadsViewMode = mode;
+  document.getElementById('btn-leads-table').classList.toggle('active', mode==='table');
+  document.getElementById('btn-leads-board').classList.toggle('active', mode==='board');
+  document.getElementById('leads-groupby-sel').style.display = mode==='board' ? 'inline-block' : 'none';
+  document.getElementById('btn-show-closed').style.display = mode==='board' ? 'inline-flex' : 'none';
+  document.getElementById('lead-type-tabs').style.display = mode==='board' ? 'none' : '';
+  renderLeads();
+}
+function setLeadsGroupBy(mode){
+  leadsGroupBy = mode;
+  renderLeads();
+}
+function toggleLeadsShowClosed(){
+  leadsShowClosed = !leadsShowClosed;
+  const btn = document.getElementById('btn-show-closed');
+  if (btn) btn.textContent = (leadsShowClosed?'Hide':'Show') + ' Closed';
+  renderLeads();
+}
+
+function staleInfoFor(lead){
+  const d = lead.lastEdited ? new Date(lead.lastEdited) : null;
+  const days = d ? Math.floor((Date.now()-d)/86400000) : null;
+  const color = days === null ? '' : days <= 2 ? 'var(--green)' : days <= 7 ? 'var(--amber)' : 'var(--red)';
+  const label = days === null ? 'No activity yet' : days === 0 ? 'Today' : days + 'd ago';
+  return { days, color, label };
+}
+
+const BOARD_STAGE_COLS = ['Lot','Phone Call','FB Marketplace','Internet Lead','FB Ad','FB Organic','Website','Focus'];
+const BOARD_CLOSED_COLS = ['Sold','Lost'];
+
+function bucketLeadsForBoard(leads, mode, showClosed){
+  if (mode === 'stage') {
+    const cols = showClosed ? BOARD_STAGE_COLS.concat(BOARD_CLOSED_COLS) : BOARD_STAGE_COLS;
+    return cols.map(stage => ({
+      key: stage, label: stage, draggable: true,
+      leads: leads.filter(l => getLeadTab(l) === stage)
+    }));
+  }
+  if (mode === 'recency') {
+    const fresh=[], aging=[], stale=[];
+    leads.forEach(l => { const {days} = staleInfoFor(l); (days===null||days>7?stale:days<=2?fresh:aging).push(l); });
+    return [
+      { key:'fresh', label:'Fresh (≤2d)', draggable:false, leads:fresh },
+      { key:'aging', label:'Aging (≤7d)', draggable:false, leads:aging },
+      { key:'stale', label:'Stale (7d+)', draggable:false, leads:stale }
+    ];
+  }
+  if (mode === 'new') {
+    const isNew = l => l.timestamp && (Date.now()-new Date(l.timestamp))/86400000 <= 2;
+    return [
+      { key:'new', label:'New (≤48h)', draggable:false, leads:leads.filter(isNew) },
+      { key:'established', label:'Established', draggable:false, leads:leads.filter(l=>!isNew(l)) }
+    ];
+  }
+  if (mode === 'turned') {
+    const turned = leads.filter(l => l.turnedTo && l.turnedToFirst && l.turnedTo !== l.turnedToFirst);
+    const byRep = {};
+    turned.forEach(l => { const rep=l.turnedTo; (byRep[rep]=byRep[rep]||[]).push(l); });
+    return Object.keys(byRep).sort().map(rep => ({ key:rep, label:rep, draggable:false, leads:byRep[rep] }));
+  }
+  if (mode === 'quality') {
+    const grade = l => (l.leadRank||'')[0] || '';
+    const isDead = l => (l.leadRank||'').indexOf('D') >= 0;
+    const cols = ['A','B','C'].map(g => ({
+      key:g, label:'Grade '+g, draggable:false,
+      leads: leads.filter(l => !isDead(l) && grade(l)===g)
+    }));
+    if (showClosed) {
+      cols.push({ key:'unranked', label:'Unranked', draggable:false, leads: leads.filter(l => !isDead(l) && (grade(l)===''||grade(l)==='0')) });
+      cols.push({ key:'dead', label:'Dead', draggable:false, leads: leads.filter(isDead) });
+    }
+    return cols;
+  }
+  return [];
+}
+
+function renderLeadsBoard(){
+  const content = document.getElementById('leads-content');
+  const subtitle = document.getElementById('leads-subtitle');
+  if (subtitle) subtitle.textContent = '('+leadsData.length+')';
+
+  const visibleLeads = leadsFilter === 'matched'
+    ? leadsData.filter(l => l._matches && l._matches.length > 0)
+    : leadsData;
+
+  if (!visibleLeads.length) {
+    content.innerHTML = `<div class="empty"><h3>No leads</h3><p>Add one with the Add Lead button above.</p></div>`;
+    return;
+  }
+
+  const buckets = bucketLeadsForBoard(visibleLeads, leadsGroupBy, leadsShowClosed);
+  content.innerHTML = `<div class="leads-board">${buckets.map(renderBoardColumn).join('')}</div>`;
+}
+
+function renderBoardColumn(bucket){
+  const cards = bucket.leads.map(l => renderBoardCard(l, bucket.draggable)).join('');
+  return `<div class="board-column"
+      ondragover="${bucket.draggable?`boardColDragOver(event)`:''}"
+      ondrop="${bucket.draggable?`boardColDrop(event,'${bucket.key}')`:''}">
+    <div class="board-column-header"><span>${bucket.label}</span><span class="board-column-count">${bucket.leads.length}</span></div>
+    <div class="board-column-body">${cards || '<div class="board-column-empty">—</div>'}</div>
+  </div>`;
+}
+
+function renderBoardCard(lead, draggable){
+  const fName = capName(lead.firstName);
+  const lName = capName(lead.lastName);
+  const fullName = [fName,lName].filter(Boolean).join(' ') || '—';
+  const phone = fmtPhone(lead.phone);
+  const src = getLeadSourceType(lead);
+  const rank = lead.leadRank || '';
+  const vList = Array.isArray(lead.vehicleList) ? lead.vehicleList : [];
+  const stock = (vList[0] && vList[0].stock) || '';
+  const {color:staleColor, label:staleLabel} = staleInfoFor(lead);
+
+  const copyBtn = (text, title) => text ? `<button class="mini-copy-btn board-copy-btn" title="Copy ${title}" onclick="event.stopPropagation();copyText('${String(text).replace(/'/g,"\\'")}',this)">⧉</button>` : '';
+
+  return `<div class="board-card"
+      ${draggable?'draggable="true"':''}
+      ondragstart="${draggable?`boardCardDragStart(event,${lead.rowIndex})`:''}"
+      ondragend="${draggable?'boardCardDragEnd(event)':''}"
+      onclick="openDrawerFromLead(${lead.rowIndex})">
+    <div class="board-card-top">
+      ${rank?`<span class="board-rank-badge">${rank}</span>`:''}
+      <span class="board-src-badge">${src}</span>
+    </div>
+    <div class="board-card-name">${fullName}</div>
+    <div class="board-card-row"><span>${phone||'—'}</span>${copyBtn(lead.phone,'phone')}</div>
+    ${stock?`<div class="board-card-row"><span>#${stock}</span>${copyBtn(stock,'stock #')}</div>`:''}
+    ${lead.vehicleInterest?`<div class="board-card-interest">${lead.vehicleInterest}</div>`:''}
+    <div class="board-card-bottom">
+      <span class="board-stale-dot" style="background:${staleColor||'var(--border)'}"></span>
+      <span>${staleLabel}</span>
+    </div>
+  </div>`;
+}
+
+function boardColDragOver(e){ e.preventDefault(); e.currentTarget.classList.add('board-col-dragover'); }
+function boardCardDragStart(e, rowIndex){ _boardDragRowIndex = rowIndex; e.dataTransfer.effectAllowed='move'; e.currentTarget.style.opacity='0.4'; }
+function boardCardDragEnd(e){ e.currentTarget.style.opacity=''; document.querySelectorAll('.board-col-dragover').forEach(c=>c.classList.remove('board-col-dragover')); }
+async function boardColDrop(e, stageKey){
+  e.preventDefault();
+  e.currentTarget.classList.remove('board-col-dragover');
+  if (_boardDragRowIndex === null) return;
+  const rowIndex = _boardDragRowIndex;
+  _boardDragRowIndex = null;
+  await moveLeadTo(rowIndex, stageKey);
 }
 
 function updateLeadsSubtitle(){
@@ -3502,6 +3739,18 @@ async function updateLeadFieldFromDrawer(field, value){
   if((field==='timeframe'||field==='status') && document.getElementById('leads-content')) renderLeads();
   try { await apiPost('updateLead',{rowIndex:currentLeadRowIndex,field,value}); }
   catch(e){ showToast('Save failed'); }
+}
+
+// leadRank format: [connection A/B/C/0][timing 1/2/3/0][profit A/B/C/0] + optional T (better turned) + optional D (dead lead)
+function updateLeadRankFromDrawer(){
+  const p1 = document.getElementById('rank-pos1').value;
+  const p2 = document.getElementById('rank-pos2').value;
+  const p3 = document.getElementById('rank-pos3').value;
+  const t = document.getElementById('rank-turn').checked;
+  const d = document.getElementById('rank-dead').checked;
+  const rank = p1 + p2 + p3 + (t?'T':'') + (d?'D':'');
+  updateLeadFieldFromDrawer('leadRank', rank);
+  if (document.getElementById('leads-content')) renderLeads();
 }
 
 // ── Vehicle Search (for leads) ────────────────────────────────
