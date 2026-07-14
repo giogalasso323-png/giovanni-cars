@@ -2868,7 +2868,7 @@ function viewMatchedLeads() {
 let leadsFilter = 'all'; // 'all' | 'matched'
 let leadsTab = 'Lot'; // 'Lot' | 'FB Marketplace' | 'FB Ad' | 'Website' | 'Focus' | 'Lost' | 'Sold'
 let leadsViewMode = 'table'; // 'table' | 'board'
-let leadsGroupBy = 'stage'; // 'stage' | 'recency' | 'new' | 'turned' | 'quality'
+let leadsGroupBy = 'process'; // 'process' | 'stage' | 'recency' | 'new' | 'turned' | 'quality'
 let leadsShowClosed = false; // show Sold/Lost (stage) or Unranked/Dead (quality) columns
 let _boardDragRowIndex = null;
 
@@ -3162,7 +3162,8 @@ async function loadLeads(){
       <div class="leads-toolbar-right">
         <button class="btn ${leadsFilter==='matched'?'btn-primary':''}" id="btn-filter-matched" onclick="toggleMatchedFilter()" style="font-size:12px"><span style="color:var(--green)">●</span> Matched Only</button>
         <select id="leads-groupby-sel" onchange="setLeadsGroupBy(this.value)" style="display:${leadsViewMode==='board'?'inline-block':'none'};background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:6px;font-family:'Inter',sans-serif;font-size:12px;outline:none">
-          <option value="stage"${leadsGroupBy==='stage'?' selected':''}>Group: Stage</option>
+          <option value="process"${leadsGroupBy==='process'?' selected':''}>Group: Sales Process</option>
+          <option value="stage"${leadsGroupBy==='stage'?' selected':''}>Group: Source (reference only)</option>
           <option value="recency"${leadsGroupBy==='recency'?' selected':''}>Group: Recency</option>
           <option value="new"${leadsGroupBy==='new'?' selected':''}>Group: New</option>
           <option value="turned"${leadsGroupBy==='turned'?' selected':''}>Group: Turned</option>
@@ -3363,11 +3364,36 @@ function staleInfoFor(lead){
 const BOARD_STAGE_COLS = ['Lot','Phone Call','FB Marketplace','Internet Lead','FB Ad','FB Organic','Website','Focus'];
 const BOARD_CLOSED_COLS = ['Sold','Lost'];
 
+const PROCESS_COLS = [
+  { key:'New',     label:'New Lead',            match: l => !isWaitingLead(l) && (!l.status || l.status==='New') },
+  { key:'Working', label:'Working',             match: l => !isWaitingLead(l) && (l.status==='One Way Communication' || l.status==='Two Way Communication') },
+  { key:'Appt',    label:'Appt Set',            match: l => !isWaitingLead(l) && l.status==='Appt' },
+  { key:'Waiting', label:'Needs Vehicle Match', match: l => isWaitingLead(l) },
+  { key:'Cold',    label:'Cold',                match: l => !isWaitingLead(l) && l.status==='Cold' }
+];
+// What dragging a card into each process column actually writes.
+// Sold/Lost aren't here — those fall through to moveLeadTo() (inFocus), same as closed columns everywhere else.
+const PROCESS_COL_WRITE = {
+  'New':     { status:'New', vehicleNotAvailable:'false' },
+  'Working': { status:'One Way Communication', vehicleNotAvailable:'false' },
+  'Appt':    { status:'Appt', vehicleNotAvailable:'false' },
+  'Cold':    { status:'Cold', vehicleNotAvailable:'false' },
+  'Waiting': { vehicleNotAvailable:'true' }
+};
+
 function bucketLeadsForBoard(leads, mode, showClosed){
+  if (mode === 'process') {
+    const active = leads.filter(l => getLeadTab(l) !== 'Sold' && getLeadTab(l) !== 'Lost');
+    const cols = PROCESS_COLS.map(c => ({ key:c.key, label:c.label, draggable:true, leads: active.filter(c.match) }));
+    if (showClosed) {
+      BOARD_CLOSED_COLS.forEach(stage => cols.push({ key:stage, label:stage, draggable:true, leads: leads.filter(l=>getLeadTab(l)===stage) }));
+    }
+    return cols;
+  }
   if (mode === 'stage') {
     const cols = showClosed ? BOARD_STAGE_COLS.concat(BOARD_CLOSED_COLS) : BOARD_STAGE_COLS;
     return cols.map(stage => ({
-      key: stage, label: stage, draggable: true,
+      key: stage, label: stage, draggable: false,
       leads: leads.filter(l => getLeadTab(l) === stage)
     }));
   }
@@ -3473,13 +3499,25 @@ function renderBoardCard(lead, draggable){
 function boardColDragOver(e){ e.preventDefault(); e.currentTarget.classList.add('board-col-dragover'); }
 function boardCardDragStart(e, rowIndex){ _boardDragRowIndex = rowIndex; e.dataTransfer.effectAllowed='move'; e.currentTarget.style.opacity='0.4'; }
 function boardCardDragEnd(e){ e.currentTarget.style.opacity=''; document.querySelectorAll('.board-col-dragover').forEach(c=>c.classList.remove('board-col-dragover')); }
-async function boardColDrop(e, stageKey){
+async function boardColDrop(e, colKey){
   e.preventDefault();
   e.currentTarget.classList.remove('board-col-dragover');
   if (_boardDragRowIndex === null) return;
   const rowIndex = _boardDragRowIndex;
   _boardDragRowIndex = null;
-  await moveLeadTo(rowIndex, stageKey);
+  if (leadsGroupBy === 'process' && PROCESS_COL_WRITE[colKey]) {
+    const lead = leadsData.find(l => l.rowIndex === rowIndex);
+    if (!lead) return;
+    const writes = PROCESS_COL_WRITE[colKey];
+    const saves = Object.keys(writes).map(field => {
+      lead[field] = writes[field];
+      return apiPost('updateLead', { rowIndex, field, value: writes[field] });
+    });
+    await Promise.all(saves);
+    renderLeads();
+    return;
+  }
+  await moveLeadTo(rowIndex, colKey);
 }
 
 function updateLeadsSubtitle(){
