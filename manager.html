@@ -205,6 +205,7 @@
   .lead-status-sel.s-twoway     { background: var(--green-bg);                  color: var(--green); }
   .lead-status-sel.s-cold       { background: var(--bg3);                       color: var(--text3); }
   .lead-status-sel.s-appt       { background: rgba(139,92,246,0.12);            color: #a78bfa; }
+  .lead-status-sel.s-beback     { background: rgba(45,212,191,0.12);            color: #2dd4bf; }
   .lead-status-sel.s-sold       { background: var(--green-bg);                  color: var(--green); font-weight: 700; }
   .lead-status-sel.s-lost       { background: var(--red-bg);                    color: var(--red); }
   .lead-note-input { background: transparent; border: none; border-bottom: 1px dashed var(--border2); color: var(--text2); font-family: 'Inter', sans-serif; font-size: 12px; width: 150px; outline: none; padding: 2px 4px; }
@@ -2090,6 +2091,14 @@ async function moveLeadTo(rowIndex, newType) {
     // Pipeline state change — preserve source type in leadType
     lead.inFocus = newType;
     saves.push(apiPost('updateLead', { rowIndex, field: 'inFocus', value: newType }));
+    if (newType === 'Sold') {
+      // Keep the original sale date across re-drags; always land back in "this month" (unarchived).
+      const stamp = lead.leadSoldDate || new Date().toISOString();
+      lead.leadSoldDate = stamp;
+      lead.soldArchived = 'false';
+      saves.push(apiPost('updateLead', { rowIndex, field: 'leadSoldDate', value: stamp }));
+      saves.push(apiPost('updateLead', { rowIndex, field: 'soldArchived', value: 'false' }));
+    }
     // Also ensure leadType is a source type (not a stale Focus/Lost from old data)
     const src = getLeadSourceType(lead);
     if (lead.leadType !== src) {
@@ -2950,10 +2959,10 @@ function buildMatchingSectionHtml(lead) {
 let leadsData = [];
 let selectedLeads = new Set();
 let appSettings = { repNames: [] };
-const LEAD_STATUSES = ['New','One Way Communication','Two Way Communication','Cold','Appt','Sold','Lost'];
+const LEAD_STATUSES = ['New','One Way Communication','Two Way Communication','Cold','Appt','Be Back','Sold','Lost'];
 const LEAD_STATUS_COLORS = {
   'New':'s-new','One Way Communication':'s-oneway','Two Way Communication':'s-twoway',
-  'Cold':'s-cold','Appt':'s-appt','Sold':'s-sold','Lost':'s-lost'
+  'Cold':'s-cold','Appt':'s-appt','Be Back':'s-beback','Sold':'s-sold','Lost':'s-lost'
 };
 
 // ===== SECTION: LEADS / CRM TAB =====
@@ -3368,25 +3377,33 @@ const PROCESS_COLS = [
   { key:'New',     label:'New Lead',            match: l => !isWaitingLead(l) && (!l.status || l.status==='New') },
   { key:'Working', label:'Working',             match: l => !isWaitingLead(l) && (l.status==='One Way Communication' || l.status==='Two Way Communication') },
   { key:'Appt',    label:'Appt Set',            match: l => !isWaitingLead(l) && l.status==='Appt' },
+  { key:'BeBack',  label:'Be Back',             match: l => !isWaitingLead(l) && l.status==='Be Back' },
   { key:'Waiting', label:'Needs Vehicle Match', match: l => isWaitingLead(l) },
   { key:'Cold',    label:'Cold',                match: l => !isWaitingLead(l) && l.status==='Cold' }
 ];
 // What dragging a card into each process column actually writes.
 // Sold/Lost aren't here — those fall through to moveLeadTo() (inFocus), same as closed columns everywhere else.
+// SoldArchived is the exception: it's a closed-column split (see bucketLeadsForBoard), not a stage, so it's a plain field write.
 const PROCESS_COL_WRITE = {
   'New':     { status:'New', vehicleNotAvailable:'false' },
   'Working': { status:'One Way Communication', vehicleNotAvailable:'false' },
   'Appt':    { status:'Appt', vehicleNotAvailable:'false' },
+  'BeBack':  { status:'Be Back', vehicleNotAvailable:'false' },
   'Cold':    { status:'Cold', vehicleNotAvailable:'false' },
-  'Waiting': { vehicleNotAvailable:'true' }
+  'Waiting': { vehicleNotAvailable:'true' },
+  'SoldArchived': { soldArchived:'true' }
 };
+function isSoldArchived(l){ return l.soldArchived===true || l.soldArchived==='true'; }
 
 function bucketLeadsForBoard(leads, mode, showClosed){
   if (mode === 'process') {
     const active = leads.filter(l => getLeadTab(l) !== 'Sold' && getLeadTab(l) !== 'Lost');
     const cols = PROCESS_COLS.map(c => ({ key:c.key, label:c.label, draggable:true, leads: active.filter(c.match) }));
     if (showClosed) {
-      BOARD_CLOSED_COLS.forEach(stage => cols.push({ key:stage, label:stage, draggable:true, leads: leads.filter(l=>getLeadTab(l)===stage) }));
+      const sold = leads.filter(l => getLeadTab(l) === 'Sold');
+      cols.push({ key:'Sold', label:'Sold This Month', draggable:true, leads: sold.filter(l=>!isSoldArchived(l)) });
+      cols.push({ key:'SoldArchived', label:'Sold', draggable:true, leads: sold.filter(isSoldArchived) });
+      cols.push({ key:'Lost', label:'Lost', draggable:true, leads: leads.filter(l=>getLeadTab(l)==='Lost') });
     }
     return cols;
   }
@@ -3482,7 +3499,7 @@ function renderBoardCard(lead, draggable){
       ondragend="${draggable?'boardCardDragEnd(event)':''}"
       onclick="openDrawerFromLead(${lead.rowIndex})">
     <div class="board-card-top">
-      ${rank?`<span class="board-rank-badge">${rank}</span>`:''}
+      ${rankBadgeHtml(rank)}
       <span class="board-src-badge">${src}</span>
     </div>
     <div class="board-card-name">${fullName}</div>
@@ -3496,6 +3513,21 @@ function renderBoardCard(lead, draggable){
   </div>`;
 }
 
+function rankCharColor(ch, isTiming){
+  if (!ch || ch === '0') return 'var(--text3)';
+  if (isTiming) return ch==='1' ? 'var(--green)' : ch==='2' ? 'var(--amber)' : ch==='3' ? 'var(--red)' : 'var(--text3)';
+  return ch==='A' ? 'var(--green)' : ch==='B' ? 'var(--amber)' : ch==='C' ? 'var(--red)' : 'var(--text3)';
+}
+function rankBadgeHtml(rank){
+  if (!rank) return '';
+  const p1 = rank[0]||'', p2 = rank[1]||'', p3 = rank[2]||'', suffix = rank.slice(3);
+  return `<span class="board-rank-badge">`+
+    `<span style="color:${rankCharColor(p1,false)}">${p1}</span>`+
+    `<span style="color:${rankCharColor(p2,true)}">${p2}</span>`+
+    `<span style="color:${rankCharColor(p3,false)}">${p3}</span>`+
+    (suffix?`<span style="color:var(--text3)">${suffix}</span>`:'')+
+    `</span>`;
+}
 function boardColDragOver(e){ e.preventDefault(); e.currentTarget.classList.add('board-col-dragover'); }
 function boardCardDragStart(e, rowIndex){ _boardDragRowIndex = rowIndex; e.dataTransfer.effectAllowed='move'; e.currentTarget.style.opacity='0.4'; }
 function boardCardDragEnd(e){ e.currentTarget.style.opacity=''; document.querySelectorAll('.board-col-dragover').forEach(c=>c.classList.remove('board-col-dragover')); }

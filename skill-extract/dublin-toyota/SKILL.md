@@ -364,13 +364,16 @@ When Giovanni gives you info about a customer he's already talking to, find thei
 1. Save the date/time to `followUpDate` in ISO format
 2. Create a calendar event in **Dublin Toyota Appts.**
 3. Write the event ID back to `calEventId` immediately
-4. Append note: `[CW YYYY-MM-DD]: Appointment set for [date/time]`
+4. Set `status` to `Appt` (drives the Appt Set column on the Leads board)
+5. Append note: `[CW YYYY-MM-DD]: Appointment set for [date/time]`
 
 **Rescheduling** — if Giovanni tells you to move an appointment:
 1. Call `get_event` using the lead's `calEventId`
 2. Call `update_event` with the new date/time
 3. Update `followUpDate` on the lead
 4. Append note: `[CW YYYY-MM-DD]: Rescheduled from [old] to [new]`
+
+**Be Back** — when Giovanni says he met a customer in person at the dealership and they gave a verbal idea they'll return, but no appointment is set yet: set `status` to `Be Back` via `update_lead`. Don't set this on your own inference — only when Giovanni tells you the customer was physically at the dealership and open to coming back.
 
 To find the right lead when Giovanni doesn't give a rowIndex, call `get_leads` and match by name or phone.
 
