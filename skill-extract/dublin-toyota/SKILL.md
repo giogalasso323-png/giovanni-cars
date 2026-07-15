@@ -391,6 +391,7 @@ To find the right lead when Giovanni doesn't give a rowIndex, call `get_leads` a
 - Flag near-mini deals — they're worth pursuing
 - **Always write `calEventId` back after creating a calendar event — never skip this**
 - **Always prefix your notes with `[CW YYYY-MM-DD]:`** — Giovanni's entries have no prefix
+- `vehicleInterest` = pure vehicle specs only (color, drivetrain, price range, model year, package/features). Buyer type, negotiation stance, cash/finance, or anything else non-spec goes in `notes` instead, never `vehicleInterest`.
 
 ---
 
