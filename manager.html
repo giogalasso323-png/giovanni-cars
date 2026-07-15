@@ -2985,6 +2985,11 @@ const LEGACY_STATUS_SPLIT = {
   'Lost':                   { status:'',        pipelineStage:'Working' }
 };
 function migrateLeadPipelineFields(lead){
+  // Backend hasn't been redeployed with the pipelineStage column yet — the key won't even
+  // be present on the object (as opposed to present-but-empty). Skip entirely rather than
+  // guessing from `status`, which may already be in its short (post-split) form from an
+  // earlier partial migration attempt — re-deriving from that would silently corrupt it.
+  if (!('pipelineStage' in lead)) return;
   if (lead.pipelineStage) return;
   const split = LEGACY_STATUS_SPLIT[lead.status||''] || { status:'', pipelineStage:'New' };
   lead.status = split.status;
