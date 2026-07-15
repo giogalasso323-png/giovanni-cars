@@ -281,6 +281,13 @@
   .board-card-row { display: flex; align-items: center; justify-content: space-between; gap: 6px; font-size: 12px; font-family: 'DM Mono', monospace; color: var(--text2); margin-bottom: 3px; }
   .board-copy-btn { padding: 2px 6px; font-size: 10px; }
   .board-card-interest { font-size: 11px; color: var(--text3); margin: 4px 0; line-height: 1.35; }
+  .board-card-note { font-size: 11px; color: var(--text2); margin: 4px 0; line-height: 1.35; font-style: italic; }
+  .notes-log { display: flex; flex-direction: column; gap: 6px; max-height: 180px; overflow-y: auto; transition: max-height 0.15s; }
+  .notes-log.expanded { max-height: 480px; }
+  .note-entry { background: var(--bg3); border: 1px solid var(--border); border-radius: 6px; padding: 8px 10px; }
+  .note-entry-meta { display: flex; justify-content: space-between; gap: 8px; font-size: 10px; color: var(--text3); margin-bottom: 4px; }
+  .note-entry-by { font-weight: 600; flex-shrink: 0; }
+  .note-entry-text { font-size: 13px; color: var(--text2); white-space: pre-wrap; line-height: 1.4; }
   .board-card-bottom { display: flex; align-items: center; gap: 6px; margin-top: 6px; font-size: 10px; color: var(--text3); }
   .board-stale-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
   .origin-tag { display: inline-flex; align-items: center; padding: 1px 6px; border-radius: 3px; font-size: 10px; font-weight: 700; background: rgba(139,92,246,0.12); color: #a78bfa; margin-left: 5px; vertical-align: middle; }
@@ -1711,7 +1718,6 @@ function buildLeadSectionHtml(lead, car){
   const lastVal = lead.turnedTo || '';
   const inpStyle = `width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:6px;font-family:'Inter',sans-serif;font-size:13px;outline:none;box-sizing:border-box`;
 
-  const notesEsc = (lead.notes||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
   const viEsc = (lead.vehicleInterest||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
   const fEsc = fName.replace(/"/g,'&quot;');
   const lEsc = lName.replace(/"/g,'&quot;');
@@ -1909,8 +1915,12 @@ function buildLeadSectionHtml(lead, car){
 
     <!-- Notes -->
     <div style="margin-bottom:12px">
-      <div class="field-label">Notes</div>
-      <textarea style="width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:6px;font-family:'Inter',sans-serif;font-size:13px;outline:none;resize:vertical;min-height:56px;box-sizing:border-box" placeholder="Add notes…" onblur="updateLeadFieldFromDrawer('notes',this.value)">${notesEsc}</textarea>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+        <div class="field-label" style="margin:0">Notes</div>
+        <button class="mini-copy-btn" id="notes-expand-btn" onclick="toggleNotesExpand(this)">Expand</button>
+      </div>
+      <textarea rows="2" placeholder="Add a note… (Enter to save, Shift+Enter for new line)" style="width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:6px;font-family:'Inter',sans-serif;font-size:13px;outline:none;resize:vertical;box-sizing:border-box;margin-bottom:8px" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();submitLeadNote(${lead.rowIndex},this);}"></textarea>
+      <div id="lead-notes-section">${buildNotesLogHtml(lead)}</div>
     </div>
 
     <!-- Sales Reps -->
@@ -2983,6 +2993,62 @@ function migrateLeadPipelineFields(lead){
   apiPost('updateLead', { rowIndex: lead.rowIndex, field: 'pipelineStage', value: split.pipelineStage });
 }
 
+// Notes log — `notes` used to be one free-edit blob; now it's a JSON array of
+// { ts, by, text } entries so each interaction shows as its own timestamped block.
+function migrateLeadNotes(lead){
+  if (Array.isArray(lead.notes)) return;
+  const raw = lead.notes;
+  if (!raw) { lead.notes = []; return; }
+  try {
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed)) { lead.notes = parsed; return; }
+  } catch(e) {}
+  // Legacy plain-text notes — wrap as one entry so nothing is lost, then write back.
+  const log = [{ ts: lead.timestamp || null, by: 'Legacy', text: String(raw) }];
+  lead.notes = log;
+  apiPost('updateLead', { rowIndex: lead.rowIndex, field: 'notes', value: JSON.stringify(log) });
+}
+function formatNoteTs(ts){
+  if (!ts) return 'Before tracking started';
+  return new Date(ts).toLocaleDateString([],{month:'short',day:'numeric',year:'numeric',hour:'2-digit',minute:'2-digit'});
+}
+function latestNoteText(lead){
+  const log = Array.isArray(lead.notes) ? lead.notes : [];
+  return log.length ? (log[log.length-1].text || '') : '';
+}
+function buildNotesLogHtml(lead){
+  const log = Array.isArray(lead.notes) ? lead.notes : [];
+  if (!log.length) return `<div style="font-size:12px;color:var(--text3);padding:8px 0;text-align:center">No notes yet</div>`;
+  const esc = s => String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  const entries = [...log].reverse();
+  return `<div class="notes-log" id="notes-log-scroll">${entries.map(e => `
+    <div class="note-entry">
+      <div class="note-entry-meta"><span>${formatNoteTs(e.ts)}</span><span class="note-entry-by">${esc(e.by)}</span></div>
+      <div class="note-entry-text">${esc(e.text)}</div>
+    </div>`).join('')}</div>`;
+}
+function toggleNotesExpand(btn){
+  const log = document.getElementById('notes-log-scroll');
+  if (!log) return;
+  const expanded = log.classList.toggle('expanded');
+  btn.textContent = expanded ? 'Collapse' : 'Expand';
+}
+async function submitLeadNote(rowIndex, textarea){
+  const text = textarea.value.trim();
+  if (!text) return;
+  textarea.value = '';
+  const lead = leadsData.find(l => l.rowIndex === rowIndex);
+  if (!lead) return;
+  const log = Array.isArray(lead.notes) ? lead.notes : [];
+  log.push({ ts: new Date().toISOString(), by: 'Giovanni', text });
+  lead.notes = log;
+  const section = document.getElementById('lead-notes-section');
+  if (section) section.innerHTML = buildNotesLogHtml(lead);
+  if (document.getElementById('leads-content')) renderLeads();
+  try { await apiPost('updateLead', { rowIndex, field: 'notes', value: JSON.stringify(log) }); showToast('Note added'); }
+  catch(e) { showToast('Note save failed'); }
+}
+
 // ===== SECTION: LEADS / CRM TAB =====
 
 // ── Lead Helpers ──────────────────────────────────────────────
@@ -3220,6 +3286,7 @@ async function loadLeads(){
       try { l.vehicleList = l.vehicleList ? JSON.parse(l.vehicleList) : []; }
       catch(e) { l.vehicleList = []; }
       migrateLeadPipelineFields(l);
+      migrateLeadNotes(l);
     });
     document.getElementById('cnt-leads').textContent = leadsData.length;
     // Run matching on all open leads
@@ -3512,8 +3579,11 @@ function renderBoardCard(lead, draggable){
   const stock = (vList[0] && vList[0].stock) || '';
   const rep = lead.turnedTo || lead.turnedToFirst || '';
   const {color:staleColor, label:staleLabel} = staleInfoFor(lead);
+  const lastNote = latestNoteText(lead);
+  const lastNoteShort = lastNote.length > 90 ? lastNote.slice(0,90)+'…' : lastNote;
 
   const copyBtn = (text, title) => text ? `<button class="mini-copy-btn board-copy-btn" title="Copy ${title}" onclick="event.stopPropagation();copyText('${String(text).replace(/'/g,"\\'")}',this)">⧉</button>` : '';
+  const escText = s => String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 
   return `<div class="board-card"
       ${draggable?'draggable="true"':''}
@@ -3530,7 +3600,8 @@ function renderBoardCard(lead, draggable){
     <div class="board-card-row"><span>${phone||'—'}</span>${copyBtn(lead.phone,'phone')}</div>
     ${stock?`<div class="board-card-row"><span>#${stock}</span>${copyBtn(stock,'stock #')}</div>`:''}
     ${rep?`<div class="board-card-row"><span${rep!=='Giovanni'?' style="color:var(--purple)"':''}>Rep: ${rep}</span></div>`:''}
-    ${lead.vehicleInterest?`<div class="board-card-interest">${lead.vehicleInterest}</div>`:''}
+    ${lead.vehicleInterest?`<div class="board-card-interest">${escText(lead.vehicleInterest)}</div>`:''}
+    ${lastNoteShort?`<div class="board-card-note">${escText(lastNoteShort)}</div>`:''}
     <div class="board-card-bottom">
       <span class="board-stale-dot" style="background:${staleColor||'var(--border)'}"></span>
       <span>${staleLabel}</span>
@@ -3656,15 +3727,6 @@ async function updateLeadStatus(rowIndex, sel){
   updateLeadsSubtitle();
   try { await apiPost('updateLead',{rowIndex,field:'status',value:status}); showToast('Status updated'); }
   catch(e){ showToast('Save failed: '+e.message); }
-}
-
-async function saveLeadNote(rowIndex, input){
-  const note = input.value.trim();
-  const lead = leadsData.find(l=>l.rowIndex===rowIndex);
-  if(lead && lead.notes===note) return;
-  if(lead) lead.notes=note;
-  try { await apiPost('updateLead',{rowIndex,field:'notes',value:note}); }
-  catch(e){ showToast('Note save failed'); }
 }
 
 // ── Delete Lead ───────────────────────────────────────────────
@@ -4122,7 +4184,8 @@ function renderNewCarDrawer(c, isLeadContext) {
           </select>
         </div>
         <div><div class="field-label">Notes</div>
-          <input type="text" style="width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:6px;font-family:'Inter',sans-serif;font-size:13px;outline:none" value="${(lead.notes||'').replace(/"/g,'&quot;')}" placeholder="Add note…" onblur="updateLeadFieldFromDrawer('notes',this.value)" onkeydown="if(event.key==='Enter')this.blur()">
+          ${latestNoteText(lead)?`<div style="font-size:12px;color:var(--text2);margin-bottom:6px;line-height:1.4">${latestNoteText(lead).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</div>`:''}
+          <input type="text" style="width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:6px;font-family:'Inter',sans-serif;font-size:13px;outline:none" placeholder="Add a note…" onkeydown="if(event.key==='Enter'){event.preventDefault();submitLeadNote(${lead.rowIndex},this);}">
         </div>
       </div>`;
     }
@@ -5189,6 +5252,8 @@ async function openLeadPickerForCar(vin) {
       leadsData.forEach(l => {
         try { l.vehicleList = l.vehicleList ? JSON.parse(l.vehicleList) : []; }
         catch(e) { l.vehicleList = []; }
+        migrateLeadPipelineFields(l);
+        migrateLeadNotes(l);
       });
       document.getElementById('cnt-leads').textContent = leadsData.length;
     } catch(e) {

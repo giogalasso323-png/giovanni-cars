@@ -224,7 +224,7 @@ When Giovanni says **"focus"** or sends a screenshot of a focus entry:
 1. Ask Giovanni for closing notes — one prompt:
    > "Closing notes: What do they want specifically, timeframe, when are they coming back, who else needs to be involved?"
 2. Set `pipelineStage` to `BeBack` on the lead (drives the Be Back column on the Leads board)
-3. Save closing notes to lead with `[CW YYYY-MM-DD]:` prefix
+3. Save closing notes to the lead as a new notes entry (see Notes format above)
 4. Draft the BB text immediately (see below) — Giovanni copies and sends as the customer walks out
 5. Close the session
 
@@ -346,8 +346,12 @@ Extract and save anything meaningful Giovanni tells you about a customer:
 
 When Giovanni verbally tells you something about a customer, update the lead's `notes` field via `update_lead`.
 
-**Always prefix Cowork-added notes with:** `[CW YYYY-MM-DD]:` (e.g. `[CW 2026-06-16]: spoke on phone — still interested`)
-Giovanni's manual entries have no prefix. Always append — never overwrite existing notes.
+**`notes` is a JSON array of entries, not a plain string** — `[{ "ts": ISO-timestamp, "by": "Cowork"|"Giovanni", "text": "..." }, ...]`. Each interaction is its own entry so the board/drawer can show them as separate timestamped blocks instead of one crunched wall of text. To add a note:
+1. `get_leads` to fetch the lead, `JSON.parse` its current `notes` value (empty/missing → `[]`)
+2. Push a new entry: `{ ts: <current ISO timestamp>, by: "Cowork", text: "..." }`
+3. `update_lead` with field `notes`, value = `JSON.stringify(the full array)` — always the whole array, never a partial overwrite
+
+This replaces the old `[CW YYYY-MM-DD]: ...` prefix convention — the `by` and `ts` fields now carry that information structurally.
 
 ---
 
@@ -370,13 +374,13 @@ When Giovanni gives you info about a customer he's already talking to, find thei
 2. Create a calendar event in **Dublin Toyota Appts.**
 3. Write the event ID back to `calEventId` immediately
 4. Set `pipelineStage` to `Appt` (drives the Appt Set column on the Leads board)
-5. Append note: `[CW YYYY-MM-DD]: Appointment set for [date/time]`
+5. Append a notes entry: "Appointment set for [date/time]"
 
 **Rescheduling** — if Giovanni tells you to move an appointment:
 1. Call `get_event` using the lead's `calEventId`
 2. Call `update_event` with the new date/time
 3. Update `followUpDate` on the lead
-4. Append note: `[CW YYYY-MM-DD]: Rescheduled from [old] to [new]`
+4. Append a notes entry: "Rescheduled from [old] to [new]"
 
 **Be Back** — when Giovanni says he met a customer in person at the dealership and they gave a verbal idea they'll return, but no appointment is set yet: set `pipelineStage` to `BeBack` via `update_lead`. Don't set this on your own inference — only when Giovanni tells you the customer was physically at the dealership and open to coming back.
 
@@ -395,7 +399,7 @@ To find the right lead when Giovanni doesn't give a rowIndex, call `get_leads` a
 - Positions 2 and 3 = available (non-sold) cars only
 - Flag near-mini deals — they're worth pursuing
 - **Always write `calEventId` back after creating a calendar event — never skip this**
-- **Always prefix your notes with `[CW YYYY-MM-DD]:`** — Giovanni's entries have no prefix
+- **`notes` is a JSON array of `{ts, by, text}` entries — always append a new entry to the full array, never overwrite or add a bare string** (see Notes format above)
 - `vehicleInterest` = pure vehicle specs only (color, drivetrain, price range, model year, package/features). Buyer type, negotiation stance, cash/finance, or anything else non-spec goes in `notes` instead, never `vehicleInterest`.
 
 ---
@@ -439,7 +443,7 @@ Jason Xue · 415-290-4433 · FB Marketplace (6/16)
 If Giovanni says yes:
 1. Add the matching car to the lead's `vehicleList`
 2. Update `vehicleNotAvailable` back to `false`
-3. Append note: `[CW YYYY-MM-DD]: Match found — [stock] [year make model] at $X. Following up.`
+3. Append a notes entry: "Match found — [stock] [year make model] at $X. Following up."
 4. Draft a follow-up text for Giovanni to send:
    > "Hey [first name], this is Giovanni from Dublin Toyota. We actually just got something in that matches what you were looking for — [year make model], [color], [mileage] miles at $[price]. Want to come take a look?"
 
