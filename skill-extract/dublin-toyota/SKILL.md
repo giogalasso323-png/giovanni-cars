@@ -223,9 +223,10 @@ When Giovanni says **"focus"** or sends a screenshot of a focus entry:
 **"bb"** → Be Back flow:
 1. Ask Giovanni for closing notes — one prompt:
    > "Closing notes: What do they want specifically, timeframe, when are they coming back, who else needs to be involved?"
-2. Save closing notes to lead with `[CW YYYY-MM-DD]:` prefix
-3. Draft the BB text immediately (see below) — Giovanni copies and sends as the customer walks out
-4. Close the session
+2. Set `pipelineStage` to `BeBack` on the lead (drives the Be Back column on the Leads board)
+3. Save closing notes to lead with `[CW YYYY-MM-DD]:` prefix
+4. Draft the BB text immediately (see below) — Giovanni copies and sends as the customer walks out
+5. Close the session
 
 **"no car"** → set `vehicleNotAvailable: true`, save what they wanted to notes (model, year, price range, mileage, color, powertrain), close session
 
@@ -354,7 +355,11 @@ Giovanni's manual entries have no prefix. Always append — never overwrite exis
 
 When Giovanni gives you info about a customer he's already talking to, find their lead and update it.
 
-**Auto-set status to "Two Way Communication"** whenever Giovanni says any of these:
+**Two independent fields, don't conflate them:**
+- `status` = communication state only: `''` (not yet contacted), `One Way`, `Two Way`, or `Cold`
+- `pipelineStage` = position in the sales process: `New`, `Working`, `Appt`, `BeBack`, or `Cold` — drives the Sales Process board columns. Cold can apply to both fields independently — a lead can go cold in conversation while Giovanni still has it manually parked in the Cold pipeline column, or vice versa.
+
+**Auto-set `status` to `Two Way`** whenever Giovanni says any of these:
 - "I just spoke with him/her on the phone"
 - "I was texting with them"
 - "I talked to / I called [name]"
@@ -364,7 +369,7 @@ When Giovanni gives you info about a customer he's already talking to, find thei
 1. Save the date/time to `followUpDate` in ISO format
 2. Create a calendar event in **Dublin Toyota Appts.**
 3. Write the event ID back to `calEventId` immediately
-4. Set `status` to `Appt` (drives the Appt Set column on the Leads board)
+4. Set `pipelineStage` to `Appt` (drives the Appt Set column on the Leads board)
 5. Append note: `[CW YYYY-MM-DD]: Appointment set for [date/time]`
 
 **Rescheduling** — if Giovanni tells you to move an appointment:
@@ -373,7 +378,7 @@ When Giovanni gives you info about a customer he's already talking to, find thei
 3. Update `followUpDate` on the lead
 4. Append note: `[CW YYYY-MM-DD]: Rescheduled from [old] to [new]`
 
-**Be Back** — when Giovanni says he met a customer in person at the dealership and they gave a verbal idea they'll return, but no appointment is set yet: set `status` to `Be Back` via `update_lead`. Don't set this on your own inference — only when Giovanni tells you the customer was physically at the dealership and open to coming back.
+**Be Back** — when Giovanni says he met a customer in person at the dealership and they gave a verbal idea they'll return, but no appointment is set yet: set `pipelineStage` to `BeBack` via `update_lead`. Don't set this on your own inference — only when Giovanni tells you the customer was physically at the dealership and open to coming back.
 
 To find the right lead when Giovanni doesn't give a rowIndex, call `get_leads` and match by name or phone.
 

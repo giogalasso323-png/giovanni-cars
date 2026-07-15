@@ -31,7 +31,7 @@ const LEADS_COLUMNS = [
   'timestamp','firstName','lastName','phone','vehicle','vin',
   'timeframe','source','status','notes','followUpDate','vehicleList',
   'leadType','inFocus','turnedTo','vehicleNotAvailable','vehicleInterest','turnedToFirst',
-  'addedBy','calEventId','lastEdited','leadRank','leadSoldDate','soldArchived'
+  'addedBy','calEventId','lastEdited','leadRank','leadSoldDate','soldArchived','pipelineStage'
 ];
 
 function doGet(e)     { return handleRequest(e); }
@@ -108,7 +108,7 @@ function submitLead(data) {
   var row = LEADS_COLUMNS.map(function(col) {
     if (col === 'timestamp') return new Date().toISOString();
     if (col === 'source' && !data[col]) return 'manual';
-    if (col === 'status' && !data[col]) return 'New';
+    if (col === 'pipelineStage' && !data[col]) return 'New';
     return data[col] !== undefined ? data[col] : '';
   });
   sh.appendRow(row);

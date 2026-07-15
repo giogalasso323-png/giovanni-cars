@@ -204,10 +204,6 @@
   .lead-status-sel.s-oneway     { background: var(--amber-bg);                  color: var(--amber); }
   .lead-status-sel.s-twoway     { background: var(--green-bg);                  color: var(--green); }
   .lead-status-sel.s-cold       { background: var(--bg3);                       color: var(--text3); }
-  .lead-status-sel.s-appt       { background: rgba(139,92,246,0.12);            color: #a78bfa; }
-  .lead-status-sel.s-beback     { background: rgba(45,212,191,0.12);            color: #2dd4bf; }
-  .lead-status-sel.s-sold       { background: var(--green-bg);                  color: var(--green); font-weight: 700; }
-  .lead-status-sel.s-lost       { background: var(--red-bg);                    color: var(--red); }
   .lead-note-input { background: transparent; border: none; border-bottom: 1px dashed var(--border2); color: var(--text2); font-family: 'Inter', sans-serif; font-size: 12px; width: 150px; outline: none; padding: 2px 4px; }
   .lead-note-input:focus { border-bottom-color: var(--accent); color: var(--text); }
   .leads-toolbar { display: flex; align-items: center; justify-content: space-between; padding: 12px 28px; border-bottom: 1px solid var(--border); background: var(--bg2); flex-wrap: wrap; gap: 8px; }
@@ -665,15 +661,13 @@
         <textarea id="al-timeframe" rows="2" placeholder="What's holding up the timing? (co-signer, down payment, insurance, etc.)" style="width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:8px 10px;border-radius:var(--radius);font-family:'Inter',sans-serif;font-size:13px;outline:none;resize:vertical"></textarea>
       </div>
       <div>
-        <div class="field-label">Status</div>
-        <select id="al-status" style="width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:8px 10px;border-radius:var(--radius);font-family:'Inter',sans-serif;font-size:13px;outline:none;appearance:none">
-          <option value="New">New</option>
-          <option value="One Way Communication">One Way Communication</option>
-          <option value="Two Way Communication">Two Way Communication</option>
+        <div class="field-label">Pipeline Position</div>
+        <select id="al-pipeline" style="width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:8px 10px;border-radius:var(--radius);font-family:'Inter',sans-serif;font-size:13px;outline:none;appearance:none">
+          <option value="New">New Lead</option>
+          <option value="Working">Working</option>
+          <option value="Appt">Appt Set</option>
+          <option value="BeBack">Be Back</option>
           <option value="Cold">Cold</option>
-          <option value="Appt">Appt</option>
-          <option value="Sold">Sold</option>
-          <option value="Lost">Lost</option>
         </select>
       </div>
     </div>
@@ -1679,7 +1673,8 @@ function openDrawerFromLead(rowIndex){
 }
 
 function buildLeadSectionHtml(lead, car){
-  const statusOpts=LEAD_STATUSES.map(s=>`<option value="${s}"${s===(lead.status||'New')?' selected':''}>${s}</option>`).join('');
+  const statusOpts=LEAD_STATUSES.map(s=>`<option value="${s}"${s===(lead.status||'')?' selected':''}>${LEAD_STATUS_LABELS[s]}</option>`).join('');
+  const pipelineOpts=PIPELINE_STAGES.map(s=>`<option value="${s}"${s===(lead.pipelineStage||'New')?' selected':''}>${PIPELINE_STAGE_LABELS[s]}</option>`).join('');
 
   const sourceType = getLeadSourceType(lead);  // Lot / FB Marketplace / FB Ad
   const inFocus = lead.inFocus || '';           // '' | 'Focus' | 'Lost'
@@ -1844,6 +1839,14 @@ function buildLeadSectionHtml(lead, car){
       </div>
     </div>
 
+    <!-- Pipeline Position (New / Working / Appt / Be Back / Cold — drives the Sales Process board columns) -->
+    <div style="margin-bottom:12px">
+      <div class="field-label" style="margin-bottom:6px">Pipeline Position</div>
+      <select style="width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:6px;font-family:'Inter',sans-serif;font-size:13px;outline:none" onchange="updateLeadFieldFromDrawer('pipelineStage',this.value)">
+        ${pipelineOpts}
+      </select>
+    </div>
+
     <!-- Customer Grade (leadRank) -->
     <div style="margin-bottom:12px">
       <div class="field-label" style="margin-bottom:6px">Customer Grade</div>
@@ -1884,9 +1887,9 @@ function buildLeadSectionHtml(lead, car){
       <textarea rows="2" placeholder="What's holding up the timing? (co-signer, down payment, insurance, etc.)" style="width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:6px;font-family:'Inter',sans-serif;font-size:13px;outline:none;resize:vertical" onblur="updateLeadFieldFromDrawer('timeframe',this.value)">${String(lead.timeframe||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</textarea>
     </div>
 
-    <!-- Status -->
+    <!-- Communication Status -->
     <div style="margin-bottom:12px">
-      <div class="field-label" style="margin-bottom:5px">Status</div>
+      <div class="field-label" style="margin-bottom:5px">Communication Status</div>
       <select style="width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:6px;font-family:'Inter',sans-serif;font-size:13px;outline:none" onchange="updateLeadFieldFromDrawer('status',this.value)">
         ${statusOpts}
       </select>
@@ -2831,7 +2834,7 @@ function isWaitingLead(l) {
 function runMatchingForAllLeads() {
   let matchedLeadCount = 0;
   for (const lead of leadsData) {
-    if (lead.status === 'Sold' || lead.status === 'Lost') continue;
+    if (getLeadTab(lead) === 'Sold' || getLeadTab(lead) === 'Lost') continue;
     const matches = findMatchesForLead(lead);
     lead._matches = matches; // cache on lead object
     if (matches.length) matchedLeadCount++;
@@ -2947,11 +2950,38 @@ function buildMatchingSectionHtml(lead) {
 let leadsData = [];
 let selectedLeads = new Set();
 let appSettings = { repNames: [] };
-const LEAD_STATUSES = ['New','One Way Communication','Two Way Communication','Cold','Appt','Be Back','Sold','Lost'];
-const LEAD_STATUS_COLORS = {
-  'New':'s-new','One Way Communication':'s-oneway','Two Way Communication':'s-twoway',
-  'Cold':'s-cold','Appt':'s-appt','Be Back':'s-beback','Sold':'s-sold','Lost':'s-lost'
+// Communication status — pure comms state, independent of pipeline position (see PIPELINE_STAGES).
+const LEAD_STATUSES = ['','One Way','Two Way','Cold'];
+const LEAD_STATUS_LABELS = { '':'Not Contacted', 'One Way':'One Way', 'Two Way':'Two Way', 'Cold':'Cold' };
+const LEAD_STATUS_COLORS = { '':'s-new', 'One Way':'s-oneway', 'Two Way':'s-twoway', 'Cold':'s-cold' };
+
+// Pipeline position — where the lead sits in the sales process. Drives the Sales Process board columns.
+// Waiting (Needs Vehicle Match) is derived from vehicleNotAvailable, and Sold/Lost from inFocus — neither lives here.
+const PIPELINE_STAGES = ['New','Working','Appt','BeBack','Cold'];
+const PIPELINE_STAGE_LABELS = { 'New':'New Lead', 'Working':'Working', 'Appt':'Appt Set', 'BeBack':'Be Back', 'Cold':'Cold' };
+
+// One-time backfill: legacy `status` used to encode both comms state and pipeline position together
+// (e.g. 'One Way Communication', 'Appt', 'Be Back'). Split any lead still missing `pipelineStage`
+// into the two independent fields and write both back. Self-heals across the whole sheet as leads load.
+const LEGACY_STATUS_SPLIT = {
+  '':                       { status:'',        pipelineStage:'New' },
+  'New':                    { status:'',        pipelineStage:'New' },
+  'One Way Communication':  { status:'One Way', pipelineStage:'Working' },
+  'Two Way Communication':  { status:'Two Way', pipelineStage:'Working' },
+  'Appt':                   { status:'Two Way', pipelineStage:'Appt' },
+  'Be Back':                { status:'Two Way', pipelineStage:'BeBack' },
+  'Cold':                   { status:'Cold',    pipelineStage:'Cold' },
+  'Sold':                   { status:'',        pipelineStage:'Working' },
+  'Lost':                   { status:'',        pipelineStage:'Working' }
 };
+function migrateLeadPipelineFields(lead){
+  if (lead.pipelineStage) return;
+  const split = LEGACY_STATUS_SPLIT[lead.status||''] || { status:'', pipelineStage:'New' };
+  lead.status = split.status;
+  lead.pipelineStage = split.pipelineStage;
+  apiPost('updateLead', { rowIndex: lead.rowIndex, field: 'status', value: split.status });
+  apiPost('updateLead', { rowIndex: lead.rowIndex, field: 'pipelineStage', value: split.pipelineStage });
+}
 
 // ===== SECTION: LEADS / CRM TAB =====
 
@@ -3189,6 +3219,7 @@ async function loadLeads(){
     leadsData.forEach(l => {
       try { l.vehicleList = l.vehicleList ? JSON.parse(l.vehicleList) : []; }
       catch(e) { l.vehicleList = []; }
+      migrateLeadPipelineFields(l);
     });
     document.getElementById('cnt-leads').textContent = leadsData.length;
     // Run matching on all open leads
@@ -3252,11 +3283,9 @@ function renderLeads(){
     const daysSinceEdit = lastEditedDate ? Math.floor((Date.now() - lastEditedDate) / 86400000) : null;
     const staleColor = daysSinceEdit === null ? '' : daysSinceEdit <= 2 ? 'var(--green)' : daysSinceEdit <= 7 ? 'var(--amber)' : 'var(--red)';
     const staleDot = staleColor ? `<span title="Last edited ${daysSinceEdit === 0 ? 'today' : daysSinceEdit + 'd ago'}" style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${staleColor};flex-shrink:0"></span>` : '';
-    const status = lead.status || 'New';
+    const status = lead.status || '';
     const cls = LEAD_STATUS_COLORS[status]||'s-new';
-    // Table status dropdown excludes Sold and Lost — handled via pipeline status
-    const TABLE_STATUSES = LEAD_STATUSES.filter(s => s !== 'Sold' && s !== 'Lost');
-    const statusOpts = TABLE_STATUSES.map(s=>`<option value="${s}"${s===status?' selected':''}>${s}</option>`).join('');
+    const statusOpts = LEAD_STATUSES.map(s=>`<option value="${s}"${s===status?' selected':''}>${LEAD_STATUS_LABELS[s]}</option>`).join('');
     const isSelected = selectedLeads.has(lead.rowIndex);
 
     // Show first car from the customer's vehicle list
@@ -3325,7 +3354,7 @@ function renderLeads(){
 
   content.innerHTML=`<div class="table-wrap"><table class="lead-table"><thead><tr>
     <th style="width:32px"><input type="checkbox" onchange="toggleAllLeads(this)"></th>
-    <th>Date</th><th>Name</th><th>Phone</th><th>Vehicle</th><th>Timeframe</th><th>Status</th><th></th>
+    <th>Date</th><th>Name</th><th>Phone</th><th>Vehicle</th><th>Timing Notes</th><th>Status</th><th></th>
   </tr></thead><tbody>${rows}</tbody></table></div>`;
 }
 
@@ -3362,22 +3391,22 @@ const BOARD_STAGE_COLS = ['Lot','Phone Call','FB Marketplace','Internet Lead','F
 const BOARD_CLOSED_COLS = ['Sold','Lost'];
 
 const PROCESS_COLS = [
-  { key:'New',     label:'New Lead',            match: l => !isWaitingLead(l) && (!l.status || l.status==='New') },
-  { key:'Working', label:'Working',             match: l => !isWaitingLead(l) && (l.status==='One Way Communication' || l.status==='Two Way Communication') },
-  { key:'Appt',    label:'Appt Set',            match: l => !isWaitingLead(l) && l.status==='Appt' },
-  { key:'BeBack',  label:'Be Back',             match: l => !isWaitingLead(l) && l.status==='Be Back' },
+  { key:'New',     label:'New Lead',            match: l => !isWaitingLead(l) && (!l.pipelineStage || l.pipelineStage==='New') },
+  { key:'Working', label:'Working',             match: l => !isWaitingLead(l) && l.pipelineStage==='Working' },
+  { key:'Appt',    label:'Appt Set',            match: l => !isWaitingLead(l) && l.pipelineStage==='Appt' },
+  { key:'BeBack',  label:'Be Back',             match: l => !isWaitingLead(l) && l.pipelineStage==='BeBack' },
   { key:'Waiting', label:'Needs Vehicle Match', match: l => isWaitingLead(l) },
-  { key:'Cold',    label:'Cold',                match: l => !isWaitingLead(l) && l.status==='Cold' }
+  { key:'Cold',    label:'Cold',                match: l => !isWaitingLead(l) && l.pipelineStage==='Cold' }
 ];
 // What dragging a card into each process column actually writes.
 // Sold/Lost aren't here — those fall through to moveLeadTo() (inFocus), same as closed columns everywhere else.
 // SoldArchived is the exception: it's a closed-column split (see bucketLeadsForBoard), not a stage, so it's a plain field write.
 const PROCESS_COL_WRITE = {
-  'New':     { status:'New', vehicleNotAvailable:'false' },
-  'Working': { status:'One Way Communication', vehicleNotAvailable:'false' },
-  'Appt':    { status:'Appt', vehicleNotAvailable:'false' },
-  'BeBack':  { status:'Be Back', vehicleNotAvailable:'false' },
-  'Cold':    { status:'Cold', vehicleNotAvailable:'false' },
+  'New':     { pipelineStage:'New', vehicleNotAvailable:'false' },
+  'Working': { pipelineStage:'Working', vehicleNotAvailable:'false' },
+  'Appt':    { pipelineStage:'Appt', vehicleNotAvailable:'false' },
+  'BeBack':  { pipelineStage:'BeBack', vehicleNotAvailable:'false' },
+  'Cold':    { pipelineStage:'Cold', vehicleNotAvailable:'false' },
   'Waiting': { vehicleNotAvailable:'true' },
   'SoldArchived': { soldArchived:'true' }
 };
@@ -3551,7 +3580,7 @@ async function boardColDrop(e, colKey){
 function updateLeadsSubtitle(){
   const subtitle = document.getElementById('leads-subtitle');
   if(!subtitle) return;
-  const newCount = leadsData.filter(l=>l.status==='New'||!l.status).length;
+  const newCount = leadsData.filter(l=>!l.pipelineStage||l.pipelineStage==='New').length;
   subtitle.textContent = '('+leadsData.length+')' + (newCount?' — '+newCount+' new':'');
 }
 
@@ -3678,7 +3707,7 @@ function openAddLeadModal(preselectedVin){
   document.getElementById('al-vehicle-results').style.display='none';
   document.getElementById('al-vehicle-selected').style.display='none';
   document.getElementById('al-timeframe').value='';
-  document.getElementById('al-status').value='New';
+  document.getElementById('al-pipeline').value='New';
   document.getElementById('al-error').style.display='none';
   ['al-first-dd','al-last-dd'].forEach(id=>{ const dd=document.getElementById(id); if(dd) dd.style.display='none'; });
   selectAlLeadType('Lot');
@@ -3749,7 +3778,7 @@ async function submitManualLead(){
   const lastName  = document.getElementById('al-lastname').value.trim();
   const phone     = document.getElementById('al-phone').value.trim();
   const timeframe = document.getElementById('al-timeframe').value;
-  const status    = document.getElementById('al-status').value;
+  const pipelineStage = document.getElementById('al-pipeline').value;
   const notes     = document.getElementById('al-notes').value.trim();
   const vehicleInterest = document.getElementById('al-vehicle-interest').value.trim();
   const vehicleNotAvailable = document.getElementById('al-not-avail').checked ? 'true' : '';
@@ -3766,7 +3795,7 @@ async function submitManualLead(){
     firstName, lastName, phone, timeframe,
     vehicle: alSelectedVehicle,
     vin: alSelectedVin,
-    status, notes, vehicleInterest, vehicleNotAvailable,
+    pipelineStage, notes, vehicleInterest, vehicleNotAvailable,
     turnedToFirst, turnedTo,
     source: document.getElementById('al-leadtype').value,
     leadType: document.getElementById('al-leadtype').value,
@@ -3801,8 +3830,8 @@ async function updateLeadFieldFromDrawer(field, value){
   if(currentLeadRowIndex===null) return;
   const lead=leadsData.find(l=>l.rowIndex===currentLeadRowIndex);
   if(lead) lead[field]=value;
-  if(field==='status') updateLeadsSubtitle();
-  if((field==='timeframe'||field==='status') && document.getElementById('leads-content')) renderLeads();
+  if(field==='status'||field==='pipelineStage') updateLeadsSubtitle();
+  if((field==='timeframe'||field==='status'||field==='pipelineStage') && document.getElementById('leads-content')) renderLeads();
   try { await apiPost('updateLead',{rowIndex:currentLeadRowIndex,field,value}); }
   catch(e){ showToast('Save failed'); }
 }
@@ -4065,7 +4094,8 @@ function renderNewCarDrawer(c, isLeadContext) {
   if (isLeadContext && currentLeadRowIndex !== null) {
     const lead = leadsData.find(l => l.rowIndex === currentLeadRowIndex);
     if (lead) {
-      const stopts = LEAD_STATUSES.map(s=>`<option value="${s}"${s===(lead.status||'New')?' selected':''}>${s}</option>`).join('');
+      const stopts = LEAD_STATUSES.map(s=>`<option value="${s}"${s===(lead.status||'')?' selected':''}>${LEAD_STATUS_LABELS[s]}</option>`).join('');
+      const pipelineOptsMini = PIPELINE_STAGES.map(s=>`<option value="${s}"${s===(lead.pipelineStage||'New')?' selected':''}>${PIPELINE_STAGE_LABELS[s]}</option>`).join('');
       h += `<div style="background:rgba(74,158,255,0.07);border:1px solid rgba(74,158,255,0.2);border-radius:var(--radius);padding:14px 16px;margin-bottom:16px">
         <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:12px">
           <div>
@@ -4085,6 +4115,11 @@ function renderNewCarDrawer(c, isLeadContext) {
               ${stopts}
             </select>
           </div>
+        </div>
+        <div style="margin-bottom:10px"><div class="field-label">Pipeline Position</div>
+          <select style="width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:6px;font-family:'Inter',sans-serif;font-size:13px;outline:none" onchange="updateLeadFieldFromDrawer('pipelineStage',this.value)">
+            ${pipelineOptsMini}
+          </select>
         </div>
         <div><div class="field-label">Notes</div>
           <input type="text" style="width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:6px;font-family:'Inter',sans-serif;font-size:13px;outline:none" value="${(lead.notes||'').replace(/"/g,'&quot;')}" placeholder="Add note…" onblur="updateLeadFieldFromDrawer('notes',this.value)" onkeydown="if(event.key==='Enter')this.blur()">
@@ -5171,8 +5206,8 @@ function closeLeadPicker() {
 function renderLeadPickerResults(q) {
   q = (q || '').toLowerCase().trim();
   const open = leadsData.filter(l => {
-    const s = l.status || '';
-    if (s === 'Sold' || s === 'Lost') return false;
+    const tab = getLeadTab(l);
+    if (tab === 'Sold' || tab === 'Lost') return false;
     if (!q) return true;
     return [(l.firstName||''),(l.lastName||''),(l.phone||'')].join(' ').toLowerCase().includes(q);
   });
@@ -5183,7 +5218,7 @@ function renderLeadPickerResults(q) {
   }
   el.innerHTML = open.map(l => {
     const name = ((l.firstName||'') + ' ' + (l.lastName||'')).trim() || 'Unknown';
-    const status = l.status || 'New';
+    const status = l.status || '';
     const colorClass = LEAD_STATUS_COLORS[status] || 's-new';
     const hasVehicle = l.vehicle || l.vin;
     return `<div onclick="selectLeadForCar(${l.rowIndex})"
@@ -5191,7 +5226,7 @@ function renderLeadPickerResults(q) {
       onmouseover="this.style.background='var(--bg3)'" onmouseout="this.style.background=''">
       <div style="display:flex;justify-content:space-between;align-items:center">
         <div style="font-size:14px;font-weight:600;color:var(--text)">${name}</div>
-        <span class="lead-status-sel ${colorClass}" style="cursor:default">${status}</span>
+        <span class="lead-status-sel ${colorClass}" style="cursor:default">${LEAD_STATUS_LABELS[status]}</span>
       </div>
       <div style="font-size:12px;color:var(--text3);margin-top:2px;font-family:'DM Mono',monospace">${l.phone||''}${hasVehicle?' · '+( l.vehicle||'vehicle linked'):''}</div>
     </div>`;
