@@ -271,7 +271,9 @@
   .board-column-count { color: var(--text3); font-weight: 600; }
   .board-column-body { padding: 8px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; }
   .board-column-empty { text-align: center; color: var(--text3); font-size: 12px; padding: 16px 0; }
-  .board-card { background: var(--bg3); border: 1px solid var(--border); border-radius: var(--radius); padding: 10px; cursor: pointer; transition: border-color 0.15s; }
+  .board-card { background: var(--bg3); border: 1px solid var(--border); border-radius: var(--radius); padding: 10px; cursor: pointer; transition: border-color 0.15s; border-top: 2px solid transparent; border-bottom: 2px solid transparent; }
+  .board-card.board-card-drop-above { border-top-color: var(--accent); }
+  .board-card.board-card-drop-below { border-bottom-color: var(--accent); }
   .board-card:hover { border-color: var(--border2); }
   .board-card-top { display: flex; align-items: center; justify-content: flex-start; flex-wrap: wrap; margin-bottom: 6px; gap: 6px; }
   .board-rank-badge { font-family: 'DM Mono', monospace; font-size: 11px; font-weight: 700; color: var(--text); background: var(--bg4); padding: 2px 6px; border-radius: 4px; display: inline-block; min-width: 34px; text-align: center; }
@@ -3491,7 +3493,22 @@ const PROCESS_COL_WRITE = {
 };
 function isSoldArchived(l){ return l.soldArchived===true || l.soldArchived==='true'; }
 
+// Manual drag-reorder within a column persists via boardOrder (higher = higher up the column).
+// Leads never manually reordered fall back to their creation timestamp, preserving today's
+// newest-first default without needing a one-time backfill.
+function orderOf(l){
+  if (l.boardOrder) { const n = Number(l.boardOrder); if (!isNaN(n)) return n; }
+  return l.timestamp ? new Date(l.timestamp).getTime() : 0;
+}
+function sortBucketLeads(leads){
+  return [...leads].sort((a,b) => orderOf(b) - orderOf(a));
+}
 function bucketLeadsForBoard(leads, mode, showClosed){
+  const cols = bucketLeadsForBoardRaw(leads, mode, showClosed);
+  cols.forEach(c => { c.leads = sortBucketLeads(c.leads); });
+  return cols;
+}
+function bucketLeadsForBoardRaw(leads, mode, showClosed){
   if (mode === 'process') {
     const active = leads.filter(l => getLeadTab(l) !== 'Sold' && getLeadTab(l) !== 'Lost');
     const cols = PROCESS_COLS.map(c => ({ key:c.key, label:c.label, draggable:true, leads: active.filter(c.match) }));
@@ -3567,7 +3584,7 @@ function renderLeadsBoard(){
 }
 
 function renderBoardColumn(bucket){
-  const cards = bucket.leads.map(l => renderBoardCard(l, bucket.draggable)).join('');
+  const cards = bucket.leads.map(l => renderBoardCard(l, bucket.draggable, bucket.key)).join('');
   return `<div class="board-column"
       ondragover="${bucket.draggable?`boardColDragOver(event)`:''}"
       ondrop="${bucket.draggable?`boardColDrop(event,'${bucket.key}')`:''}">
@@ -3590,7 +3607,7 @@ function pipelineStatusBadgeHtml(lead){
   return `<span class="board-pipestatus-active">Active</span>`;
 }
 
-function renderBoardCard(lead, draggable){
+function renderBoardCard(lead, draggable, colKey){
   const fName = capName(lead.firstName);
   const lName = capName(lead.lastName);
   const phone = fmtPhone(lead.phone);
@@ -3610,6 +3627,9 @@ function renderBoardCard(lead, draggable){
       ${draggable?'draggable="true"':''}
       ondragstart="${draggable?`boardCardDragStart(event,${lead.rowIndex})`:''}"
       ondragend="${draggable?'boardCardDragEnd(event)':''}"
+      ondragover="${draggable?`boardCardDragOver(event)`:''}"
+      ondragleave="${draggable?`boardCardDragLeave(event)`:''}"
+      ondrop="${draggable?`boardCardDrop(event,'${colKey}',${lead.rowIndex})`:''}"
       onclick="openDrawerFromLead(${lead.rowIndex})">
     <div class="board-card-top">
       <span style="cursor:pointer" title="Set customer grade" onclick="event.stopPropagation();openQuickRank(event,${lead.rowIndex})">${rankBadgeHtml(rank)}</span>
@@ -3696,13 +3716,27 @@ async function saveQuickRank(rowIndex){
 }
 function boardColDragOver(e){ e.preventDefault(); e.currentTarget.classList.add('board-col-dragover'); }
 function boardCardDragStart(e, rowIndex){ _boardDragRowIndex = rowIndex; e.dataTransfer.effectAllowed='move'; e.currentTarget.style.opacity='0.4'; }
-function boardCardDragEnd(e){ e.currentTarget.style.opacity=''; document.querySelectorAll('.board-col-dragover').forEach(c=>c.classList.remove('board-col-dragover')); }
-async function boardColDrop(e, colKey){
+function boardCardDragEnd(e){
+  e.currentTarget.style.opacity='';
+  document.querySelectorAll('.board-col-dragover').forEach(c=>c.classList.remove('board-col-dragover'));
+  document.querySelectorAll('.board-card-drop-above,.board-card-drop-below').forEach(c=>c.classList.remove('board-card-drop-above','board-card-drop-below'));
+}
+function boardCardDragOver(e){
   e.preventDefault();
-  e.currentTarget.classList.remove('board-col-dragover');
-  if (_boardDragRowIndex === null) return;
-  const rowIndex = _boardDragRowIndex;
-  _boardDragRowIndex = null;
+  e.stopPropagation(); // don't also trigger the column's own dragover highlight
+  const rect = e.currentTarget.getBoundingClientRect();
+  const above = (e.clientY - rect.top) < rect.height / 2;
+  e.currentTarget.classList.toggle('board-card-drop-above', above);
+  e.currentTarget.classList.toggle('board-card-drop-below', !above);
+}
+function boardCardDragLeave(e){
+  e.currentTarget.classList.remove('board-card-drop-above','board-card-drop-below');
+}
+// Applies whatever a drop into `colKey` means for the dragged lead — a pipeline/source
+// field change (generic write for process columns, moveLeadTo's inFocus branch for
+// Sold/Lost/Focus/stage columns). Shared by column-body drops and card-level drops that
+// land on a different column than the one the card started in.
+async function applyColumnMove(rowIndex, colKey){
   if (leadsGroupBy === 'process' && PROCESS_COL_WRITE[colKey]) {
     const lead = leadsData.find(l => l.rowIndex === rowIndex);
     if (!lead) return;
@@ -3716,6 +3750,49 @@ async function boardColDrop(e, colKey){
     return;
   }
   await moveLeadTo(rowIndex, colKey);
+}
+async function boardColDrop(e, colKey){
+  e.preventDefault();
+  e.currentTarget.classList.remove('board-col-dragover');
+  if (_boardDragRowIndex === null) return;
+  const rowIndex = _boardDragRowIndex;
+  _boardDragRowIndex = null;
+  await applyColumnMove(rowIndex, colKey);
+}
+// Dropping directly on a card either reorders within the same column (manual priority
+// order, persisted via boardOrder) or — if dragged in from a different column — applies
+// the normal column-move logic, same as dropping on empty column space.
+async function boardCardDrop(e, colKey, targetRowIndex){
+  e.preventDefault();
+  e.stopPropagation();
+  e.currentTarget.classList.remove('board-card-drop-above','board-card-drop-below');
+  if (_boardDragRowIndex === null || _boardDragRowIndex === targetRowIndex) { _boardDragRowIndex = null; return; }
+  const draggedRowIndex = _boardDragRowIndex;
+  _boardDragRowIndex = null;
+
+  const visibleLeads = leadsFilter === 'matched' ? leadsData.filter(l => l._matches && l._matches.length > 0) : leadsData;
+  const buckets = bucketLeadsForBoard(visibleLeads, leadsGroupBy, leadsShowClosed);
+  const bucket = buckets.find(b => b.key === colKey);
+  const sameColumn = bucket && bucket.leads.some(l => l.rowIndex === draggedRowIndex);
+
+  if (!sameColumn) { await applyColumnMove(draggedRowIndex, colKey); return; }
+
+  const draggedLead = leadsData.find(l => l.rowIndex === draggedRowIndex);
+  if (!draggedLead) return;
+  const rect = e.currentTarget.getBoundingClientRect();
+  const above = (e.clientY - rect.top) < rect.height / 2;
+  const ordered = bucket.leads.filter(l => l.rowIndex !== draggedRowIndex);
+  const targetIdx = ordered.findIndex(l => l.rowIndex === targetRowIndex);
+  const insertIdx = above ? targetIdx : targetIdx + 1;
+  const prev = ordered[insertIdx - 1];
+  const next = ordered[insertIdx];
+  const prevOrder = prev ? orderOf(prev) : orderOf(ordered[0]) + 1000;
+  const nextOrder = next ? orderOf(next) : (ordered.length ? orderOf(ordered[ordered.length-1]) - 1000 : Date.now());
+  const newOrder = (prevOrder + nextOrder) / 2;
+  draggedLead.boardOrder = newOrder;
+  renderLeads();
+  try { await apiPost('updateLead', { rowIndex: draggedRowIndex, field: 'boardOrder', value: String(newOrder) }); }
+  catch(err) { showToast('Reorder failed'); }
 }
 
 function updateLeadsSubtitle(){
