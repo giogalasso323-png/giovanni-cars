@@ -280,7 +280,7 @@
   .board-card-top { display: flex; align-items: center; justify-content: flex-start; flex-wrap: wrap; margin-bottom: 6px; gap: 6px; }
   .board-rank-badge { font-family: 'DM Mono', monospace; font-size: 11px; font-weight: 700; color: var(--text); background: var(--bg4); padding: 2px 6px; border-radius: 4px; }
   .board-src-badge { font-size: 10px; font-weight: 600; color: var(--text3); background: var(--bg4); padding: 2px 6px; border-radius: 4px; white-space: nowrap; }
-  .board-focus-badge { font-size: 10px; font-weight: 700; color: var(--purple); background: rgba(167,139,250,0.14); padding: 2px 6px; border-radius: 4px; white-space: nowrap; }
+  .board-focus-badge { font-size: 10px; font-weight: 700; color: var(--blue); background: rgba(82,153,255,0.14); padding: 2px 6px; border-radius: 4px; white-space: nowrap; }
   .board-card-name { font-size: 13px; font-weight: 700; color: var(--text); margin-bottom: 4px; }
   .board-card-row { display: flex; align-items: center; justify-content: space-between; gap: 6px; font-size: 12px; font-family: 'DM Mono', monospace; color: var(--text2); margin-bottom: 3px; }
   .board-copy-btn { padding: 2px 6px; font-size: 10px; }
@@ -3500,7 +3500,7 @@ function renderBoardCard(lead, draggable){
     <div class="board-card-row"><span class="board-card-name">${lName||'—'}</span>${copyBtn(lead.lastName,'last name')}</div>
     <div class="board-card-row"><span>${phone||'—'}</span>${copyBtn(lead.phone,'phone')}</div>
     ${stock?`<div class="board-card-row"><span>#${stock}</span>${copyBtn(stock,'stock #')}</div>`:''}
-    ${rep?`<div class="board-card-row"><span>Rep: ${rep}</span></div>`:''}
+    ${rep?`<div class="board-card-row"><span${rep!=='Giovanni'?' style="color:var(--purple)"':''}>Rep: ${rep}</span></div>`:''}
     ${lead.vehicleInterest?`<div class="board-card-interest">${lead.vehicleInterest}</div>`:''}
     <div class="board-card-bottom">
       <span class="board-stale-dot" style="background:${staleColor||'var(--border)'}"></span>
