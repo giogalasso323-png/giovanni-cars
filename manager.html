@@ -274,9 +274,16 @@
   .board-card { background: var(--bg3); border: 1px solid var(--border); border-radius: var(--radius); padding: 10px; cursor: pointer; transition: border-color 0.15s; }
   .board-card:hover { border-color: var(--border2); }
   .board-card-top { display: flex; align-items: center; justify-content: flex-start; flex-wrap: wrap; margin-bottom: 6px; gap: 6px; }
-  .board-rank-badge { font-family: 'DM Mono', monospace; font-size: 11px; font-weight: 700; color: var(--text); background: var(--bg4); padding: 2px 6px; border-radius: 4px; }
+  .board-rank-badge { font-family: 'DM Mono', monospace; font-size: 11px; font-weight: 700; color: var(--text); background: var(--bg4); padding: 2px 6px; border-radius: 4px; display: inline-block; min-width: 34px; text-align: center; }
   .board-src-badge { font-size: 10px; font-weight: 600; color: var(--text3); background: var(--bg4); padding: 2px 6px; border-radius: 4px; white-space: nowrap; }
-  .board-focus-badge { font-size: 10px; font-weight: 700; color: var(--blue); background: rgba(82,153,255,0.14); padding: 2px 6px; border-radius: 4px; white-space: nowrap; }
+  .board-focus-badge, .board-pipestatus-active, .board-pipestatus-lost, .board-pipestatus-sold { font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 4px; white-space: nowrap; display: inline-block; min-width: 40px; text-align: center; }
+  .board-focus-badge { color: var(--blue); background: rgba(82,153,255,0.14); }
+  .board-pipestatus-active { color: var(--text3); background: var(--bg4); }
+  .board-pipestatus-lost { color: var(--red); background: var(--red-bg); }
+  .board-pipestatus-sold { color: var(--green); background: var(--green-bg); }
+  .quick-rank-pop { position: absolute; z-index: 1000; background: var(--bg2); border: 1px solid var(--border2); border-radius: 8px; padding: 8px; display: flex; gap: 6px; align-items: center; box-shadow: 0 8px 24px rgba(0,0,0,0.4); }
+  .quick-rank-pop select { background: var(--bg3); border: 1px solid var(--border); color: var(--text); border-radius: 6px; padding: 4px 6px; font-family: 'DM Mono', monospace; font-size: 12px; }
+  .quick-rank-pop label { display: flex; align-items: center; gap: 3px; font-size: 11px; color: var(--text2); cursor: pointer; }
   .board-card-name { font-size: 13px; font-weight: 700; color: var(--text); margin-bottom: 4px; }
   .board-card-row { display: flex; align-items: center; justify-content: space-between; gap: 6px; font-size: 12px; font-family: 'DM Mono', monospace; color: var(--text2); margin-bottom: 3px; }
   .board-copy-btn { padding: 2px 6px; font-size: 10px; }
@@ -3573,6 +3580,15 @@ function isLeadInFocus(lead){
   const ip = lead.inFocus;
   return ip === 'Focus' || ip === true || ip === 'true';
 }
+// Always renders a badge — a blank/default state should still occupy its slot so the
+// card layout doesn't shift when a field gets filled in later.
+function pipelineStatusBadgeHtml(lead){
+  const ip = lead.inFocus;
+  if (isLeadInFocus(lead)) return `<span class="board-focus-badge">Focus</span>`;
+  if (ip === 'Lost') return `<span class="board-pipestatus-lost">Lost</span>`;
+  if (ip === 'Sold') return `<span class="board-pipestatus-sold">Sold</span>`;
+  return `<span class="board-pipestatus-active">Active</span>`;
+}
 
 function renderBoardCard(lead, draggable){
   const fName = capName(lead.firstName);
@@ -3596,9 +3612,9 @@ function renderBoardCard(lead, draggable){
       ondragend="${draggable?'boardCardDragEnd(event)':''}"
       onclick="openDrawerFromLead(${lead.rowIndex})">
     <div class="board-card-top">
-      ${rankBadgeHtml(rank)}
+      <span style="cursor:pointer" title="Set customer grade" onclick="event.stopPropagation();openQuickRank(event,${lead.rowIndex})">${rankBadgeHtml(rank)}</span>
       <span class="board-src-badge">${src}</span>
-      ${isLeadInFocus(lead)?`<span class="board-focus-badge">Focus</span>`:''}
+      ${pipelineStatusBadgeHtml(lead)}
     </div>
     <div class="board-card-row"><span class="board-card-name">${fName||'—'}</span>${copyBtn(lead.firstName,'first name')}</div>
     <div class="board-card-row"><span class="board-card-name">${lName||'—'}</span>${copyBtn(lead.lastName,'last name')}</div>
@@ -3620,14 +3636,63 @@ function rankCharColor(ch, isTiming){
   return ch==='A' ? 'var(--green)' : ch==='B' ? 'var(--amber)' : ch==='C' ? 'var(--red)' : 'var(--text3)';
 }
 function rankBadgeHtml(rank){
-  if (!rank) return '';
   const p1 = rank[0]||'', p2 = rank[1]||'', p3 = rank[2]||'', suffix = rank.slice(3);
   return `<span class="board-rank-badge">`+
-    `<span style="color:${rankCharColor(p1,false)}">${p1}</span>`+
-    `<span style="color:${rankCharColor(p2,true)}">${p2}</span>`+
-    `<span style="color:${rankCharColor(p3,false)}">${p3}</span>`+
+    `<span style="color:${rankCharColor(p1,false)}">${p1||'–'}</span>`+
+    `<span style="color:${rankCharColor(p2,true)}">${p2||'–'}</span>`+
+    `<span style="color:${rankCharColor(p3,false)}">${p3||'–'}</span>`+
     (suffix?`<span style="color:var(--text3)">${suffix}</span>`:'')+
     `</span>`;
+}
+// Quick rank popover — set customer grade straight from any board card, no drawer needed.
+function openQuickRank(e, rowIndex){
+  closeQuickRank();
+  const lead = leadsData.find(l => l.rowIndex === rowIndex);
+  if (!lead) return;
+  const rank = lead.leadRank || '';
+  const p1 = rank[0]||'', p2 = rank[1]||'', p3 = rank[2]||'';
+  const suffix = rank.slice(3);
+  const t = suffix.indexOf('T') >= 0, d = suffix.indexOf('D') >= 0;
+  const rect = e.currentTarget.getBoundingClientRect();
+  const mkSel = (id, opts, val) => `<select id="${id}" onchange="saveQuickRank(${rowIndex})">${opts.map(o=>`<option value="${o}"${o===val?' selected':''}>${o||'–'}</option>`).join('')}</select>`;
+  const pop = document.createElement('div');
+  pop.id = 'quick-rank-pop';
+  pop.className = 'quick-rank-pop';
+  pop.style.top = (rect.bottom + window.scrollY + 4) + 'px';
+  pop.style.left = (rect.left + window.scrollX) + 'px';
+  pop.onclick = ev => ev.stopPropagation();
+  pop.innerHTML = `
+    ${mkSel('qr-pos1', ['','A','B','C','0'], p1)}
+    ${mkSel('qr-pos2', ['','1','2','3','0'], p2)}
+    ${mkSel('qr-pos3', ['','A','B','C','0'], p3)}
+    <label><input type="checkbox" id="qr-turn"${t?' checked':''} onchange="saveQuickRank(${rowIndex})">T</label>
+    <label><input type="checkbox" id="qr-dead"${d?' checked':''} onchange="saveQuickRank(${rowIndex})">D</label>
+  `;
+  document.body.appendChild(pop);
+  setTimeout(() => document.addEventListener('click', closeQuickRankOnOutside), 0);
+}
+function closeQuickRankOnOutside(ev){
+  const pop = document.getElementById('quick-rank-pop');
+  if (pop && !pop.contains(ev.target)) closeQuickRank();
+}
+function closeQuickRank(){
+  const pop = document.getElementById('quick-rank-pop');
+  if (!pop) return;
+  pop.remove();
+  document.removeEventListener('click', closeQuickRankOnOutside);
+  if (document.getElementById('leads-content')) renderLeads();
+}
+async function saveQuickRank(rowIndex){
+  const p1 = document.getElementById('qr-pos1').value;
+  const p2 = document.getElementById('qr-pos2').value;
+  const p3 = document.getElementById('qr-pos3').value;
+  const t = document.getElementById('qr-turn').checked;
+  const d = document.getElementById('qr-dead').checked;
+  const rank = p1 + p2 + p3 + (t?'T':'') + (d?'D':'');
+  const lead = leadsData.find(l => l.rowIndex === rowIndex);
+  if (lead) lead.leadRank = rank;
+  try { await apiPost('updateLead', { rowIndex, field: 'leadRank', value: rank }); }
+  catch(e) { showToast('Save failed'); }
 }
 function boardColDragOver(e){ e.preventDefault(); e.currentTarget.classList.add('board-col-dragover'); }
 function boardCardDragStart(e, rowIndex){ _boardDragRowIndex = rowIndex; e.dataTransfer.effectAllowed='move'; e.currentTarget.style.opacity='0.4'; }
