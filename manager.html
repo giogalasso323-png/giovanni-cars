@@ -1417,10 +1417,16 @@ async function downloadPhotosZip() {
   setTimeout(() => URL.revokeObjectURL(a.href), 10000);
 
   btn.disabled = false;
-  countEl.textContent = vins.length + ' selected';
   let msg = fetched + ' car' + (fetched > 1 ? 's' : '') + ' downloaded';
   if (empty) msg += ` · ${empty} had no photos`;
-  if (errors) msg += ` · ${errors} failed (retry those)`;
+  if (errors) {
+    // Leave the selection alone so the failed cars are still checked and easy to retry.
+    msg += ` · ${errors} failed (retry those)`;
+    countEl.textContent = vins.length + ' selected';
+  } else {
+    // Clean run — clear the selection so the next batch starts fresh without a reload.
+    clearSelection();
+  }
   showToast(msg);
 }
 
