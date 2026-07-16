@@ -372,6 +372,7 @@
     <button class="filter-tab" data-filter="live">Live <span class="tab-count" id="cnt-live">0</span></button>
     <button class="filter-tab" data-filter="posted">FB Posted <span class="tab-count" id="cnt-posted">0</span></button>
     <button class="filter-tab" data-filter="unposted">Not Posted <span class="tab-count" id="cnt-unposted">0</span></button>
+    <button class="filter-tab" data-filter="downloaded">Downloaded <span class="tab-count" id="cnt-downloaded">0</span></button>
     <button class="filter-tab" data-filter="sold">Sold <span class="tab-count" id="cnt-sold">0</span></button>
     <button class="filter-tab" data-filter="not-listed">Not Listed <span class="tab-count" id="cnt-not-listed">0</span></button>
     <button class="filter-tab" data-filter="leads">Leads <span class="tab-count" id="cnt-leads">0</span></button>
@@ -441,6 +442,7 @@
       <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
       Download Photos
     </button>
+    <button class="btn" onclick="bulkClearDownloaded()" title="Reset the Downloaded flag — use this when the actual photo files are gone (different computer, new day) so you can redownload a fresh batch">Clear Download Status</button>
     <button class="btn" style="color:var(--red)" onclick="clearSelection()">Clear</button>
   </div>
 
@@ -455,6 +457,7 @@
       <table>
         <thead><tr id="table-head-row">
           <th style="width:32px"><input type="checkbox" id="chk-all" onchange="toggleAll(this)"></th>
+          <th>Stock #</th>
           <th onclick="sortBy('title')">Vehicle</th>
           <th onclick="sortBy('price')" id="th-price">Price</th>
           <th onclick="sortBy('mileage')">Miles</th>
@@ -463,7 +466,6 @@
           <th onclick="sortBy('days')">Days on Lot</th>
           <th id="th-daysposted" style="display:none" onclick="sortBy('daysposted')">Days Posted</th>
           <th onclick="sortBy('gross')">GP</th>
-          <th>Stock #</th>
         </tr></thead>
         <tbody id="table-body"></tbody>
       </table>
@@ -959,9 +961,10 @@ function statusBadge(c) {
   return '<span class="badge badge-notfound">—</span>';
 }
 const fbBadge = c => c.fbStatus==='posted' ? '<span class="badge badge-posted">Posted</span>' : '<span class="badge badge-unposted">Not Posted</span>';
-// Shown only while photos are downloaded but the car isn't posted yet — the in-progress
-// state between a bulk photo download and actually listing it on Marketplace.
-const photosPendingBadge = c => (c.photosDownloadedDate && c.fbStatus!=='posted') ? '<span class="badge badge-photos-pending" title="Photos downloaded — not yet posted">Downloaded</span>' : '';
+// True for the in-progress state between a bulk photo download and actually listing it on
+// Marketplace — backs the "Downloaded" badge, the dedicated filter tab, and bulk-clear.
+const isPendingDownload = c => !!(c.photosDownloadedDate && c.fbStatus!=='posted');
+const photosPendingBadge = c => isPendingDownload(c) ? '<span class="badge badge-photos-pending" title="Photos downloaded — not yet posted">Downloaded</span>' : '';
 const daysClass = d => d>60?'hot':d>30?'warm':'';
 
 // ── CSV ────────────────────────────────────────────────────
@@ -1081,6 +1084,7 @@ function applyFilters() {
     if(activeFilter==='live') return (c.websiteStatus||'').toLowerCase().includes('live');
     if(activeFilter==='posted') return c.fbStatus==='posted';
     if(activeFilter==='unposted') return c.fbStatus!=='posted'&&!(c.websiteStatus||'').toLowerCase().includes('sold');
+    if(activeFilter==='downloaded') return isPendingDownload(c);
     if(activeFilter==='sold') return (c.websiteStatus||'').toLowerCase().includes('sold')||c.fbStatus==='sold';
     if(activeFilter==='not-listed') return isNotListed(c)&&!isUpcomingStub(c);
     return true;
@@ -1183,6 +1187,7 @@ function renderTable() {
 
     return `<tr onclick="openDrawer('${c.vin}')" class="${isActive?'row-active':''}">
       <td onclick="event.stopPropagation()"><input type="checkbox" ${chk} onchange="toggleSelect('${c.vin}',this)"></td>
+      <td style="color:var(--text3)">${c.stock||'—'}</td>
       <td><div class="td-main">${getTitle(c)}</div>${activeFilter==='upcoming'&&c.appraiser?`<div style="font-size:11px;color:var(--amber);margin-top:1px">${c.appraiser}</div>`:''}<div class="td-vin">${c.vin}</div></td>
       <td style="${priceStyle}">${priceDisplay}</td>
       <td>${fmtMiles(c.mileage)}</td>
@@ -1191,7 +1196,6 @@ function renderTable() {
       <td><span class="days-badge ${daysClass(d)}">${d}d</span></td>
       ${isPostedTab?`<td><span class="days-badge ${daysClass(daysPosted)}">${daysPosted}d posted</span></td>`:''}
       ${grossTableCell(c)}
-      <td style="color:var(--text3)">${c.stock||'—'}</td>
     </tr>`;
   }).join('');
 }
@@ -1265,6 +1269,7 @@ function updateCounts() {
   document.getElementById('cnt-live').textContent=inventory.filter(c=>(c.websiteStatus||'').toLowerCase().includes('live')).length;
   document.getElementById('cnt-posted').textContent=inventory.filter(c=>c.fbStatus==='posted').length;
   document.getElementById('cnt-unposted').textContent=inventory.filter(c=>c.fbStatus!=='posted'&&!(c.websiteStatus||'').toLowerCase().includes('sold')).length;
+  document.getElementById('cnt-downloaded').textContent=inventory.filter(isPendingDownload).length;
   document.getElementById('cnt-sold').textContent=inventory.filter(c=>(c.websiteStatus||'').toLowerCase().includes('sold')||c.fbStatus==='sold').length;
   document.getElementById('cnt-not-listed').textContent=inventory.filter(c=>isNotListed(c)&&!isUpcomingStub(c)).length;
 }
@@ -1349,6 +1354,17 @@ async function bulkMarkPosted() {
   await apiPost('upsertMany',{cars:vins.map(v=>inventory.find(c=>c.vin===v)).filter(Boolean)});
   setSyncInfo('ok'); showToast(vins.length+' marked as FB Posted');
 }
+
+// Resets the Downloaded flag without touching fbStatus — for when the actual photo files
+// are gone (new day, different computer) and a selected batch needs a clean redownload.
+async function bulkClearDownloaded() {
+  const vins=[...selectedVins];
+  if(!vins.length) return;
+  vins.forEach(v=>{ const c=inventory.find(x=>x.vin===v); if(c) c.photosDownloadedDate=''; });
+  clearSelection(); render(); setSyncInfo('saving');
+  await apiPost('upsertMany',{cars:vins.map(v=>inventory.find(c=>c.vin===v)).filter(Boolean)});
+  setSyncInfo('ok'); showToast(vins.length+' download status cleared');
+}
 async function bulkMarkSold() {
   const vins=[...selectedVins];
   vins.forEach(v=>{ const c=inventory.find(x=>x.vin===v); if(c){c.fbStatus='sold';c.websiteStatus='Sold/Unavailable';c.soldDate=new Date().toISOString();} });
@@ -1373,7 +1389,7 @@ async function downloadPhotosZip() {
     const vin = vins[i];
     const car = inventory.find(c => c.vin === vin);
     const label = car
-      ? `${car.year} ${car.make} ${car.model}${car.trim ? ' ' + car.trim : ''} (${car.stock || vin.slice(-6)})`
+      ? `${car.stock || vin.slice(-6)} - ${car.year} ${car.make} ${car.model}${car.trim ? ' ' + car.trim : ''}`
       : vin;
 
     countEl.textContent = `Fetching ${i + 1} of ${vins.length}: ${label}…`;
@@ -4365,8 +4381,8 @@ function renderNewCarsView() {
     const disColor  = dis>60?'var(--red)':dis>30?'var(--amber)':'var(--text3)';
     const isActive  = c.vin === lastOpenedNewVin;
     return `<tr onclick="openNewCarDrawer('${c.vin}')" class="${isActive?'row-active':''}">
-      <td><div class="td-main">${c.year||''} ${c.modelName||'—'}</div><div class="td-vin">${c.vin}</div></td>
       <td style="color:var(--text3)">${c.stock||'—'}</td>
+      <td><div class="td-main">${c.year||''} ${c.modelName||'—'}</div><div class="td-vin">${c.vin}</div></td>
       <td>${decodeColor(c.extColor)}</td>
       <td style="font-weight:600">${price}</td>
       <td style="color:${disColor}">${dis||'—'}d</td>
@@ -4407,8 +4423,8 @@ function renderNewCarsView() {
       <div class="table-wrap">
         <table>
           <thead><tr>
-            <th onclick="setNewCarsSort('model')">Model / VIN</th>
             <th>Stock #</th>
+            <th onclick="setNewCarsSort('model')">Model / VIN</th>
             <th>Color</th>
             <th onclick="setNewCarsSort('price-asc')">Price</th>
             <th onclick="setNewCarsSort('dis')">DIS</th>
