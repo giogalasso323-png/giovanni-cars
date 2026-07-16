@@ -297,6 +297,7 @@
   .note-entry-meta { display: flex; justify-content: space-between; gap: 8px; font-size: 10px; color: var(--text3); margin-bottom: 4px; }
   .note-entry-by { font-weight: 600; flex-shrink: 0; }
   .note-entry-text { font-size: 13px; color: var(--text2); white-space: pre-wrap; line-height: 1.4; }
+  .note-entry-actions { display: flex; gap: 6px; margin-top: 6px; }
   .board-card-bottom { display: flex; align-items: center; gap: 6px; margin-top: 6px; font-size: 10px; color: var(--text3); }
   .board-stale-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
   .origin-tag { display: inline-flex; align-items: center; padding: 1px 6px; border-radius: 3px; font-size: 10px; font-weight: 700; background: rgba(139,92,246,0.12); color: #a78bfa; margin-left: 5px; vertical-align: middle; }
@@ -1690,10 +1691,8 @@ function openDrawerFromLead(rowIndex){
 
 function buildLeadSectionHtml(lead, car){
   const statusOpts=LEAD_STATUSES.map(s=>`<option value="${s}"${s===(lead.status||'')?' selected':''}>${LEAD_STATUS_LABELS[s]}</option>`).join('');
-  const pipelineOpts=PIPELINE_STAGES.map(s=>`<option value="${s}"${s===(lead.pipelineStage||'New')?' selected':''}>${PIPELINE_STAGE_LABELS[s]}</option>`).join('');
 
   const sourceType = getLeadSourceType(lead);  // Lot / FB Marketplace / FB Ad
-  const inFocus = lead.inFocus || '';           // '' | 'Focus' | 'Lost'
 
   const SOURCE_STYLE = {
     'Lot':            { color:'var(--blue)',  border:'rgba(82,153,255,0.3)' },
@@ -1713,9 +1712,10 @@ function buildLeadSectionHtml(lead, car){
       : `<button class="lead-type-tab" onclick="changeLeadType('${type}')">${label}</button>`;
   };
 
-  const mkPipeBtn = (val, label, color) => {
-    const active = inFocus === val;
-    return `<button class="lead-type-tab${active?' active':''}" style="${active?`background:${color};color:#fff;border-color:${color};opacity:1;cursor:default`:''}" ${active?'disabled':''} onclick="${val===''?'returnLeadToSource()':'moveLeadTo('+lead.rowIndex+',\''+val+'\')'}">${label}</button>`;
+  const currentPosKey = pipelineStatusKey(lead);
+  const mkPosBtn = (o) => {
+    const active = currentPosKey === o.key;
+    return `<button class="lead-type-tab${active?' active':''}" style="${active?'background:var(--blue);color:#fff;border-color:var(--blue);opacity:1;cursor:default':''}" ${active?'disabled':''} onclick="setLeadPipelinePosition(${lead.rowIndex},'${o.key}')">${o.label}</button>`;
   };
 
   const fName = capName(lead.firstName);
@@ -1843,23 +1843,18 @@ function buildLeadSectionHtml(lead, car){
       </div>
     </div>
 
-    <!-- Pipeline Status (Active / Focus / Lost / Sold) -->
+    <!-- In Focus? -->
+    <div style="margin-bottom:12px">
+      <div class="field-label" style="margin-bottom:6px">In Focus?</div>
+      <button class="lead-type-tab${isLeadInFocus(lead)?' active':''}" style="${isLeadInFocus(lead)?'background:var(--purple);color:#fff;border-color:var(--purple);opacity:1':''}" onclick="toggleLeadFocus(${lead.rowIndex})">${isLeadInFocus(lead)?'✓ In Focus':'Not in Focus'}</button>
+    </div>
+
+    <!-- Pipeline Status — one button per board column, same as dragging a card there -->
     <div style="margin-bottom:12px">
       <div class="field-label" style="margin-bottom:6px">Pipeline Status</div>
       <div style="display:flex;gap:6px;flex-wrap:wrap">
-        ${mkPipeBtn('','Active','var(--green)')}
-        ${mkPipeBtn('Focus','Focus','var(--purple)')}
-        ${mkPipeBtn('Lost','Lost','var(--red)')}
-        ${mkPipeBtn('Sold','Sold','var(--green)')}
+        ${PIPELINE_POSITION_OPTIONS.map(mkPosBtn).join('')}
       </div>
-    </div>
-
-    <!-- Pipeline Position (New / Working / Appt / Be Back / Cold — drives the Sales Process board columns) -->
-    <div style="margin-bottom:12px">
-      <div class="field-label" style="margin-bottom:6px">Pipeline Position</div>
-      <select style="width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:6px;font-family:'Inter',sans-serif;font-size:13px;outline:none" onchange="updateLeadFieldFromDrawer('pipelineStage',this.value)">
-        ${pipelineOpts}
-      </select>
     </div>
 
     <!-- Customer Grade (leadRank) -->
@@ -1956,6 +1951,9 @@ function buildLeadSectionHtml(lead, car){
         </div>
       </div>
     </div>
+  </div>
+  <div style="margin-bottom:16px">
+    <button class="mini-copy-btn" style="color:var(--red);border-color:var(--red)" onclick="deleteLeadFromDrawer(${lead.rowIndex})">Delete Lead</button>
   </div>
   <div id="lead-vehicles-section">${buildVehicleListHtml(lead)}</div>`;
 }
@@ -2131,11 +2129,26 @@ async function moveLeadTo(rowIndex, newType) {
     }
   } catch(e) { showToast('Failed: ' + e.message); }
 }
-async function returnLeadToSource() {
-  if (currentLeadRowIndex === null) return;
-  const lead = leadsData.find(l => l.rowIndex === currentLeadRowIndex);
+
+// In Focus is now a pure on/off toggle, independent of Sold/Lost/pipeline position —
+// replaces the old "Active" button that unconditionally reset both leadType and inFocus.
+async function toggleLeadFocus(rowIndex){
+  const lead = leadsData.find(l => l.rowIndex === rowIndex);
   if (!lead) return;
-  await moveLeadTo(currentLeadRowIndex, getLeadSourceType(lead));
+  const newVal = isLeadInFocus(lead) ? '' : 'Focus';
+  lead.inFocus = newVal;
+  try {
+    await apiPost('updateLead', { rowIndex, field: 'inFocus', value: newVal });
+    showToast(newVal ? 'Marked In Focus' : 'Removed from Focus');
+  } catch(e) { showToast('Save failed'); }
+  if (document.getElementById('leads-content')) renderLeads();
+  if (currentLeadRowIndex === rowIndex) {
+    document.getElementById('drawer-body').innerHTML = buildLeadSectionHtml(lead, null);
+  }
+}
+// Pipeline Status button click — same effect as dragging the card to that board column.
+async function setLeadPipelinePosition(rowIndex, colKey){
+  await applyColumnMove(rowIndex, colKey);
 }
 
 // ── Add Vehicle to Lead ───────────────────────────────────────
@@ -2889,7 +2902,22 @@ let leadsTab = 'Lot'; // 'Lot' | 'FB Marketplace' | 'FB Ad' | 'Website' | 'Focus
 let leadsViewMode = 'table'; // 'table' | 'board'
 let leadsGroupBy = 'process'; // 'process' | 'stage' | 'recency' | 'new' | 'turned' | 'quality'
 let leadsShowClosed = false; // show Sold/Lost (stage) or Unranked/Dead (quality) columns
+let leadsSearch = ''; // free-text filter by name or phone, active in both table and board views
 let _boardDragRowIndex = null;
+
+function setLeadsSearch(v){
+  leadsSearch = v;
+  renderLeads(); // redirects to renderLeadsBoard() internally when in board view
+}
+function leadMatchesSearch(l){
+  const q = leadsSearch.trim().toLowerCase();
+  if (!q) return true;
+  const name = `${l.firstName||''} ${l.lastName||''}`.toLowerCase();
+  if (name.includes(q)) return true;
+  const qDigits = q.replace(/\D/g,'');
+  if (qDigits && (l.phone||'').replace(/\D/g,'').includes(qDigits)) return true;
+  return false;
+}
 
 function getLeadTab(lead) {
   const ip = lead.inFocus || '';
@@ -2979,6 +3007,28 @@ const LEAD_STATUS_COLORS = { '':'s-new', 'One Way':'s-oneway', 'Two Way':'s-twow
 const PIPELINE_STAGES = ['New','Working','Appt','BeBack','Cold'];
 const PIPELINE_STAGE_LABELS = { 'New':'New Lead', 'Working':'Working', 'Appt':'Appt Set', 'BeBack':'Be Back', 'Cold':'Cold' };
 
+// Every column a lead can live in on the board, in the same left-to-right order as the
+// board itself. Drives the drawer's "Pipeline Status" button row — clicking one of these
+// is the click-based equivalent of dragging the card to that column.
+const PIPELINE_POSITION_OPTIONS = [
+  { key:'New',          label:'New Lead' },
+  { key:'Working',      label:'Working' },
+  { key:'Appt',         label:'Appt Set' },
+  { key:'BeBack',       label:'Be Back' },
+  { key:'Waiting',      label:'Needs Vehicle Match' },
+  { key:'Cold',         label:'Cold' },
+  { key:'Sold',         label:'Sold This Month' },
+  { key:'SoldArchived', label:'Sold' },
+  { key:'Lost',         label:'Lost' }
+];
+function pipelineStatusKey(lead){
+  const tab = getLeadTab(lead);
+  if (tab === 'Lost') return 'Lost';
+  if (tab === 'Sold') return isSoldArchived(lead) ? 'SoldArchived' : 'Sold';
+  if (isWaitingLead(lead)) return 'Waiting';
+  return lead.pipelineStage || 'New';
+}
+
 // One-time backfill: legacy `status` used to encode both comms state and pipeline position together
 // (e.g. 'One Way Communication', 'Appt', 'Be Back'). Split any lead still missing `pipelineStage`
 // into the two independent fields and write both back. Self-heals across the whole sheet as leads load.
@@ -3034,18 +3084,40 @@ function buildNotesLogHtml(lead){
   const log = Array.isArray(lead.notes) ? lead.notes : [];
   if (!log.length) return `<div style="font-size:12px;color:var(--text3);padding:8px 0;text-align:center">No notes yet</div>`;
   const esc = s => String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-  const entries = [...log].reverse();
-  return `<div class="notes-log" id="notes-log-scroll">${entries.map(e => `
-    <div class="note-entry">
+  const jsEsc = s => String(s||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/\n/g,'\\n').replace(/\r/g,'');
+  // Render newest-first, but keep each entry's real index into lead.notes (chronological,
+  // append order) so edit/delete act on the right array element.
+  const indices = log.map((_, i) => i).reverse();
+  return `<div class="notes-log" id="notes-log-scroll">${indices.map(i => {
+    const e = log[i];
+    return `
+    <div class="note-entry" id="note-entry-${lead.rowIndex}-${i}">
       <div class="note-entry-meta"><span>${formatNoteTs(e.ts)}</span><span class="note-entry-by">${esc(e.by)}</span></div>
       <div class="note-entry-text">${esc(e.text)}</div>
-    </div>`).join('')}</div>`;
+      <div class="note-entry-actions">
+        <button class="mini-copy-btn" onclick="event.stopPropagation();copyText('${jsEsc(e.text)}',this)">Copy</button>
+        <button class="mini-copy-btn" onclick="event.stopPropagation();startEditNote(${lead.rowIndex},${i})">Edit</button>
+        <button class="mini-copy-btn" onclick="event.stopPropagation();deleteLeadNote(${lead.rowIndex},${i})">Delete</button>
+      </div>
+    </div>`;
+  }).join('')}</div>`;
 }
 function toggleNotesExpand(btn){
   const log = document.getElementById('notes-log-scroll');
   if (!log) return;
   const expanded = log.classList.toggle('expanded');
   btn.textContent = expanded ? 'Collapse' : 'Expand';
+}
+function refreshNotesSection(rowIndex){
+  const lead = leadsData.find(l => l.rowIndex === rowIndex);
+  if (!lead) return;
+  const section = document.getElementById('lead-notes-section');
+  if (section) section.innerHTML = buildNotesLogHtml(lead);
+  if (document.getElementById('leads-content')) renderLeads();
+}
+async function saveLeadNotesLog(rowIndex, log){
+  try { await apiPost('updateLead', { rowIndex, field: 'notes', value: JSON.stringify(log) }); }
+  catch(e) { showToast('Note save failed'); }
 }
 async function submitLeadNote(rowIndex, textarea){
   const text = textarea.value.trim();
@@ -3056,11 +3128,42 @@ async function submitLeadNote(rowIndex, textarea){
   const log = Array.isArray(lead.notes) ? lead.notes : [];
   log.push({ ts: new Date().toISOString(), by: 'Giovanni', text });
   lead.notes = log;
-  const section = document.getElementById('lead-notes-section');
-  if (section) section.innerHTML = buildNotesLogHtml(lead);
-  if (document.getElementById('leads-content')) renderLeads();
-  try { await apiPost('updateLead', { rowIndex, field: 'notes', value: JSON.stringify(log) }); showToast('Note added'); }
-  catch(e) { showToast('Note save failed'); }
+  refreshNotesSection(rowIndex);
+  await saveLeadNotesLog(rowIndex, log);
+  showToast('Note added');
+}
+function startEditNote(rowIndex, idx){
+  const lead = leadsData.find(l => l.rowIndex === rowIndex);
+  const entry = lead && lead.notes[idx];
+  const container = document.getElementById(`note-entry-${rowIndex}-${idx}`);
+  if (!entry || !container) return;
+  const esc = s => String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  container.innerHTML = `
+    <textarea id="note-edit-${rowIndex}-${idx}" rows="3" style="width:100%;background:var(--bg2);border:1px solid var(--border2);color:var(--text);padding:6px 10px;border-radius:6px;font-family:'Inter',sans-serif;font-size:13px;outline:none;resize:vertical;margin-bottom:6px;box-sizing:border-box">${esc(entry.text)}</textarea>
+    <div style="display:flex;gap:6px">
+      <button class="btn" style="font-size:12px;padding:4px 12px" onclick="event.stopPropagation();saveEditNote(${rowIndex},${idx})">Save</button>
+      <button class="mini-copy-btn" onclick="event.stopPropagation();refreshNotesSection(${rowIndex})">Cancel</button>
+    </div>`;
+}
+async function saveEditNote(rowIndex, idx){
+  const lead = leadsData.find(l => l.rowIndex === rowIndex);
+  const ta = document.getElementById(`note-edit-${rowIndex}-${idx}`);
+  if (!lead || !ta) return;
+  const text = ta.value.trim();
+  if (!text) return;
+  lead.notes[idx].text = text;
+  refreshNotesSection(rowIndex);
+  await saveLeadNotesLog(rowIndex, lead.notes);
+  showToast('Note updated');
+}
+async function deleteLeadNote(rowIndex, idx){
+  const lead = leadsData.find(l => l.rowIndex === rowIndex);
+  if (!lead || !lead.notes[idx]) return;
+  if (!confirm('Delete this note? This cannot be undone.')) return;
+  lead.notes.splice(idx, 1);
+  refreshNotesSection(rowIndex);
+  await saveLeadNotesLog(rowIndex, lead.notes);
+  showToast('Note deleted');
 }
 
 // ===== SECTION: LEADS / CRM TAB =====
@@ -3266,6 +3369,7 @@ async function loadLeads(){
   view.innerHTML=`
     <div class="leads-toolbar">
       <h2>Leads <span id="leads-subtitle" style="font-size:13px;font-weight:400;color:var(--text3)"></span></h2>
+      <input type="text" id="leads-search-input" value="${leadsSearch.replace(/"/g,'&quot;')}" placeholder="Search name or phone…" oninput="setLeadsSearch(this.value)" style="flex:1;min-width:160px;max-width:260px;background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:6px;font-family:'Inter',sans-serif;font-size:13px;outline:none">
       <div class="leads-toolbar-right">
         <button class="btn ${leadsFilter==='matched'?'btn-primary':''}" id="btn-filter-matched" onclick="toggleMatchedFilter()" style="font-size:12px"><span style="color:var(--green)">●</span> Matched Only</button>
         <select id="leads-groupby-sel" onchange="setLeadsGroupBy(this.value)" style="display:${leadsViewMode==='board'?'inline-block':'none'};background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:6px;font-family:'Inter',sans-serif;font-size:12px;outline:none">
@@ -3347,13 +3451,15 @@ function renderLeads(){
   }
   updateLeadsSubtitle();
 
-  // Apply matched filter
-  const visibleLeads = leadsFilter === 'matched'
+  // Apply matched + search filters (search is scoped to the current tab here — the board
+  // view's search ignores tabs/columns entirely, which is the fast cross-column lookup)
+  let visibleLeads = leadsFilter === 'matched'
     ? tabLeads.filter(l => l._matches && l._matches.length > 0)
     : tabLeads;
+  if (leadsSearch.trim()) visibleLeads = visibleLeads.filter(leadMatchesSearch);
 
   if (!visibleLeads.length) {
-    content.innerHTML = `<div style="text-align:center;padding:40px;color:var(--text3)">No matched leads yet. Import inventory CSV to run matching.</div>`;
+    content.innerHTML = `<div style="text-align:center;padding:40px;color:var(--text3)">${leadsSearch.trim() ? 'No leads in this tab match that search.' : 'No matched leads yet. Import inventory CSV to run matching.'}</div>`;
     return;
   }
 
@@ -3570,16 +3676,20 @@ function renderLeadsBoard(){
   const subtitle = document.getElementById('leads-subtitle');
   if (subtitle) subtitle.textContent = '('+leadsData.length+')';
 
-  const visibleLeads = leadsFilter === 'matched'
+  let visibleLeads = leadsFilter === 'matched'
     ? leadsData.filter(l => l._matches && l._matches.length > 0)
     : leadsData;
+  const searching = !!leadsSearch.trim();
+  if (searching) visibleLeads = visibleLeads.filter(leadMatchesSearch);
 
   if (!visibleLeads.length) {
-    content.innerHTML = `<div class="empty"><h3>No leads</h3><p>Add one with the Add Lead button above.</p></div>`;
+    content.innerHTML = `<div class="empty"><h3>No leads</h3><p>${searching ? 'No leads match that search.' : 'Add one with the Add Lead button above.'}</p></div>`;
     return;
   }
 
-  const buckets = bucketLeadsForBoard(visibleLeads, leadsGroupBy, leadsShowClosed);
+  // While actively searching, don't let the Show Closed toggle hide a match — someone
+  // texting back about an old sale should still turn up.
+  const buckets = bucketLeadsForBoard(visibleLeads, leadsGroupBy, leadsShowClosed || searching);
   content.innerHTML = `<div class="leads-board">${buckets.map(renderBoardColumn).join('')}</div>`;
 }
 
@@ -3737,7 +3847,7 @@ function boardCardDragLeave(e){
 // Sold/Lost/Focus/stage columns). Shared by column-body drops and card-level drops that
 // land on a different column than the one the card started in.
 async function applyColumnMove(rowIndex, colKey){
-  if (leadsGroupBy === 'process' && PROCESS_COL_WRITE[colKey]) {
+  if (PROCESS_COL_WRITE[colKey]) {
     const lead = leadsData.find(l => l.rowIndex === rowIndex);
     if (!lead) return;
     const writes = PROCESS_COL_WRITE[colKey];
@@ -3747,6 +3857,9 @@ async function applyColumnMove(rowIndex, colKey){
     });
     await Promise.all(saves);
     renderLeads();
+    if (currentLeadRowIndex === rowIndex) {
+      document.getElementById('drawer-body').innerHTML = buildLeadSectionHtml(lead, null);
+    }
     return;
   }
   await moveLeadTo(rowIndex, colKey);
@@ -3881,6 +3994,13 @@ function confirmDeleteLead(rowIndex){
   const lead = leadsData.find(l=>l.rowIndex===rowIndex);
   const name = lead ? (lead.firstName+' '+lead.lastName).trim() : 'this lead';
   if(!confirm('Delete '+name+'? This cannot be undone.')) return;
+  doDeleteLead(rowIndex);
+}
+function deleteLeadFromDrawer(rowIndex){
+  const lead = leadsData.find(l=>l.rowIndex===rowIndex);
+  const name = lead ? (lead.firstName+' '+lead.lastName).trim() : 'this lead';
+  if(!confirm('Delete '+name+'? This cannot be undone.')) return;
+  closeDrawer();
   doDeleteLead(rowIndex);
 }
 async function doDeleteLead(rowIndex){
