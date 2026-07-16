@@ -218,7 +218,11 @@ When Giovanni says **"focus"** or sends a screenshot of a focus entry:
 
 ### Step 4 — Resolution
 
-**"sold"** → mark the lead sold, done. Report confirmation.
+**"sold"** → mark the lead sold:
+1. Set `inFocus` to `Sold`
+2. Set `leadSoldDate` to the current ISO timestamp — but check the lead first and skip this step if it already has a `leadSoldDate`, so re-marking never overwrites the original sale date
+3. Set `soldArchived` to `false` (lands the lead in "Sold This Month" on the board, not the archived Sold column)
+4. Report confirmation
 
 **"bb"** → Be Back flow:
 1. Ask Giovanni for closing notes — one prompt:
