@@ -195,12 +195,12 @@ function createMcpServer() {
       },
       {
         name: 'get_leads',
-        description: 'Get customer leads from the CRM. Filter by tab: Lot, FB Marketplace, FB Ad, Focus, Lost. Each lead includes leadType (source bucket), inFocus (pipeline status), vehicleList, vehicleInterest, timeframe, status, and sales rep info.',
+        description: 'Get customer leads from the CRM. Filter by tab: Lot, FB Marketplace, FB Ad, Focus, Lost, Sold. Each lead includes leadType (source bucket), inFocus (Active/Focus/Lost/Sold), pipelineStage (New/Working/Appt/BeBack/Cold — Sales Process board column), vehicleList, vehicleInterest, timeframe (free-text timing notes, not a duration), status (comms state), and sales rep info. notes is a JSON array of {ts, by, text} entries, not a plain string.',
         inputSchema: {
           type: 'object',
           properties: {
-            tab: { type: 'string', description: 'Filter by tab: Lot, FB Marketplace, FB Ad, Focus, Lost. Omit to get all.' },
-            status: { type: 'string', description: 'Filter by status: New, One Way Communication, Two Way Communication, Cold, Appt, Sold, Lost' }
+            tab: { type: 'string', description: 'Filter by tab: Lot, FB Marketplace, FB Ad, Focus, Lost, Sold. Omit to get all.' },
+            status: { type: 'string', description: 'Filter by comms status: "" (not yet contacted), One Way, Two Way, Cold' }
           }
         }
       },
@@ -215,17 +215,17 @@ function createMcpServer() {
             phone: { type: 'string' },
             vehicle: { type: 'string', description: 'Vehicle they are interested in (free text)' },
             vin: { type: 'string' },
-            timeframe: { type: 'string', description: 'e.g. 3d, 1w, 2w, 1m, 3m' },
+            timeframe: { type: 'string', description: 'Free-text timing notes — what\'s holding up the timing (co-signer, down payment, insurance, etc.), not a duration code' },
             leadType: { type: 'string', description: 'Source bucket: Lot, FB Marketplace, FB Ad (default: Lot)' },
-            vehicleInterest: { type: 'string', description: 'Notes about what vehicle they are looking for' },
-            notes: { type: 'string' }
+            vehicleInterest: { type: 'string', description: 'Pure vehicle specs only — color, drivetrain, price range, model year, package/features. Buyer type, negotiation stance, cash/finance goes in notes instead, never here.' },
+            notes: { type: 'string', description: 'If set, must be a JSON array string of {ts, by, text} entries (e.g. [{"ts":"<ISO timestamp>","by":"Cowork","text":"..."}]) — never a bare string. Usually easier to leave blank on creation and add the first entry via a follow-up update_lead call.' }
           },
           required: ['firstName', 'phone']
         }
       },
       {
         name: 'update_lead',
-        description: 'Update a field on an existing lead by row index. Common fields: firstName, lastName, phone, timeframe, status, vehicleInterest, notes, followUpDate, turnedTo, turnedToFirst.',
+        description: 'Update a field on an existing lead by row index. Common fields: firstName, lastName, phone, timeframe (free-text timing notes), status (comms: "", One Way, Two Way, Cold), pipelineStage (New/Working/Appt/BeBack/Cold), vehicleInterest (pure vehicle specs only), notes (JSON array string of {ts, by, text} — parse existing, push a new entry, stringify the whole array back, never overwrite with a bare string), followUpDate, turnedTo, turnedToFirst, leadRank, leadSoldDate, soldArchived, inFocus (Focus/Lost/Sold), vehicleNotAvailable.',
         inputSchema: {
           type: 'object',
           properties: {
