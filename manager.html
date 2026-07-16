@@ -2312,6 +2312,22 @@ function renderDrawer(c, opts={}){
 
   const mileageNum=c.mileage?Number(c.mileage).toLocaleString():'—';
 
+  // ── VIN / STOCK ───────────────────────────────────────────
+  h+=`<div class="field-row">
+    <div class="field-group"><div class="field-label">VIN</div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <div class="field-value" style="flex:1;font-family:'DM Mono',monospace;font-size:12px;letter-spacing:0.5px">${c.vin}</div>
+        <button class="mini-copy-btn" onclick="copyText('${c.vin}',this)">Copy</button>
+      </div>
+    </div>
+    <div class="field-group"><div class="field-label">Stock #</div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <div class="field-value" style="flex:1">${c.stock||'—'}</div>
+        ${c.stock?`<button class="mini-copy-btn" onclick="copyText('${c.stock}',this)">Copy</button>`:''}
+      </div>
+    </div>
+  </div>`;
+
   h+=`<div class="field-row">
     <div class="field-group"><div class="field-label">Year</div><div class="field-value">${c.year||'—'}</div></div>
     <div class="field-group"><div class="field-label">Make</div><div class="field-value">${c.make||'—'}</div></div>
@@ -2324,13 +2340,13 @@ function renderDrawer(c, opts={}){
     </div></div>`;
 
   h+=`<div class="field-row">
+    <div class="field-group"><div class="field-label">Fuel Type</div><div class="field-value">${fuelType||'—'}</div></div>
     <div class="field-group"><div class="field-label">Mileage</div>
       <div style="display:flex;align-items:center;gap:8px">
         <div class="field-value" style="font-size:18px;font-weight:600;font-family:'DM Mono',monospace">${mileageNum}</div>
         <button class="mini-copy-btn" onclick="copyText('${c.mileage||''}',this)">Copy</button>
       </div>
     </div>
-    <div class="field-group"><div class="field-label">Fuel Type</div><div class="field-value">${fuelType||'—'}</div></div>
   </div>`;
 
   // ── PRICE CONTROL SECTION ─────────────────────────────────
@@ -2371,22 +2387,6 @@ function renderDrawer(c, opts={}){
 
   // ── GROSS ANALYSIS ────────────────────────────────────────
   h += buildGrossSection(c);
-
-  // ── VIN / STOCK ───────────────────────────────────────────
-  h+=`<div class="field-row">
-    <div class="field-group"><div class="field-label">VIN</div>
-      <div style="display:flex;align-items:center;gap:8px">
-        <div class="field-value" style="flex:1;font-family:'DM Mono',monospace;font-size:12px;letter-spacing:0.5px">${c.vin}</div>
-        <button class="mini-copy-btn" onclick="copyText('${c.vin}',this)">Copy</button>
-      </div>
-    </div>
-    <div class="field-group"><div class="field-label">Stock #</div>
-      <div style="display:flex;align-items:center;gap:8px">
-        <div class="field-value" style="flex:1">${c.stock||'—'}</div>
-        ${c.stock?`<button class="mini-copy-btn" onclick="copyText('${c.stock}',this)">Copy</button>`:''}
-      </div>
-    </div>
-  </div>`;
 
   // ── LINKS ─────────────────────────────────────────────────
   h+=`<div style="display:flex;gap:10px;flex-wrap:wrap;margin:16px 0">`;
@@ -5018,7 +5018,11 @@ function buildGrossSection(c) {
   const bottomColor = commColor(g.bottomComm);
   const sameComm    = g.topComm === g.bottomComm;
   return `
-  <div class="section-title">Commission Estimate</div>
+  <div class="section-title" style="display:flex;align-items:center;justify-content:space-between;cursor:pointer" onclick="toggleGrossVisibility()">
+    <span>GP</span>
+    <button class="mini-copy-btn" id="gross-toggle-btn" onclick="event.stopPropagation();toggleGrossVisibility()">Show</button>
+  </div>
+  <div id="gross-hideable" style="display:none">
   <div id="gross-section" style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px;margin-bottom:16px">
     <div id="gross-badge" style="margin-bottom:10px">${buildGrossStatusBadge(g)}</div>
     <div style="display:flex;align-items:baseline;gap:6px;margin-bottom:2px">
@@ -5059,7 +5063,19 @@ function buildGrossSection(c) {
         <div id="discount-impact" style="font-size:11px;color:var(--text3);margin-top:3px">Comes out of your check</div>
       </div>
     </div>
+  </div>
   </div>`;
+}
+
+// GP is hidden by default every time the drawer opens — a customer or coworker glancing at
+// the screen shouldn't ever land on commission figures without a deliberate click to reveal them.
+function toggleGrossVisibility(){
+  const content = document.getElementById('gross-hideable');
+  const btn = document.getElementById('gross-toggle-btn');
+  if (!content) return;
+  const showing = content.style.display !== 'none';
+  content.style.display = showing ? 'none' : '';
+  if (btn) btn.textContent = showing ? 'Show' : 'Hide';
 }
 
 function recalcGross() {
