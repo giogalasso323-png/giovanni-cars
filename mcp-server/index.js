@@ -238,12 +238,12 @@ function createMcpServer() {
       },
       {
         name: 'set_lead_pipeline',
-        description: 'Move a lead to Focus or Lost, or return it to its source tab (Lot/FB Marketplace/FB Ad). Use this instead of update_lead for pipeline status changes — it correctly handles both inFocus and leadType fields.',
+        description: 'Move a lead to Focus, Lost, or Sold, or turn off Focus (pipeline: "Active"). Sold also stamps leadSoldDate (only if not already set, so re-calling never overwrites the original sale date) and soldArchived: false, matching the manager app\'s own sold flow. "Active" only turns off Focus — it errors instead of silently clearing a Lost/Sold lead back to blank, since that used to be a real bug (an old UI button did exactly this by accident). Does not touch leadType.',
         inputSchema: {
           type: 'object',
           properties: {
             rowIndex: { type: 'number', description: 'Lead row index from get_leads' },
-            pipeline: { type: 'string', description: 'Focus, Lost, Sold, or Active (Active returns it to its source tab)' }
+            pipeline: { type: 'string', description: 'Focus, Lost, Sold, or Active (Active turns off Focus only — errors if the lead is currently Lost or Sold rather than silently clearing it)' }
           },
           required: ['rowIndex', 'pipeline']
         }
@@ -483,6 +483,7 @@ function createMcpServer() {
             let tab;
             if (inFocus === 'Focus' || inFocus === true || inFocus === 'true' || lt === 'Focus') tab = 'Focus';
             else if (inFocus === 'Lost' || lt === 'Lost') tab = 'Lost';
+            else if (inFocus === 'Sold') tab = 'Sold';
             else if (lt && lt !== 'Focus' && lt !== 'Lost') tab = lt;
             else if (l.source === 'FB Marketplace' || l.source === 'FB Ad') tab = l.source;
             else tab = 'Lot';
@@ -511,13 +512,40 @@ function createMcpServer() {
         case 'set_lead_pipeline': {
           const pipeline = args.pipeline;
           const rIdx = args.rowIndex;
-          if (pipeline === 'Focus' || pipeline === 'Lost' || pipeline === 'Sold') {
-            await callScript('updateLead', { rowIndex: rIdx, field: 'inFocus', value: pipeline });
-            result = { ok: true, moved: pipeline };
-          } else {
+          if (!['Focus', 'Lost', 'Sold', 'Active'].includes(pipeline)) {
+            result = { error: `Unknown pipeline value: ${pipeline}. Use Focus, Lost, Sold, or Active.` };
+            break;
+          }
+          if (pipeline === 'Sold') {
+            // Mirror the manager app's own sold flow: stamp leadSoldDate once (never overwrite
+            // on re-marking) and leave soldArchived false so it lands in "Sold This Month".
+            const allLeads = await callScript('getLeads');
+            const lead = Array.isArray(allLeads) ? allLeads.find(l => l.rowIndex === rIdx) : null;
+            await callScript('updateLead', { rowIndex: rIdx, field: 'inFocus', value: 'Sold' });
+            if (!lead || !lead.leadSoldDate) {
+              await callScript('updateLead', { rowIndex: rIdx, field: 'leadSoldDate', value: new Date().toISOString() });
+            }
+            await callScript('updateLead', { rowIndex: rIdx, field: 'soldArchived', value: 'false' });
+            result = { ok: true, moved: 'Sold' };
+            break;
+          }
+          if (pipeline === 'Active') {
+            // Only meaningful as "turn off Focus" — never silently pull a lead out of Lost/Sold.
+            // An old UI button did exactly that by accident; don't reproduce it here.
+            const allLeads = await callScript('getLeads');
+            const lead = Array.isArray(allLeads) ? allLeads.find(l => l.rowIndex === rIdx) : null;
+            const current = lead ? (lead.inFocus || '') : '';
+            if (current === 'Lost' || current === 'Sold') {
+              result = { error: `Lead is currently ${current} — "Active" only turns off Focus and won't silently reopen a Lost/Sold lead. Call set_lead_pipeline again with pipeline: "${current}" if that's genuinely intended, or use update_lead directly on inFocus.` };
+              break;
+            }
             await callScript('updateLead', { rowIndex: rIdx, field: 'inFocus', value: '' });
             result = { ok: true, moved: 'Active' };
+            break;
           }
+          // Focus or Lost
+          await callScript('updateLead', { rowIndex: rIdx, field: 'inFocus', value: pipeline });
+          result = { ok: true, moved: pipeline };
           break;
         }
 
