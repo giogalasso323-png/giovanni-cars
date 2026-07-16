@@ -19,6 +19,16 @@ const SCRIPT_URL  = process.env.SCRIPT_URL  || '';
 const AUTH_TOKEN  = process.env.AUTH_TOKEN  || '';
 const PORT        = process.env.PORT        || 3000;
 
+// getLeads' Apps Script response is { leads: [...] }, not a bare array — callScript()
+// returns whatever Apps Script sends back verbatim. Every caller needs the actual array.
+async function getLeadsList() {
+  const res = await callScript('getLeads');
+  if (res && res.error) throw new Error(res.error);
+  if (Array.isArray(res)) return res;
+  if (res && Array.isArray(res.leads)) return res.leads;
+  return [];
+}
+
 async function callScript(action, body = {}, attempt = 1) {
   const response = await fetch(`${SCRIPT_URL}?action=${action}`, {
     method: 'POST',
@@ -475,8 +485,7 @@ function createMcpServer() {
           break;
 
         case 'get_leads': {
-          const allLeads = await callScript('getLeads');
-          if (!Array.isArray(allLeads)) { result = allLeads; break; }
+          const allLeads = await getLeadsList();
           let leads = allLeads.map(l => {
             const inFocus = l.inFocus || '';
             const lt = l.leadType || '';
@@ -519,8 +528,8 @@ function createMcpServer() {
           if (pipeline === 'Sold') {
             // Mirror the manager app's own sold flow: stamp leadSoldDate once (never overwrite
             // on re-marking) and leave soldArchived false so it lands in "Sold This Month".
-            const allLeads = await callScript('getLeads');
-            const lead = Array.isArray(allLeads) ? allLeads.find(l => l.rowIndex === rIdx) : null;
+            const allLeads = await getLeadsList();
+            const lead = allLeads.find(l => l.rowIndex === rIdx);
             await callScript('updateLead', { rowIndex: rIdx, field: 'inFocus', value: 'Sold' });
             if (!lead || !lead.leadSoldDate) {
               await callScript('updateLead', { rowIndex: rIdx, field: 'leadSoldDate', value: new Date().toISOString() });
@@ -532,8 +541,8 @@ function createMcpServer() {
           if (pipeline === 'Active') {
             // Only meaningful as "turn off Focus" — never silently pull a lead out of Lost/Sold.
             // An old UI button did exactly that by accident; don't reproduce it here.
-            const allLeads = await callScript('getLeads');
-            const lead = Array.isArray(allLeads) ? allLeads.find(l => l.rowIndex === rIdx) : null;
+            const allLeads = await getLeadsList();
+            const lead = allLeads.find(l => l.rowIndex === rIdx);
             const current = lead ? (lead.inFocus || '') : '';
             if (current === 'Lost' || current === 'Sold') {
               result = { error: `Lead is currently ${current} — "Active" only turns off Focus and won't silently reopen a Lost/Sold lead. Call set_lead_pipeline again with pipeline: "${current}" if that's genuinely intended, or use update_lead directly on inFocus.` };
