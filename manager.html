@@ -2915,7 +2915,7 @@ function leadMatchesSearch(l){
   const name = `${l.firstName||''} ${l.lastName||''}`.toLowerCase();
   if (name.includes(q)) return true;
   const qDigits = q.replace(/\D/g,'');
-  if (qDigits && (l.phone||'').replace(/\D/g,'').includes(qDigits)) return true;
+  if (qDigits && String(l.phone||'').replace(/\D/g,'').includes(qDigits)) return true;
   return false;
 }
 
