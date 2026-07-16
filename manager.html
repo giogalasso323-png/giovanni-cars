@@ -106,6 +106,7 @@
   .badge-priceup { background: rgba(240,160,48,0.15); color: var(--amber); font-weight: 700; }
   .badge-noprice { background: rgba(240,160,48,0.15); color: var(--amber); font-weight: 700; }
   .badge-unposted { background: var(--bg3); color: var(--text3); }
+  .badge-photos-pending { background: var(--amber-bg); color: var(--amber); margin-left: 4px; }
 
   /* CARDS */
   .card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; }
@@ -958,6 +959,9 @@ function statusBadge(c) {
   return '<span class="badge badge-notfound">—</span>';
 }
 const fbBadge = c => c.fbStatus==='posted' ? '<span class="badge badge-posted">Posted</span>' : '<span class="badge badge-unposted">Not Posted</span>';
+// Shown only while photos are downloaded but the car isn't posted yet — the in-progress
+// state between a bulk photo download and actually listing it on Marketplace.
+const photosPendingBadge = c => (c.photosDownloadedDate && c.fbStatus!=='posted') ? '<span class="badge badge-photos-pending" title="Photos downloaded — not yet posted">Downloaded</span>' : '';
 const daysClass = d => d>60?'hot':d>30?'warm':'';
 
 // ── CSV ────────────────────────────────────────────────────
@@ -1183,7 +1187,7 @@ function renderTable() {
       <td style="${priceStyle}">${priceDisplay}</td>
       <td>${fmtMiles(c.mileage)}</td>
       <td>${statusBadge(c)}</td>
-      <td>${fbBadge(c)}</td>
+      <td>${fbBadge(c)}${photosPendingBadge(c)}</td>
       <td><span class="days-badge ${daysClass(d)}">${d}d</span></td>
       ${isPostedTab?`<td><span class="days-badge ${daysClass(daysPosted)}">${daysPosted}d posted</span></td>`:''}
       ${grossTableCell(c)}
@@ -1200,7 +1204,7 @@ function renderCards() {
   g.innerHTML=filtered.map(c=>{
     const d=daysOnLot(c), p=c.websitePrice||c.price;
     return `<div class="card" onclick="openDrawer('${c.vin}')">
-      <div class="card-header"><div><div class="card-title">${getTitle(c)}</div><div class="card-vin">${c.vin}</div></div>${fbBadge(c)}</div>
+      <div class="card-header"><div><div class="card-title">${getTitle(c)}</div><div class="card-vin">${c.vin}</div></div>${fbBadge(c)}${photosPendingBadge(c)}</div>
       ${statusBadge(c)}
       ${p?`<div class="card-price">${fmtPrice(p)}</div>`:''}
       <div class="card-meta">${c.mileage?`<span>${fmtMiles(c.mileage)}</span>`:''}${c.color?`<span>${c.color}</span>`:''}${c.stock?`<span>#${c.stock}</span>`:''}</div>
@@ -1340,7 +1344,7 @@ function updateActionBar(){
 
 async function bulkMarkPosted() {
   const vins=[...selectedVins];
-  vins.forEach(v=>{ const c=inventory.find(x=>x.vin===v); if(c){c.fbStatus='posted';c.fbPostedDate=new Date().toISOString();} });
+  vins.forEach(v=>{ const c=inventory.find(x=>x.vin===v); if(c){c.fbStatus='posted';c.fbPostedDate=new Date().toISOString();c.photosDownloadedDate='';} });
   clearSelection(); render(); setSyncInfo('saving');
   await apiPost('upsertMany',{cars:vins.map(v=>inventory.find(c=>c.vin===v)).filter(Boolean)});
   setSyncInfo('ok'); showToast(vins.length+' marked as FB Posted');
@@ -1363,6 +1367,7 @@ async function downloadPhotosZip() {
 
   const zip = new JSZip();
   let fetched = 0, empty = 0, errors = 0;
+  const downloadedCars = []; // stamped with photosDownloadedDate and persisted after the loop
 
   for (let i = 0; i < vins.length; i++) {
     const vin = vins[i];
@@ -1390,11 +1395,17 @@ async function downloadPhotosZip() {
       const folder = zip.folder(label);
       res.photos.forEach(p => folder.file(p.name, p.data, { base64: true }));
       fetched++;
+      if (car) { car.photosDownloadedDate = new Date().toISOString(); downloadedCars.push(car); }
     } else {
       empty++;
     }
 
     if (i < vins.length - 1) await new Promise(r => setTimeout(r, 1500));
+  }
+
+  if (downloadedCars.length) {
+    render(); // reflect the new "Downloaded" badges right away, even before the zip finishes
+    try { await apiPost('upsertMany', { cars: downloadedCars }); } catch(e) { /* zip still downloads; badge just won't have persisted */ }
   }
 
   if (fetched === 0) {
@@ -2411,6 +2422,19 @@ function renderDrawer(c, opts={}){
     ${c.fbPostedDate?`<div style="font-size:11px;color:var(--text3);margin-top:6px">Posted ${new Date(c.fbPostedDate).toLocaleDateString()} &mdash; ${daysPosted}d ago</div>`:''}
   </div>`;
 
+  // ── PHOTOS DOWNLOADED (bulk-download tracking) ─────────────
+  // Auto-set by the bulk photo download; uncheck as you finish posting each one during a
+  // listing session so it's obvious at a glance what's still left from that batch.
+  if (c.fbStatus !== 'posted') {
+    h+=`<div class="field-group">
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;color:var(--text2)">
+        <input type="checkbox" ${c.photosDownloadedDate?'checked':''} onchange="toggleCarPhotosDownloaded(this.checked)" style="width:16px;height:16px;cursor:pointer">
+        Photos downloaded — not yet posted
+      </label>
+      ${c.photosDownloadedDate?`<div style="font-size:11px;color:var(--text3);margin-top:4px;margin-left:24px">Downloaded ${new Date(c.photosDownloadedDate).toLocaleDateString()}</div>`:''}
+    </div>`;
+  }
+
   // ── DESCRIPTION ───────────────────────────────────────────
   h+=`<div class="section-title">Description</div>
   <div class="field-group">
@@ -2430,6 +2454,7 @@ async function setFbStatus(status){
   const c=inventory.find(x=>x.vin===vin); if(!c) return;
   c.fbStatus=status;
   if(status==='posted' && !c.fbPostedDate) c.fbPostedDate=new Date().toISOString();
+  if(status==='posted') c.photosDownloadedDate=''; // now actually posted — the pending-download flag is moot
   if(status==='unposted' || status==='posted'){
     if((c.websiteStatus||'').toLowerCase().includes('sold')) c.websiteStatus='';
   }
@@ -2447,7 +2472,10 @@ async function setFbStatus(status){
   try {
     await apiPost('updateField',{vin:c.vin,field:'fbStatus',value:status});
     if((c.websiteStatus||'')==='') await apiPost('updateField',{vin:c.vin,field:'websiteStatus',value:''});
-    if(status==='posted') await apiPost('updateField',{vin:c.vin,field:'fbPostedDate',value:c.fbPostedDate});
+    if(status==='posted') {
+      await apiPost('updateField',{vin:c.vin,field:'fbPostedDate',value:c.fbPostedDate});
+      await apiPost('updateField',{vin:c.vin,field:'photosDownloadedDate',value:''});
+    }
     setSyncInfo('ok');
     showToast('✓ Saved — safe to move on');
   } catch(e) {
@@ -2462,6 +2490,16 @@ async function setFbStatus(status){
   if(status==='sold' && c.drivePhotoFolder){
     showDeletePhotosPrompt(c);
   }
+}
+
+async function toggleCarPhotosDownloaded(checked){
+  const vin=currentVin;
+  const c=inventory.find(x=>x.vin===vin); if(!c) return;
+  c.photosDownloadedDate = checked ? new Date().toISOString() : '';
+  renderDrawer(c);
+  render();
+  try { await apiPost('updateField',{vin:c.vin,field:'photosDownloadedDate',value:c.photosDownloadedDate}); }
+  catch(e){ showToast('Save failed'); }
 }
 
 function showDeletePhotosPrompt(c){
