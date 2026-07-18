@@ -963,9 +963,10 @@ function statusBadge(c) {
 }
 const fbBadge = c => c.fbStatus==='posted' ? '<span class="badge badge-posted">Posted</span>' : '<span class="badge badge-unposted">Not Posted</span>';
 // Shown only on the FB Posted 2 tab — grey until this specific car has also been posted
-// to the second account, blue once it has. fbStatus2 is only meaningful within that pool
-// (cars where fbStatus is already 'posted'), so no separate "not posted" state is needed.
-const fbBadge2 = c => c.fbStatus2==='posted' ? '<span class="badge badge-posted">FB Posted 2</span>' : '<span class="badge badge-unposted">FB Posted 1</span>';
+// to the second account, blue once it has. If the car sells while still posted on account 2,
+// it stays in this tab (see applyFilters) with a red reminder until the listing is taken down
+// and marked Not Posted, instead of silently disappearing with a live post still up.
+const fbBadge2 = c => c.fbStatus==='sold' ? '<span class="badge badge-sold">SOLD — remove listing</span>' : (c.fbStatus2==='posted' ? '<span class="badge badge-posted">FB Posted 2</span>' : '<span class="badge badge-unposted">FB Posted 1</span>');
 // True for the in-progress state between a bulk photo download and actually listing it on
 // Marketplace — backs the "Downloaded" badge, the dedicated filter tab, and bulk-clear.
 const isPendingDownload = c => !!(c.photosDownloadedDate && c.fbStatus!=='posted');
@@ -1088,7 +1089,7 @@ function applyFilters() {
     }
     if(activeFilter==='live') return (c.websiteStatus||'').toLowerCase().includes('live');
     if(activeFilter==='posted') return c.fbStatus==='posted';
-    if(activeFilter==='posted2') return c.fbStatus==='posted';
+    if(activeFilter==='posted2') return c.fbStatus==='posted' || (c.fbStatus==='sold' && c.fbStatus2==='posted');
     if(activeFilter==='unposted') return c.fbStatus!=='posted'&&!(c.websiteStatus||'').toLowerCase().includes('sold');
     if(activeFilter==='downloaded') return isPendingDownload(c);
     if(activeFilter==='sold') return (c.websiteStatus||'').toLowerCase().includes('sold')||c.fbStatus==='sold';
@@ -1158,7 +1159,7 @@ async function markNotListedAsSold() {
   if(!toMark.length){ showToast('Nothing to mark'); return; }
   if(!confirm(`Mark ${toMark.length} unlisted car${toMark.length===1?'':'s'} as Sold?`)) return;
   const now = new Date().toISOString();
-  toMark.forEach(c=>{ c.fbStatus='sold'; c.fbStatus2='sold'; c.websiteStatus='Sold/Unavailable'; c.soldDate=now; });
+  toMark.forEach(c=>{ c.fbStatus='sold'; c.websiteStatus='Sold/Unavailable'; c.soldDate=now; });
   render(); setSyncInfo('saving');
   await apiPost('upsertMany',{cars:toMark});
   setSyncInfo('ok'); showToast(toMark.length+' marked as Sold');
@@ -1276,7 +1277,7 @@ function updateCounts() {
   document.getElementById('cnt-upcoming').textContent=inventory.filter(isUpcomingStub).length;
   document.getElementById('cnt-live').textContent=inventory.filter(c=>(c.websiteStatus||'').toLowerCase().includes('live')).length;
   document.getElementById('cnt-posted').textContent=inventory.filter(c=>c.fbStatus==='posted').length;
-  document.getElementById('cnt-posted2').textContent=inventory.filter(c=>c.fbStatus==='posted').length;
+  document.getElementById('cnt-posted2').textContent=inventory.filter(c=>c.fbStatus==='posted' || (c.fbStatus==='sold' && c.fbStatus2==='posted')).length;
   document.getElementById('cnt-unposted').textContent=inventory.filter(c=>c.fbStatus!=='posted'&&!(c.websiteStatus||'').toLowerCase().includes('sold')).length;
   document.getElementById('cnt-downloaded').textContent=inventory.filter(isPendingDownload).length;
   document.getElementById('cnt-sold').textContent=inventory.filter(c=>(c.websiteStatus||'').toLowerCase().includes('sold')||c.fbStatus==='sold').length;
@@ -1380,7 +1381,7 @@ async function bulkClearDownloaded() {
 }
 async function bulkMarkSold() {
   const vins=[...selectedVins];
-  vins.forEach(v=>{ const c=inventory.find(x=>x.vin===v); if(c){c.fbStatus='sold';c.fbStatus2='sold';c.websiteStatus='Sold/Unavailable';c.soldDate=new Date().toISOString();} });
+  vins.forEach(v=>{ const c=inventory.find(x=>x.vin===v); if(c){c.fbStatus='sold';c.websiteStatus='Sold/Unavailable';c.soldDate=new Date().toISOString();} });
   clearSelection(); render(); setSyncInfo('saving');
   await apiPost('upsertMany',{cars:vins.map(v=>inventory.find(c=>c.vin===v)).filter(Boolean)});
   setSyncInfo('ok'); showToast('Marked as sold');
@@ -2455,6 +2456,7 @@ function renderDrawer(c, opts={}){
       <button class="status-btn ${c.fbStatus==='sold'?'s-sold':''}" onclick="setFbStatus('sold')">Sold</button>
     </div>
     ${dispFbPostedDate?`<div style="font-size:11px;color:var(--text3);margin-top:6px">Posted ${new Date(dispFbPostedDate).toLocaleDateString()} &mdash; ${dispDaysPosted}d ago</div>`:''}
+    ${fb2Context && c.fbStatus==='sold' && c.fbStatus2==='posted' ? `<div style="font-size:11px;color:var(--red);margin-top:6px;font-weight:600">This car is sold. Remove the live listing on account 2, then tap Not Posted.</div>` : ''}
   </div>`;
 
   // ── PHOTOS DOWNLOADED (bulk-download tracking) ─────────────
@@ -2491,10 +2493,12 @@ async function setFbStatus(status){
   const saves = [];
 
   if(status==='sold'){
-    // Sold is a whole-car state, not per-account — always syncs both, regardless of which
-    // FB-posting tab the drawer was opened from (mirrors bulkMarkSold/markNotListedAsSold).
-    c.fbStatus='sold'; c.fbStatus2='sold';
-    saves.push(['fbStatus','sold'], ['fbStatus2','sold']);
+    // Sold is a whole-car state, not per-account (mirrors bulkMarkSold/markNotListedAsSold).
+    // fbStatus2 is deliberately left untouched: if the car was still posted on account 2,
+    // it needs to stay 'posted' so the FB Posted 2 tab keeps showing it as a reminder to
+    // actually take the listing down, instead of silently disappearing.
+    c.fbStatus='sold';
+    saves.push(['fbStatus','sold']);
   } else if(fb2){
     c.fbStatus2=status;
     if(status==='posted' && !c.fbPostedDate2) c.fbPostedDate2=new Date().toISOString();
