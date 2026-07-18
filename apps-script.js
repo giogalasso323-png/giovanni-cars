@@ -24,7 +24,8 @@ const COLUMNS = [
   'vehicleHistory','features','certification','addedDate',
   'lastChecked','fbPostedDate','soldDate','websiteUrl','fbPostedPrice','priceDropped','dis','currentFbPrice','originalPrice','drivePhotoFolder','drivePhotoCount',
   'appraisedValue','certCost','appraiser','isUpcoming',
-  'disp','apprStatus','apprCertified','importBatchTime','importRowOrder','photosDownloadedDate'
+  'disp','apprStatus','apprCertified','importBatchTime','importRowOrder','photosDownloadedDate',
+  'fbStatus2','fbPostedDate2'
 ];
 
 const LEADS_COLUMNS = [

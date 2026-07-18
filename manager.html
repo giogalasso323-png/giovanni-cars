@@ -371,6 +371,7 @@
     <button class="filter-tab" data-filter="upcoming">Upcoming <span class="tab-count" id="cnt-upcoming">0</span></button>
     <button class="filter-tab" data-filter="live">Live <span class="tab-count" id="cnt-live">0</span></button>
     <button class="filter-tab" data-filter="posted">FB Posted <span class="tab-count" id="cnt-posted">0</span></button>
+    <button class="filter-tab" data-filter="posted2">FB Posted 2 <span class="tab-count" id="cnt-posted2">0</span></button>
     <button class="filter-tab" data-filter="unposted">Not Posted <span class="tab-count" id="cnt-unposted">0</span></button>
     <button class="filter-tab" data-filter="downloaded">Downloaded <span class="tab-count" id="cnt-downloaded">0</span></button>
     <button class="filter-tab" data-filter="sold">Sold <span class="tab-count" id="cnt-sold">0</span></button>
@@ -961,6 +962,10 @@ function statusBadge(c) {
   return '<span class="badge badge-notfound">—</span>';
 }
 const fbBadge = c => c.fbStatus==='posted' ? '<span class="badge badge-posted">Posted</span>' : '<span class="badge badge-unposted">Not Posted</span>';
+// Shown only on the FB Posted 2 tab — grey until this specific car has also been posted
+// to the second account, blue once it has. fbStatus2 is only meaningful within that pool
+// (cars where fbStatus is already 'posted'), so no separate "not posted" state is needed.
+const fbBadge2 = c => c.fbStatus2==='posted' ? '<span class="badge badge-posted">FB Posted 2</span>' : '<span class="badge badge-unposted">FB Posted 1</span>';
 // True for the in-progress state between a bulk photo download and actually listing it on
 // Marketplace — backs the "Downloaded" badge, the dedicated filter tab, and bulk-clear.
 const isPendingDownload = c => !!(c.photosDownloadedDate && c.fbStatus!=='posted');
@@ -1083,6 +1088,7 @@ function applyFilters() {
     }
     if(activeFilter==='live') return (c.websiteStatus||'').toLowerCase().includes('live');
     if(activeFilter==='posted') return c.fbStatus==='posted';
+    if(activeFilter==='posted2') return c.fbStatus==='posted';
     if(activeFilter==='unposted') return c.fbStatus!=='posted'&&!(c.websiteStatus||'').toLowerCase().includes('sold');
     if(activeFilter==='downloaded') return isPendingDownload(c);
     if(activeFilter==='sold') return (c.websiteStatus||'').toLowerCase().includes('sold')||c.fbStatus==='sold';
@@ -1152,7 +1158,7 @@ async function markNotListedAsSold() {
   if(!toMark.length){ showToast('Nothing to mark'); return; }
   if(!confirm(`Mark ${toMark.length} unlisted car${toMark.length===1?'':'s'} as Sold?`)) return;
   const now = new Date().toISOString();
-  toMark.forEach(c=>{ c.fbStatus='sold'; c.websiteStatus='Sold/Unavailable'; c.soldDate=now; });
+  toMark.forEach(c=>{ c.fbStatus='sold'; c.fbStatus2='sold'; c.websiteStatus='Sold/Unavailable'; c.soldDate=now; });
   render(); setSyncInfo('saving');
   await apiPost('upsertMany',{cars:toMark});
   setSyncInfo('ok'); showToast(toMark.length+' marked as Sold');
@@ -1162,6 +1168,7 @@ function renderTable() {
   document.getElementById('table-view').style.display='block'; document.getElementById('card-view').style.display='none';
   const tb=document.getElementById('table-body');
   const isPostedTab = activeFilter==='posted';
+  const isPosted2Tab = activeFilter==='posted2';
   if(!filtered.length){ tb.innerHTML=`<tr><td colspan="${isPostedTab?10:9}" style="text-align:center;padding:40px;color:var(--text3)">No vehicles match</td></tr>`; return; }
   tb.innerHTML=filtered.map(c=>{
     const d=daysOnLot(c), chk=selectedVins.has(c.vin)?'checked':'';
@@ -1192,7 +1199,7 @@ function renderTable() {
       <td style="${priceStyle}">${priceDisplay}</td>
       <td>${fmtMiles(c.mileage)}</td>
       <td>${statusBadge(c)}</td>
-      <td>${fbBadge(c)}${photosPendingBadge(c)}</td>
+      <td>${isPosted2Tab?fbBadge2(c):fbBadge(c)}${photosPendingBadge(c)}</td>
       <td><span class="days-badge ${daysClass(d)}">${d}d</span></td>
       ${isPostedTab?`<td><span class="days-badge ${daysClass(daysPosted)}">${daysPosted}d posted</span></td>`:''}
       ${grossTableCell(c)}
@@ -1204,11 +1211,12 @@ function renderCards() {
   document.getElementById('table-view').style.display='none'; document.getElementById('card-view').style.display='grid';
   const g=document.getElementById('card-view');
   g.style.gridTemplateColumns = ''; // reset any override left by renderUpcomingCards()
+  const isPosted2Tab = activeFilter==='posted2';
   if(!filtered.length){ g.innerHTML='<div style="grid-column:1/-1;text-align:center;padding:40px;color:var(--text3)">No vehicles match</div>'; return; }
   g.innerHTML=filtered.map(c=>{
     const d=daysOnLot(c), p=c.websitePrice||c.price;
     return `<div class="card" onclick="openDrawer('${c.vin}')">
-      <div class="card-header"><div><div class="card-title">${getTitle(c)}</div><div class="card-vin">${c.vin}</div></div>${fbBadge(c)}${photosPendingBadge(c)}</div>
+      <div class="card-header"><div><div class="card-title">${getTitle(c)}</div><div class="card-vin">${c.vin}</div></div>${isPosted2Tab?fbBadge2(c):fbBadge(c)}${photosPendingBadge(c)}</div>
       ${statusBadge(c)}
       ${p?`<div class="card-price">${fmtPrice(p)}</div>`:''}
       <div class="card-meta">${c.mileage?`<span>${fmtMiles(c.mileage)}</span>`:''}${c.color?`<span>${c.color}</span>`:''}${c.stock?`<span>#${c.stock}</span>`:''}</div>
@@ -1268,6 +1276,7 @@ function updateCounts() {
   document.getElementById('cnt-upcoming').textContent=inventory.filter(isUpcomingStub).length;
   document.getElementById('cnt-live').textContent=inventory.filter(c=>(c.websiteStatus||'').toLowerCase().includes('live')).length;
   document.getElementById('cnt-posted').textContent=inventory.filter(c=>c.fbStatus==='posted').length;
+  document.getElementById('cnt-posted2').textContent=inventory.filter(c=>c.fbStatus==='posted').length;
   document.getElementById('cnt-unposted').textContent=inventory.filter(c=>c.fbStatus!=='posted'&&!(c.websiteStatus||'').toLowerCase().includes('sold')).length;
   document.getElementById('cnt-downloaded').textContent=inventory.filter(isPendingDownload).length;
   document.getElementById('cnt-sold').textContent=inventory.filter(c=>(c.websiteStatus||'').toLowerCase().includes('sold')||c.fbStatus==='sold').length;
@@ -1349,10 +1358,14 @@ function updateActionBar(){
 
 async function bulkMarkPosted() {
   const vins=[...selectedVins];
-  vins.forEach(v=>{ const c=inventory.find(x=>x.vin===v); if(c){c.fbStatus='posted';c.fbPostedDate=new Date().toISOString();c.photosDownloadedDate='';} });
+  const isFb2 = activeFilter==='posted2';
+  vins.forEach(v=>{ const c=inventory.find(x=>x.vin===v); if(c){
+    if(isFb2){ c.fbStatus2='posted'; c.fbPostedDate2=new Date().toISOString(); }
+    else { c.fbStatus='posted';c.fbPostedDate=new Date().toISOString();c.photosDownloadedDate=''; }
+  }});
   clearSelection(); render(); setSyncInfo('saving');
   await apiPost('upsertMany',{cars:vins.map(v=>inventory.find(c=>c.vin===v)).filter(Boolean)});
-  setSyncInfo('ok'); showToast(vins.length+' marked as FB Posted');
+  setSyncInfo('ok'); showToast(vins.length+(isFb2?' marked as FB Posted 2':' marked as FB Posted'));
 }
 
 // Resets the Downloaded flag without touching fbStatus — for when the actual photo files
@@ -1367,7 +1380,7 @@ async function bulkClearDownloaded() {
 }
 async function bulkMarkSold() {
   const vins=[...selectedVins];
-  vins.forEach(v=>{ const c=inventory.find(x=>x.vin===v); if(c){c.fbStatus='sold';c.websiteStatus='Sold/Unavailable';c.soldDate=new Date().toISOString();} });
+  vins.forEach(v=>{ const c=inventory.find(x=>x.vin===v); if(c){c.fbStatus='sold';c.fbStatus2='sold';c.websiteStatus='Sold/Unavailable';c.soldDate=new Date().toISOString();} });
   clearSelection(); render(); setSyncInfo('saving');
   await apiPost('upsertMany',{cars:vins.map(v=>inventory.find(c=>c.vin===v)).filter(Boolean)});
   setSyncInfo('ok'); showToast('Marked as sold');
@@ -2289,7 +2302,6 @@ function renderDrawer(c, opts={}){
   const currentFbP = c.currentFbPrice||0;
   const origP = c.originalPrice||0;
   const hasMismatch = c.fbStatus==='posted' && currentFbP && websiteP && currentFbP !== websiteP;
-  const daysPosted = c.fbPostedDate ? Math.floor((Date.now()-new Date(c.fbPostedDate))/86400000) : 0;
   const isLeadContext = !skipLeadSection && currentLeadRowIndex !== null;
   let h='';
 
@@ -2428,14 +2440,21 @@ function renderDrawer(c, opts={}){
   h+=`</div>`;
 
   // ── FB STATUS ─────────────────────────────────────────────
-  h+=`<div class="section-title">Facebook Status</div>
+  // Account 2 is a distinct posting track from the same drawer — scoped by whichever tab
+  // (activeFilter) the car was opened from. Sold stays whole-car (see setFbStatus).
+  const fb2Context = activeFilter==='posted2';
+  const dispFbStatus = fb2Context ? c.fbStatus2 : c.fbStatus;
+  const dispFbPostedDate = fb2Context ? c.fbPostedDate2 : c.fbPostedDate;
+  const dispDaysPosted = dispFbPostedDate ? Math.floor((Date.now()-new Date(dispFbPostedDate))/86400000) : 0;
+
+  h+=`<div class="section-title">Facebook Status${fb2Context?' (Account 2)':''}</div>
   <div class="field-group">
     <div class="status-control">
-      <button class="status-btn ${c.fbStatus==='posted'?'s-posted':''}" onclick="setFbStatus('posted')">Posted</button>
-      <button class="status-btn ${c.fbStatus==='unposted'?'s-unposted':''}" onclick="setFbStatus('unposted')">Not Posted</button>
+      <button class="status-btn ${dispFbStatus==='posted'?'s-posted':''}" onclick="setFbStatus('posted')">Posted</button>
+      <button class="status-btn ${dispFbStatus==='unposted'?'s-unposted':''}" onclick="setFbStatus('unposted')">Not Posted</button>
       <button class="status-btn ${c.fbStatus==='sold'?'s-sold':''}" onclick="setFbStatus('sold')">Sold</button>
     </div>
-    ${c.fbPostedDate?`<div style="font-size:11px;color:var(--text3);margin-top:6px">Posted ${new Date(c.fbPostedDate).toLocaleDateString()} &mdash; ${daysPosted}d ago</div>`:''}
+    ${dispFbPostedDate?`<div style="font-size:11px;color:var(--text3);margin-top:6px">Posted ${new Date(dispFbPostedDate).toLocaleDateString()} &mdash; ${dispDaysPosted}d ago</div>`:''}
   </div>`;
 
   // ── PHOTOS DOWNLOADED (bulk-download tracking) ─────────────
@@ -2468,11 +2487,28 @@ function renderDrawer(c, opts={}){
 async function setFbStatus(status){
   const vin=currentVin;
   const c=inventory.find(x=>x.vin===vin); if(!c) return;
-  c.fbStatus=status;
-  if(status==='posted' && !c.fbPostedDate) c.fbPostedDate=new Date().toISOString();
-  if(status==='posted') c.photosDownloadedDate=''; // now actually posted — the pending-download flag is moot
+  const fb2 = activeFilter==='posted2';
+  const saves = [];
+
+  if(status==='sold'){
+    // Sold is a whole-car state, not per-account — always syncs both, regardless of which
+    // FB-posting tab the drawer was opened from (mirrors bulkMarkSold/markNotListedAsSold).
+    c.fbStatus='sold'; c.fbStatus2='sold';
+    saves.push(['fbStatus','sold'], ['fbStatus2','sold']);
+  } else if(fb2){
+    c.fbStatus2=status;
+    if(status==='posted' && !c.fbPostedDate2) c.fbPostedDate2=new Date().toISOString();
+    saves.push(['fbStatus2',status]);
+    if(status==='posted') saves.push(['fbPostedDate2',c.fbPostedDate2]);
+  } else {
+    c.fbStatus=status;
+    if(status==='posted' && !c.fbPostedDate) c.fbPostedDate=new Date().toISOString();
+    if(status==='posted') c.photosDownloadedDate=''; // now actually posted — the pending-download flag is moot
+    saves.push(['fbStatus',status]);
+    if(status==='posted') { saves.push(['fbPostedDate',c.fbPostedDate], ['photosDownloadedDate','']); }
+  }
   if(status==='unposted' || status==='posted'){
-    if((c.websiteStatus||'').toLowerCase().includes('sold')) c.websiteStatus='';
+    if((c.websiteStatus||'').toLowerCase().includes('sold')) { c.websiteStatus=''; saves.push(['websiteStatus','']); }
   }
   c.fbDescription=buildFBDesc(c);
   currentVin=vin;
@@ -2486,12 +2522,7 @@ async function setFbStatus(status){
   setSyncInfo('saving');
 
   try {
-    await apiPost('updateField',{vin:c.vin,field:'fbStatus',value:status});
-    if((c.websiteStatus||'')==='') await apiPost('updateField',{vin:c.vin,field:'websiteStatus',value:''});
-    if(status==='posted') {
-      await apiPost('updateField',{vin:c.vin,field:'fbPostedDate',value:c.fbPostedDate});
-      await apiPost('updateField',{vin:c.vin,field:'photosDownloadedDate',value:''});
-    }
+    for(const [field,value] of saves) await apiPost('updateField',{vin:c.vin,field,value});
     setSyncInfo('ok');
     showToast('✓ Saved — safe to move on');
   } catch(e) {
