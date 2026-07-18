@@ -25,7 +25,7 @@ const COLUMNS = [
   'lastChecked','fbPostedDate','soldDate','websiteUrl','fbPostedPrice','priceDropped','dis','currentFbPrice','originalPrice','drivePhotoFolder','drivePhotoCount',
   'appraisedValue','certCost','appraiser','isUpcoming',
   'disp','apprStatus','apprCertified','importBatchTime','importRowOrder','photosDownloadedDate',
-  'fbStatus2','fbPostedDate2'
+  'fbStatus2','fbPostedDate2','currentFbPrice2','priceDropped2'
 ];
 
 const LEADS_COLUMNS = [

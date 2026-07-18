@@ -936,20 +936,22 @@ const isNotListed = c => (c.websiteStatus||'').toLowerCase().includes('delist') 
 // stray website status from a scrape that shouldn't have touched a stub in the first place).
 const isUpcomingStub = c => c.isUpcoming === true;
 
-function statusBadge(c) {
+function statusBadge(c, acct2) {
   const s=(c.websiteStatus||'').toLowerCase();
   if(s.includes('sold')||s.includes('unavailable')) return '<span class="badge badge-sold">Sold</span>';
 
+  const posted = acct2 ? c.fbStatus2==='posted' : c.fbStatus==='posted';
+  const fbP = Number(acct2 ? c.currentFbPrice2 : c.currentFbPrice)||0;
+
   if(s.includes('delist')) {
-    if(c.fbStatus==='posted') return '<span class="badge badge-delist">Check FB — Delist</span>';
+    if(posted) return '<span class="badge badge-delist">Check FB — Delist</span>';
     return '<span class="badge badge-notfound">Not on Website</span>';
   }
 
   if(s.includes('live')) {
     // Price flags — only for posted cars
-    if(c.fbStatus==='posted'){
+    if(posted){
       const webP=Number(c.websitePrice)||0;
-      const fbP=Number(c.currentFbPrice)||0;
       if(!fbP && webP) return '<span class="badge badge-live">Live</span><span class="badge badge-noprice" style="margin-left:5px">Missing Price</span>';
       if(fbP && webP && webP < fbP) return '<span class="badge badge-live">Live</span><span class="badge badge-pricedrop" style="margin-left:5px">⬇ Price Drop</span>';
       if(fbP && webP && webP > fbP) return '<span class="badge badge-live">Live</span><span class="badge badge-priceup" style="margin-left:5px">⬆ Price Up</span>';
@@ -1177,8 +1179,9 @@ function renderTable() {
 
     // Price column logic
     let priceDisplay, priceStyle;
-    if(c.fbStatus==='posted'){
-      const fbP = c.currentFbPrice||0;
+    const postedThisAcct = isPosted2Tab ? c.fbStatus2==='posted' : c.fbStatus==='posted';
+    if(postedThisAcct){
+      const fbP = (isPosted2Tab ? c.currentFbPrice2 : c.currentFbPrice)||0;
       const webP = c.websitePrice||0;
       const hasMismatch = fbP && webP && fbP !== webP;
       priceDisplay = fbP ? fmtPrice(fbP) : (webP ? fmtPrice(webP) : '—');
@@ -1199,7 +1202,7 @@ function renderTable() {
       <td><div class="td-main">${getTitle(c)}</div>${activeFilter==='upcoming'&&c.appraiser?`<div style="font-size:11px;color:var(--amber);margin-top:1px">${c.appraiser}</div>`:''}<div class="td-vin">${c.vin}</div></td>
       <td style="${priceStyle}">${priceDisplay}</td>
       <td>${fmtMiles(c.mileage)}</td>
-      <td>${statusBadge(c)}</td>
+      <td>${statusBadge(c, isPosted2Tab)}</td>
       <td>${isPosted2Tab?fbBadge2(c):fbBadge(c)}${photosPendingBadge(c)}</td>
       <td><span class="days-badge ${daysClass(d)}">${d}d</span></td>
       ${isPostedTab?`<td><span class="days-badge ${daysClass(daysPosted)}">${daysPosted}d posted</span></td>`:''}
@@ -1218,7 +1221,7 @@ function renderCards() {
     const d=daysOnLot(c), p=c.websitePrice||c.price;
     return `<div class="card" onclick="openDrawer('${c.vin}')">
       <div class="card-header"><div><div class="card-title">${getTitle(c)}</div><div class="card-vin">${c.vin}</div></div>${isPosted2Tab?fbBadge2(c):fbBadge(c)}${photosPendingBadge(c)}</div>
-      ${statusBadge(c)}
+      ${statusBadge(c, isPosted2Tab)}
       ${p?`<div class="card-price">${fmtPrice(p)}</div>`:''}
       <div class="card-meta">${c.mileage?`<span>${fmtMiles(c.mileage)}</span>`:''}${c.color?`<span>${c.color}</span>`:''}${c.stock?`<span>#${c.stock}</span>`:''}</div>
       <div class="card-footer"><span class="days-badge ${daysClass(d)}">${d}d on lot</span>${c.edmundsLabel?`<span style="font-size:11px;color:var(--green)">${c.edmundsLabel}</span>`:''}</div>
@@ -1624,11 +1627,18 @@ function applyScrapeResult(car, result) {
 
   // Set originalPrice on first scrape (never changes)
   if(!car.originalPrice && car.websitePrice) car.originalPrice=car.websitePrice;
-  // Price drop: compare website price to currentFbPrice (what they posted)
+  // Price drop: compare website price to currentFbPrice (what they posted) — tracked
+  // separately per account so a price update confirmed on one account doesn't silently
+  // mark the other account's listing as matching too.
   if(car.currentFbPrice && car.websitePrice){
     car.priceDropped = car.currentFbPrice !== car.websitePrice;
   } else {
     car.priceDropped = false;
+  }
+  if(car.currentFbPrice2 && car.websitePrice){
+    car.priceDropped2 = car.currentFbPrice2 !== car.websitePrice;
+  } else {
+    car.priceDropped2 = false;
   }
   car.fbDescription=buildFBDesc(car);
 
@@ -2299,10 +2309,13 @@ function renderDrawer(c, opts={}){
   const skipLeadSection = opts.skipLeadSection || false;
   const d=daysOnLot(c);
   const fb=buildFBDesc(c);
+  // Account 2 is a distinct posting track from the same drawer — scoped by whichever tab
+  // (activeFilter) the car was opened from. Sold stays whole-car (see setFbStatus).
+  const fb2Context = activeFilter==='posted2';
   const websiteP = c.websitePrice||c.price||0;
-  const currentFbP = c.currentFbPrice||0;
+  const currentFbP = fb2Context ? (c.currentFbPrice2||0) : (c.currentFbPrice||0);
   const origP = c.originalPrice||0;
-  const hasMismatch = c.fbStatus==='posted' && currentFbP && websiteP && currentFbP !== websiteP;
+  const hasMismatch = (fb2Context ? c.fbStatus2==='posted' : c.fbStatus==='posted') && currentFbP && websiteP && currentFbP !== websiteP;
   const isLeadContext = !skipLeadSection && currentLeadRowIndex !== null;
   let h='';
 
@@ -2363,7 +2376,7 @@ function renderDrawer(c, opts={}){
   </div>`;
 
   // ── PRICE CONTROL SECTION ─────────────────────────────────
-  h+=`<div class="section-title">Price Control</div>`;
+  h+=`<div class="section-title">Price Control${fb2Context?' (Account 2)':''}</div>`;
 
   // Original price — use originalPrice or fall back to fbPostedPrice
   const displayOrigP = origP || c.fbPostedPrice || 0;
@@ -2384,7 +2397,7 @@ function renderDrawer(c, opts={}){
   const fbPriceVal = currentFbP ? '$'+Number(currentFbP).toLocaleString() : '';
   const fbPricePlaceholder = currentFbP ? '' : 'Locked — copy website price first';
   h+=`<div class="field-group">
-    <div class="field-label">Current FB Price <span style="font-size:10px;color:var(--text3);font-weight:400">(what you posted)</span>
+    <div class="field-label">Current FB Price${fb2Context?' (Account 2)':''} <span style="font-size:10px;color:var(--text3);font-weight:400">(what you posted)</span>
       ${hasMismatch?'<span style="color:var(--red);font-size:11px;margin-left:6px">⚠ Mismatch — update FB post</span>':''}
       ${!hasMismatch&&currentFbP?'<span style="color:var(--green);font-size:11px;margin-left:6px">✓ Matches website</span>':''}
     </div>
@@ -2441,9 +2454,6 @@ function renderDrawer(c, opts={}){
   h+=`</div>`;
 
   // ── FB STATUS ─────────────────────────────────────────────
-  // Account 2 is a distinct posting track from the same drawer — scoped by whichever tab
-  // (activeFilter) the car was opened from. Sold stays whole-car (see setFbStatus).
-  const fb2Context = activeFilter==='posted2';
   const dispFbStatus = fb2Context ? c.fbStatus2 : c.fbStatus;
   const dispFbPostedDate = fb2Context ? c.fbPostedDate2 : c.fbPostedDate;
   const dispDaysPosted = dispFbPostedDate ? Math.floor((Date.now()-new Date(dispFbPostedDate))/86400000) : 0;
@@ -2627,6 +2637,9 @@ let isSaving = false;
 
 async function saveFbPrice(input){
   const c=inventory.find(x=>x.vin===currentVin); if(!c) return;
+  const fb2 = activeFilter==='posted2';
+  const priceField = fb2 ? 'currentFbPrice2' : 'currentFbPrice';
+  const droppedField = fb2 ? 'priceDropped2' : 'priceDropped';
   const raw=String(input.value).replace(/[$,]/g,'').trim();
   const val=parseInt(raw)||0;
   const confirmBtn=document.getElementById('fb-price-confirm');
@@ -2640,12 +2653,12 @@ async function saveFbPrice(input){
 
   if(!val){
     input.classList.add('fb-price-input');
-    c.currentFbPrice=0; c.priceDropped=false;
+    c[priceField]=0; c[droppedField]=false;
     if(hint) hint.textContent='Copy Website Price above to unlock this field';
     render(); setSyncInfo('saving');
     try{
-      await apiPost('updateField',{vin:c.vin,field:'currentFbPrice',value:''});
-      await apiPost('updateField',{vin:c.vin,field:'priceDropped',value:false});
+      await apiPost('updateField',{vin:c.vin,field:priceField,value:''});
+      await apiPost('updateField',{vin:c.vin,field:droppedField,value:false});
       setSyncInfo('ok'); showToast('FB price cleared');
     } catch(e){ setSyncInfo('error'); showToast('⚠ Save failed — try again'); }
     return;
@@ -2656,15 +2669,15 @@ async function saveFbPrice(input){
   if(closeBtn){ closeBtn.style.opacity='0.3'; closeBtn.style.pointerEvents='none'; closeBtn.title='Saving…'; }
   if(hint) hint.innerHTML='<span class="saving-dot"></span> Saving to sheet…';
 
-  c.currentFbPrice=val;
-  c.priceDropped = !!(c.websitePrice && val && val !== c.websitePrice);
-  input.classList.add(c.priceDropped?'mismatch':'match');
+  c[priceField]=val;
+  c[droppedField] = !!(c.websitePrice && val && val !== c.websitePrice);
+  input.classList.add(c[droppedField]?'mismatch':'match');
   input.value='$'+Number(val).toLocaleString();
   render();
 
   try{
-    await apiPost('updateField',{vin:c.vin,field:'currentFbPrice',value:val});
-    await apiPost('updateField',{vin:c.vin,field:'priceDropped',value:c.priceDropped});
+    await apiPost('updateField',{vin:c.vin,field:priceField,value:val});
+    await apiPost('updateField',{vin:c.vin,field:droppedField,value:c[droppedField]});
     // Show clear confirmed state before unlocking
     if(hint) hint.innerHTML='<span style="color:var(--green);font-weight:600;font-size:13px">✓ Saved to sheet — safe to move on</span>';
     setSyncInfo('ok');
