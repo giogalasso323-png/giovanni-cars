@@ -32,7 +32,8 @@ const LEADS_COLUMNS = [
   'timestamp','firstName','lastName','phone','vehicle','vin',
   'timeframe','source','status','notes','followUpDate','vehicleList',
   'leadType','inFocus','turnedTo','vehicleNotAvailable','vehicleInterest','turnedToFirst',
-  'addedBy','calEventId','lastEdited','leadRank','leadSoldDate','soldArchived','pipelineStage','boardOrder'
+  'addedBy','calEventId','lastEdited','leadRank','leadSoldDate','soldArchived','pipelineStage','boardOrder',
+  'leadId'
 ];
 
 function doGet(e)     { return handleRequest(e); }
@@ -110,17 +111,41 @@ function submitLead(data) {
     if (col === 'timestamp') return new Date().toISOString();
     if (col === 'source' && !data[col]) return 'manual';
     if (col === 'pipelineStage' && !data[col]) return 'New';
+    if (col === 'leadId') return Utilities.getUuid();
     return data[col] !== undefined ? data[col] : '';
   });
   sh.appendRow(row);
   return { ok: true };
 }
 
+// A lead's physical sheet row shifts whenever another row above it is deleted, so a rowIndex
+// cached by the client before a concurrent delete/move can point at the wrong row by the time
+// a follow-up write lands. leadId is a stable per-lead value that never changes, so writes and
+// deletes always re-resolve the current row from it instead of trusting a stale row number.
+function findLeadRow(sh, leadId) {
+  var last = sh.getLastRow();
+  if (last < 2) return -1;
+  var idCol = LEADS_COLUMNS.indexOf('leadId') + 1;
+  var ids = sh.getRange(2, idCol, last - 1, 1).getValues();
+  for (var i = 0; i < ids.length; i++) {
+    if (String(ids[i][0]) === String(leadId)) return i + 2;
+  }
+  return -1;
+}
+
 function deleteLead(rowIndex) {
   if (!rowIndex) return { error: 'Missing rowIndex' };
-  var sh = getLeadsSheet();
-  sh.deleteRow(Number(rowIndex));
-  return { ok: true };
+  var lock = LockService.getScriptLock();
+  lock.waitLock(30000);
+  try {
+    var sh = getLeadsSheet();
+    var row = findLeadRow(sh, rowIndex);
+    if (row < 0) return { error: 'Lead not found' };
+    sh.deleteRow(row);
+    return { ok: true };
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 // ── Settings Sheet ────────────────────────────────────────────
@@ -164,9 +189,13 @@ function getLeads() {
   var last = sh.getLastRow();
   if (last < 2) return { leads: [] };
   var numCols = LEADS_COLUMNS.length;
-  var data = sh.getRange(2, 1, last - 1, numCols).getValues();
+  var idCol = LEADS_COLUMNS.indexOf('leadId');
+  var range = sh.getRange(2, 1, last - 1, numCols);
+  var data = range.getValues();
+  var idChanged = false;
   var leads = data.map(function(row, i) {
-    var obj = { rowIndex: i + 2 };
+    if (!row[idCol]) { row[idCol] = Utilities.getUuid(); idChanged = true; }
+    var obj = { rowIndex: row[idCol] };
     LEADS_COLUMNS.forEach(function(col, j) {
       var val = row[j];
       if (val instanceof Date) val = val.toISOString();
@@ -174,6 +203,7 @@ function getLeads() {
     });
     return obj;
   }).filter(function(l) { return l.firstName || l.lastName || l.phone; });
+  if (idChanged) range.setValues(data); // backfill leadId for pre-existing rows
   return { leads: leads };
 }
 
@@ -198,15 +228,23 @@ function searchLeads(data) {
 
 function updateLead(rowIndex, field, value) {
   if (!rowIndex || !field) return { error: 'Missing rowIndex or field' };
-  var sh  = getLeadsSheet();
-  var col = LEADS_COLUMNS.indexOf(field);
-  if (col < 0) return { error: 'Unknown field: ' + field };
-  sh.getRange(rowIndex, col + 1).setValue(value);
-  var lastEditedCol = LEADS_COLUMNS.indexOf('lastEdited');
-  if (lastEditedCol >= 0 && field !== 'lastEdited') {
-    sh.getRange(rowIndex, lastEditedCol + 1).setValue(new Date().toISOString());
+  var lock = LockService.getScriptLock();
+  lock.waitLock(30000);
+  try {
+    var sh  = getLeadsSheet();
+    var row = findLeadRow(sh, rowIndex);
+    if (row < 0) return { error: 'Lead not found' };
+    var col = LEADS_COLUMNS.indexOf(field);
+    if (col < 0) return { error: 'Unknown field: ' + field };
+    sh.getRange(row, col + 1).setValue(value);
+    var lastEditedCol = LEADS_COLUMNS.indexOf('lastEdited');
+    if (lastEditedCol >= 0 && field !== 'lastEdited') {
+      sh.getRange(row, lastEditedCol + 1).setValue(new Date().toISOString());
+    }
+    return { ok: true };
+  } finally {
+    lock.releaseLock();
   }
-  return { ok: true };
 }
 
 // ── Inventory Sheet ───────────────────────────────────────────

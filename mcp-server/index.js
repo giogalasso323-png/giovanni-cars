@@ -239,7 +239,7 @@ function createMcpServer() {
         inputSchema: {
           type: 'object',
           properties: {
-            rowIndex: { type: 'number' },
+            rowIndex: { type: 'string', description: 'Lead id from get_leads (opaque string, not a numeric position)' },
             field: { type: 'string' },
             value: { type: 'string' }
           },
@@ -252,7 +252,7 @@ function createMcpServer() {
         inputSchema: {
           type: 'object',
           properties: {
-            rowIndex: { type: 'number', description: 'Lead row index from get_leads' },
+            rowIndex: { type: 'string', description: 'Lead id from get_leads (opaque string, not a numeric position)' },
             pipeline: { type: 'string', description: 'Focus, Lost, Sold, or Active (Active turns off Focus only — errors if the lead is currently Lost or Sold rather than silently clearing it)' }
           },
           required: ['rowIndex', 'pipeline']
@@ -260,11 +260,11 @@ function createMcpServer() {
       },
       {
         name: 'delete_lead',
-        description: 'Delete a lead by row index.',
+        description: 'Delete a lead by id.',
         inputSchema: {
           type: 'object',
           properties: {
-            rowIndex: { type: 'number' }
+            rowIndex: { type: 'string', description: 'Lead id from get_leads (opaque string, not a numeric position)' }
           },
           required: ['rowIndex']
         }

@@ -1772,7 +1772,7 @@ function buildLeadSectionHtml(lead, car){
   const currentPosKey = pipelineStatusKey(lead);
   const mkPosBtn = (o) => {
     const active = currentPosKey === o.key;
-    return `<button class="lead-type-tab${active?' active':''}" style="${active?'background:var(--blue);color:#fff;border-color:var(--blue);opacity:1;cursor:default':''}" ${active?'disabled':''} onclick="setLeadPipelinePosition(${lead.rowIndex},'${o.key}')">${o.label}</button>`;
+    return `<button class="lead-type-tab${active?' active':''}" style="${active?'background:var(--blue);color:#fff;border-color:var(--blue);opacity:1;cursor:default':''}" ${active?'disabled':''} onclick="setLeadPipelinePosition('${lead.rowIndex}','${o.key}')">${o.label}</button>`;
   };
 
   const fName = capName(lead.firstName);
@@ -1903,7 +1903,7 @@ function buildLeadSectionHtml(lead, car){
     <!-- In Focus? -->
     <div style="margin-bottom:12px">
       <div class="field-label" style="margin-bottom:6px">In Focus?</div>
-      <button class="lead-type-tab${isLeadInFocus(lead)?' active':''}" style="${isLeadInFocus(lead)?'background:var(--purple);color:#fff;border-color:var(--purple);opacity:1':''}" onclick="toggleLeadFocus(${lead.rowIndex})">${isLeadInFocus(lead)?'✓ In Focus':'Not in Focus'}</button>
+      <button class="lead-type-tab${isLeadInFocus(lead)?' active':''}" style="${isLeadInFocus(lead)?'background:var(--purple);color:#fff;border-color:var(--purple);opacity:1':''}" onclick="toggleLeadFocus('${lead.rowIndex}')">${isLeadInFocus(lead)?'✓ In Focus':'Not in Focus'}</button>
     </div>
 
     <!-- Pipeline Status — one button per board column, same as dragging a card there -->
@@ -1980,7 +1980,7 @@ function buildLeadSectionHtml(lead, car){
         <div class="field-label" style="margin:0">Notes</div>
         <button class="mini-copy-btn" id="notes-expand-btn" onclick="toggleNotesExpand(this)">Expand</button>
       </div>
-      <textarea rows="2" placeholder="Add a note… (Enter to save, Shift+Enter for new line)" style="width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:6px;font-family:'Inter',sans-serif;font-size:13px;outline:none;resize:vertical;box-sizing:border-box;margin-bottom:8px" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();submitLeadNote(${lead.rowIndex},this);}"></textarea>
+      <textarea rows="2" placeholder="Add a note… (Enter to save, Shift+Enter for new line)" style="width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:6px;font-family:'Inter',sans-serif;font-size:13px;outline:none;resize:vertical;box-sizing:border-box;margin-bottom:8px" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();submitLeadNote('${lead.rowIndex}',this);}"></textarea>
       <div id="lead-notes-section">${buildNotesLogHtml(lead)}</div>
     </div>
 
@@ -2010,7 +2010,7 @@ function buildLeadSectionHtml(lead, car){
     </div>
   </div>
   <div style="margin-bottom:16px">
-    <button class="mini-copy-btn" style="color:var(--red);border-color:var(--red)" onclick="deleteLeadFromDrawer(${lead.rowIndex})">Delete Lead</button>
+    <button class="mini-copy-btn" style="color:var(--red);border-color:var(--red)" onclick="deleteLeadFromDrawer('${lead.rowIndex}')">Delete Lead</button>
   </div>
   <div id="lead-vehicles-section">${buildVehicleListHtml(lead)}</div>`;
 }
@@ -2073,7 +2073,7 @@ function buildVehicleListHtml(lead) {
       draggable="true"
       ondragstart="vehicleDragStart(event,${idx})"
       ondragover="vehicleDragOver(event)"
-      ondrop="vehicleDrop(event,${idx},${lead.rowIndex})"
+      ondrop="vehicleDrop(event,${idx},'${lead.rowIndex}')"
       ondragend="vehicleDragEnd(event)"
       ${clickable?`onclick="openVehicleSubDrawer('${vin}')"`:''}>
       <div class="lead-vehicle-drag-handle" onclick="event.stopPropagation()" title="Drag to reorder">
@@ -2088,7 +2088,7 @@ function buildVehicleListHtml(lead) {
         </div>
       </div>
       <div class="lead-vehicle-item-gross">${grossHtml}</div>
-      <button class="icon-btn" title="Remove" onclick="event.stopPropagation();removeVehicleFromLead(${lead.rowIndex},${idx})" style="flex-shrink:0;align-self:flex-start;margin-top:4px">
+      <button class="icon-btn" title="Remove" onclick="event.stopPropagation();removeVehicleFromLead('${lead.rowIndex}',${idx})" style="flex-shrink:0;align-self:flex-start;margin-top:4px">
         <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
       </button>
     </div>`;
@@ -2098,7 +2098,7 @@ function buildVehicleListHtml(lead) {
   return `<div style="margin-bottom:14px">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
       <div class="field-label" style="margin:0">Vehicles to Show (${list.length})</div>
-      <button class="btn" style="font-size:11px;padding:3px 10px" onclick="openLeadVehicleSearch(${lead.rowIndex})">+ Add Car</button>
+      <button class="btn" style="font-size:11px;padding:3px 10px" onclick="openLeadVehicleSearch('${lead.rowIndex}')">+ Add Car</button>
     </div>
     ${items || '<div style="font-size:13px;color:var(--text3);padding:6px 0">No vehicles added yet. Click + Add Car to attach options.</div>'}
   </div>`;
@@ -3204,8 +3204,8 @@ function buildNotesLogHtml(lead){
       <div class="note-entry-text">${esc(e.text)}</div>
       <div class="note-entry-actions">
         <button class="mini-copy-btn" onclick="event.stopPropagation();copyText('${jsEsc(e.text)}',this)">Copy</button>
-        <button class="mini-copy-btn" onclick="event.stopPropagation();startEditNote(${lead.rowIndex},${i})">Edit</button>
-        <button class="mini-copy-btn" onclick="event.stopPropagation();deleteLeadNote(${lead.rowIndex},${i})">Delete</button>
+        <button class="mini-copy-btn" onclick="event.stopPropagation();startEditNote('${lead.rowIndex}',${i})">Edit</button>
+        <button class="mini-copy-btn" onclick="event.stopPropagation();deleteLeadNote('${lead.rowIndex}',${i})">Delete</button>
       </div>
     </div>`;
   }).join('')}</div>`;
@@ -3249,8 +3249,8 @@ function startEditNote(rowIndex, idx){
   container.innerHTML = `
     <textarea id="note-edit-${rowIndex}-${idx}" rows="3" style="width:100%;background:var(--bg2);border:1px solid var(--border2);color:var(--text);padding:6px 10px;border-radius:6px;font-family:'Inter',sans-serif;font-size:13px;outline:none;resize:vertical;margin-bottom:6px;box-sizing:border-box">${esc(entry.text)}</textarea>
     <div style="display:flex;gap:6px">
-      <button class="btn" style="font-size:12px;padding:4px 12px" onclick="event.stopPropagation();saveEditNote(${rowIndex},${idx})">Save</button>
-      <button class="mini-copy-btn" onclick="event.stopPropagation();refreshNotesSection(${rowIndex})">Cancel</button>
+      <button class="btn" style="font-size:12px;padding:4px 12px" onclick="event.stopPropagation();saveEditNote('${rowIndex}',${idx})">Save</button>
+      <button class="mini-copy-btn" onclick="event.stopPropagation();refreshNotesSection('${rowIndex}')">Cancel</button>
     </div>`;
 }
 async function saveEditNote(rowIndex, idx){
@@ -3619,8 +3619,8 @@ function renderLeads(){
     const addedByBadge = lead.addedBy
       ? `<span style="font-size:10px;color:${addedByColors[lead.addedBy]||'var(--text3)'};background:var(--bg3);padding:2px 7px;border-radius:4px;font-weight:600">${lead.addedBy}</span>`
       : '';
-    return `<tr class="${isSelected?'lead-selected':''}" onclick="openDrawerFromLead(${lead.rowIndex})" style="cursor:pointer">
-      <td onclick="event.stopPropagation()"><input type="checkbox" ${isSelected?'checked':''} onchange="toggleLeadSelect(${lead.rowIndex},this)"></td>
+    return `<tr class="${isSelected?'lead-selected':''}" onclick="openDrawerFromLead('${lead.rowIndex}')" style="cursor:pointer">
+      <td onclick="event.stopPropagation()"><input type="checkbox" ${isSelected?'checked':''} onchange="toggleLeadSelect('${lead.rowIndex}',this)"></td>
       <td style="font-family:'DM Mono',monospace;font-size:11px;white-space:nowrap">
         <div style="display:flex;align-items:center;gap:5px;color:var(--text3)">${staleDot}${date}</div>
         ${lastEditedStr ? `<div style="color:var(--text3);opacity:0.6;margin-top:2px">↻ ${lastEditedStr}</div>` : ''}
@@ -3638,9 +3638,9 @@ function renderLeads(){
       </td>
       <td>${vehicleCell}</td>
       <td><span title="${String(lead.timeframe||'').replace(/"/g,'&quot;')}" style="font-size:11px;background:var(--bg3);padding:2px 8px;border-radius:4px;color:var(--text3);display:inline-block;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:bottom">${lead.timeframe||'—'}</span></td>
-      <td onclick="event.stopPropagation()"><select class="lead-status-sel ${cls}" onchange="updateLeadStatus(${lead.rowIndex},this)">${statusOpts}</select></td>
+      <td onclick="event.stopPropagation()"><select class="lead-status-sel ${cls}" onchange="updateLeadStatus('${lead.rowIndex}',this)">${statusOpts}</select></td>
       <td onclick="event.stopPropagation()">
-        <button class="icon-btn" title="Delete lead" onclick="confirmDeleteLead(${lead.rowIndex})">
+        <button class="icon-btn" title="Delete lead" onclick="confirmDeleteLead('${lead.rowIndex}')">
           <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2"/></svg>
         </button>
       </td>
@@ -3843,14 +3843,14 @@ function renderBoardCard(lead, draggable, colKey){
 
   return `<div class="board-card"
       ${draggable?'draggable="true"':''}
-      ondragstart="${draggable?`boardCardDragStart(event,${lead.rowIndex})`:''}"
+      ondragstart="${draggable?`boardCardDragStart(event,'${lead.rowIndex}')`:''}"
       ondragend="${draggable?'boardCardDragEnd(event)':''}"
       ondragover="${draggable?`boardCardDragOver(event)`:''}"
       ondragleave="${draggable?`boardCardDragLeave(event)`:''}"
-      ondrop="${draggable?`boardCardDrop(event,'${colKey}',${lead.rowIndex})`:''}"
-      onclick="openDrawerFromLead(${lead.rowIndex})">
+      ondrop="${draggable?`boardCardDrop(event,'${colKey}','${lead.rowIndex}')`:''}"
+      onclick="openDrawerFromLead('${lead.rowIndex}')">
     <div class="board-card-top">
-      <span style="cursor:pointer" title="Set customer grade" onclick="event.stopPropagation();openQuickRank(event,${lead.rowIndex})">${rankBadgeHtml(rank)}</span>
+      <span style="cursor:pointer" title="Set customer grade" onclick="event.stopPropagation();openQuickRank(event,'${lead.rowIndex}')">${rankBadgeHtml(rank)}</span>
       <span class="board-src-badge">${src}</span>
       ${pipelineStatusBadgeHtml(lead)}
     </div>
@@ -3892,7 +3892,7 @@ function openQuickRank(e, rowIndex){
   const suffix = rank.slice(3);
   const t = suffix.indexOf('T') >= 0, d = suffix.indexOf('D') >= 0;
   const rect = e.currentTarget.getBoundingClientRect();
-  const mkSel = (id, opts, val) => `<select id="${id}" onchange="saveQuickRank(${rowIndex})">${opts.map(o=>`<option value="${o}"${o===val?' selected':''}>${o||'–'}</option>`).join('')}</select>`;
+  const mkSel = (id, opts, val) => `<select id="${id}" onchange="saveQuickRank('${rowIndex}')">${opts.map(o=>`<option value="${o}"${o===val?' selected':''}>${o||'–'}</option>`).join('')}</select>`;
   const pop = document.createElement('div');
   pop.id = 'quick-rank-pop';
   pop.className = 'quick-rank-pop';
@@ -3903,8 +3903,8 @@ function openQuickRank(e, rowIndex){
     ${mkSel('qr-pos1', ['','A','B','C','0'], p1)}
     ${mkSel('qr-pos2', ['','1','2','3','0'], p2)}
     ${mkSel('qr-pos3', ['','A','B','C','0'], p3)}
-    <label><input type="checkbox" id="qr-turn"${t?' checked':''} onchange="saveQuickRank(${rowIndex})">T</label>
-    <label><input type="checkbox" id="qr-dead"${d?' checked':''} onchange="saveQuickRank(${rowIndex})">D</label>
+    <label><input type="checkbox" id="qr-turn"${t?' checked':''} onchange="saveQuickRank('${rowIndex}')">T</label>
+    <label><input type="checkbox" id="qr-dead"${d?' checked':''} onchange="saveQuickRank('${rowIndex}')">D</label>
   `;
   document.body.appendChild(pop);
   setTimeout(() => document.addEventListener('click', closeQuickRankOnOutside), 0);
@@ -4560,7 +4560,7 @@ function renderNewCarDrawer(c, isLeadContext) {
         </div>
         <div><div class="field-label">Notes</div>
           ${latestNoteText(lead)?`<div style="font-size:12px;color:var(--text2);margin-bottom:6px;line-height:1.4">${latestNoteText(lead).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</div>`:''}
-          <input type="text" style="width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:6px;font-family:'Inter',sans-serif;font-size:13px;outline:none" placeholder="Add a note…" onkeydown="if(event.key==='Enter'){event.preventDefault();submitLeadNote(${lead.rowIndex},this);}">
+          <input type="text" style="width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:6px;font-family:'Inter',sans-serif;font-size:13px;outline:none" placeholder="Add a note…" onkeydown="if(event.key==='Enter'){event.preventDefault();submitLeadNote('${lead.rowIndex}',this);}">
         </div>
       </div>`;
     }
@@ -5677,7 +5677,7 @@ function renderLeadPickerResults(q) {
     const status = l.status || '';
     const colorClass = LEAD_STATUS_COLORS[status] || 's-new';
     const hasVehicle = l.vehicle || l.vin;
-    return `<div onclick="selectLeadForCar(${l.rowIndex})"
+    return `<div onclick="selectLeadForCar('${l.rowIndex}')"
       style="padding:12px 14px;border-bottom:1px solid var(--border);cursor:pointer;transition:background 0.1s"
       onmouseover="this.style.background='var(--bg3)'" onmouseout="this.style.background=''">
       <div style="display:flex;justify-content:space-between;align-items:center">
