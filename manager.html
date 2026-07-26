@@ -684,9 +684,9 @@
       <div>
         <div class="field-label">Pipeline Position</div>
         <select id="al-pipeline" style="width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:8px 10px;border-radius:var(--radius);font-family:'Inter',sans-serif;font-size:13px;outline:none;appearance:none">
-          <option value="Turned">Just Turned</option>
           <option value="New">New Lead</option>
           <option value="Working">Working</option>
+          <option value="Turned">Turned</option>
           <option value="Appt">Appt Set</option>
           <option value="BeBack">Be Back</option>
           <option value="Cold">Cold</option>
@@ -867,6 +867,7 @@ function showApp() { document.getElementById('app').style.display='block'; }
 async function apiFetch(url, action, body, timeoutMs = 20000, attempt = 1) {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+  let data;
   try {
     let r;
     if (!body) {
@@ -882,7 +883,7 @@ async function apiFetch(url, action, body, timeoutMs = 20000, attempt = 1) {
     if (!r.ok || !contentType.includes('json')) {
       throw new Error(`Apps Script returned a non-JSON response (status ${r.status})`);
     }
-    return await r.json();
+    data = await r.json();
   } catch (e) {
     if (attempt < 3) {
       await new Promise(res => setTimeout(res, 800 * attempt));
@@ -892,6 +893,12 @@ async function apiFetch(url, action, body, timeoutMs = 20000, attempt = 1) {
   } finally {
     clearTimeout(timeoutId);
   }
+  // Apps Script always answers HTTP 200 even for a logical failure (e.g. "Lead not found"),
+  // so a caller awaiting apiPost/apiGet can't rely on fetch() rejecting for that case -- it
+  // has to be thrown here. Thrown outside the retry block above: retrying an already-answered
+  // logical error just delays surfacing the same answer, it doesn't change it.
+  if (data && data.error) throw new Error(data.error);
+  return data;
 }
 const apiGet  = (action, timeoutMs)       => apiFetch(API_URL, action, undefined, timeoutMs);
 const apiPost = (action, body, timeoutMs) => apiFetch(API_URL, action, body, timeoutMs);
@@ -2194,7 +2201,7 @@ async function moveLeadTo(rowIndex, newType) {
     if (currentLeadRowIndex === rowIndex) {
       document.getElementById('drawer-body').innerHTML = buildLeadSectionHtml(lead, null);
     }
-  } catch(e) { showToast('Failed: ' + e.message); }
+  } catch(e) { showToast('Failed: ' + e.message + ' — reloading'); await loadLeads(); }
 }
 
 // In Focus is now a pure on/off toggle, independent of Sold/Lost/pipeline position —
@@ -2207,7 +2214,7 @@ async function toggleLeadFocus(rowIndex){
   try {
     await apiPost('updateLead', { rowIndex, field: 'inFocus', value: newVal });
     showToast(newVal ? 'Marked In Focus' : 'Removed from Focus');
-  } catch(e) { showToast('Save failed'); }
+  } catch(e) { showToast('Save failed — reloading'); await loadLeads(); return; }
   if (document.getElementById('leads-content')) renderLeads();
   if (currentLeadRowIndex === rowIndex) {
     document.getElementById('drawer-body').innerHTML = buildLeadSectionHtml(lead, null);
@@ -3122,16 +3129,16 @@ const LEAD_STATUS_COLORS = { '':'s-new', 'One Way':'s-oneway', 'Two Way':'s-twow
 
 // Pipeline position — where the lead sits in the sales process. Drives the Sales Process board columns.
 // Waiting (Needs Vehicle Match) is derived from vehicleNotAvailable, and Sold/Lost from inFocus — neither lives here.
-const PIPELINE_STAGES = ['Turned','New','Working','Appt','BeBack','Cold'];
-const PIPELINE_STAGE_LABELS = { 'Turned':'Just Turned', 'New':'New Lead', 'Working':'Working', 'Appt':'Appt Set', 'BeBack':'Be Back', 'Cold':'Cold' };
+const PIPELINE_STAGES = ['New','Working','Turned','Appt','BeBack','Cold'];
+const PIPELINE_STAGE_LABELS = { 'Turned':'Turned', 'New':'New Lead', 'Working':'Working', 'Appt':'Appt Set', 'BeBack':'Be Back', 'Cold':'Cold' };
 
 // Every column a lead can live in on the board, in the same left-to-right order as the
 // board itself. Drives the drawer's "Pipeline Status" button row — clicking one of these
 // is the click-based equivalent of dragging the card to that column.
 const PIPELINE_POSITION_OPTIONS = [
-  { key:'Turned',       label:'Just Turned' },
   { key:'New',          label:'New Lead' },
   { key:'Working',      label:'Working' },
+  { key:'Turned',       label:'Turned' },
   { key:'Appt',         label:'Appt Set' },
   { key:'BeBack',       label:'Be Back' },
   { key:'Waiting',      label:'Needs Vehicle Match' },
@@ -3697,9 +3704,9 @@ const BOARD_STAGE_COLS = ['Lot','Phone Call','FB Marketplace','Internet Lead','F
 const BOARD_CLOSED_COLS = ['Sold','Lost'];
 
 const PROCESS_COLS = [
-  { key:'Turned',  label:'Just Turned',         match: l => !isWaitingLead(l) && l.pipelineStage==='Turned' },
   { key:'New',     label:'New Lead',            match: l => !isWaitingLead(l) && (!l.pipelineStage || l.pipelineStage==='New') },
   { key:'Working', label:'Working',             match: l => !isWaitingLead(l) && l.pipelineStage==='Working' },
+  { key:'Turned',  label:'Turned',         match: l => !isWaitingLead(l) && l.pipelineStage==='Turned' },
   { key:'Appt',    label:'Appt Set',            match: l => !isWaitingLead(l) && l.pipelineStage==='Appt' },
   { key:'BeBack',  label:'Be Back',             match: l => !isWaitingLead(l) && l.pipelineStage==='BeBack' },
   { key:'Waiting', label:'Needs Vehicle Match', match: l => isWaitingLead(l) },
@@ -3972,14 +3979,19 @@ async function applyColumnMove(rowIndex, colKey){
     const lead = leadsData.find(l => l.rowIndex === rowIndex);
     if (!lead) return;
     const writes = PROCESS_COL_WRITE[colKey];
-    const saves = Object.keys(writes).map(field => {
-      lead[field] = writes[field];
-      return apiPost('updateLead', { rowIndex, field, value: writes[field] });
-    });
-    await Promise.all(saves);
+    Object.keys(writes).forEach(field => { lead[field] = writes[field]; });
     renderLeads();
     if (currentLeadRowIndex === rowIndex) {
       document.getElementById('drawer-body').innerHTML = buildLeadSectionHtml(lead, null);
+    }
+    try {
+      await Promise.all(Object.keys(writes).map(field => apiPost('updateLead', { rowIndex, field, value: writes[field] })));
+    } catch(e) {
+      // The card already moved on screen -- if the write actually failed, that's exactly the
+      // silent-zombie pattern (looks moved, sheet never changed), so reload from the server
+      // instead of leaving the UI showing a state that was never actually saved.
+      showToast('Move failed: '+e.message+' — reloading');
+      await loadLeads();
     }
     return;
   }
@@ -4133,7 +4145,6 @@ async function doDeleteLead(rowIndex){
     updateLeadActionBar();
     renderLeads();
     showToast('Lead deleted');
-    // Reload to get correct row indexes after deletion
     setTimeout(()=>loadLeads(), 1500);
   } catch(e){ showToast('Delete failed: '+e.message); }
 }
@@ -4236,7 +4247,7 @@ async function submitManualLead(){
   const turnedTo = (document.getElementById('al-rep-last').value||'').trim();
   let pipelineStage = document.getElementById('al-pipeline').value;
   // Left on the default and a hand-off rep was entered -- this is a fresh turn, not a
-  // self-sourced New Lead, so it should land in the Just Turned column, not New.
+  // self-sourced New Lead, so it should land in the Turned column, not New.
   if (pipelineStage === 'New' && (turnedToFirst || turnedTo)) pipelineStage = 'Turned';
 
   if(!firstName||!lastName||!phone){ document.getElementById('al-error').style.display='block'; return; }
