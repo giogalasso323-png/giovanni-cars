@@ -14,7 +14,7 @@ const NEW_INV_COLUMNS = [
   'onlineStatus','promotable','campaign','presold','reserved',
   'comments','rdr','addedDate','notes',
   'fbStatus','fbDescription','fbPostedPrice','fbPostedDate','currentFbPrice',
-  'websiteUrl','websiteStatus','websitePrice','lastChecked'
+  'websiteUrl','websiteStatus','websitePrice','lastChecked','photosDownloadedDate'
 ];
 
 const COLUMNS = [
@@ -136,7 +136,7 @@ function submitLead(data) {
     var row = LEADS_COLUMNS.map(function(col) {
       if (col === 'timestamp') return new Date().toISOString();
       if (col === 'source' && !data[col]) return 'manual';
-      if (col === 'pipelineStage' && !data[col]) return 'New';
+      if (col === 'pipelineStage' && !data[col]) return (data.turnedTo || data.turnedToFirst) ? 'Turned' : 'New';
       if (col === 'leadId') return Utilities.getUuid();
       return data[col] !== undefined ? data[col] : '';
     });
@@ -875,23 +875,36 @@ function parseNewVehiclePage(html, vehicleUrl) {
   };
 }
 
+// Same auto-repair as getHeaderMap() for the main Inventory sheet -- appends any
+// NEW_INV_COLUMNS entry missing from the sheet's actual header row instead of silently
+// reading/writing a column position that was never labeled.
+function getNewInvHeaderMap(sh) {
+  var last = Math.max(sh.getLastColumn(), 1);
+  var headers = sh.getRange(1, 1, 1, last).getValues()[0];
+  var missing = NEW_INV_COLUMNS.filter(function(c) { return headers.indexOf(c) < 0; });
+  if (missing.length) {
+    sh.getRange(1, last + 1, 1, missing.length).setValues([missing]);
+    missing.forEach(function(h) { headers.push(h); });
+  }
+  var map = {};
+  headers.forEach(function(h, i) { if (h) map[String(h)] = i; });
+  return map;
+}
+
 function getNewInventory() {
   var ss = getSpreadsheet();
   var sh = ss.getSheetByName(NEW_INV_SHEET);
   if (!sh) return { cars: [] };
   var last = sh.getLastRow();
   if (last < 2) return { cars: [] };
-  var numCols = Math.max(sh.getLastColumn(), NEW_INV_COLUMNS.length);
-  // Read header to build column map (handles sheets with missing new columns)
-  var headers = sh.getRange(1, 1, 1, numCols).getValues()[0].map(String);
-  var colMap = {};
-  NEW_INV_COLUMNS.forEach(function(col) { colMap[col] = headers.indexOf(col); });
+  var colMap = getNewInvHeaderMap(sh);
+  var numCols = sh.getLastColumn();
   var data = sh.getRange(2, 1, last - 1, numCols).getValues();
   var cars = data.map(function(row) {
     var obj = {};
     NEW_INV_COLUMNS.forEach(function(col) {
       var idx = colMap[col];
-      var val = idx >= 0 ? row[idx] : '';
+      var val = idx !== undefined ? row[idx] : '';
       if (val instanceof Date) val = val.toISOString();
       obj[col] = (val === null || val === undefined) ? '' : String(val);
     });
@@ -1036,14 +1049,17 @@ function importCostData(records) {
 
 function updateNewCar(vin, field, value) {
   if (!vin || !field) return { error: 'Missing vin or field' };
-  var col = NEW_INV_COLUMNS.indexOf(field);
-  if (col < 0) return { error: 'Unknown field: ' + field };
+  if (NEW_INV_COLUMNS.indexOf(field) < 0) return { error: 'Unknown field: ' + field };
   var ss = getSpreadsheet();
   var sh = ss.getSheetByName(NEW_INV_SHEET);
   if (!sh) return { error: 'Sheet not found' };
   var last = sh.getLastRow();
   if (last < 2) return { error: 'No data' };
-  var vins = sh.getRange(2, 1, last - 1, 1).getValues();
+  var colMap = getNewInvHeaderMap(sh);
+  var col = colMap[field];
+  var vinCol = colMap['vin'];
+  if (col === undefined || vinCol === undefined) return { error: 'Unknown field: ' + field };
+  var vins = sh.getRange(2, vinCol + 1, last - 1, 1).getValues();
   for (var i = 0; i < vins.length; i++) {
     if (String(vins[i][0]).toUpperCase() === String(vin).toUpperCase()) {
       sh.getRange(i + 2, col + 1).setValue(value);

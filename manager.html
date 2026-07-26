@@ -684,6 +684,7 @@
       <div>
         <div class="field-label">Pipeline Position</div>
         <select id="al-pipeline" style="width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:8px 10px;border-radius:var(--radius);font-family:'Inter',sans-serif;font-size:13px;outline:none;appearance:none">
+          <option value="Turned">Just Turned</option>
           <option value="New">New Lead</option>
           <option value="Working">Working</option>
           <option value="Appt">Appt Set</option>
@@ -3121,13 +3122,14 @@ const LEAD_STATUS_COLORS = { '':'s-new', 'One Way':'s-oneway', 'Two Way':'s-twow
 
 // Pipeline position — where the lead sits in the sales process. Drives the Sales Process board columns.
 // Waiting (Needs Vehicle Match) is derived from vehicleNotAvailable, and Sold/Lost from inFocus — neither lives here.
-const PIPELINE_STAGES = ['New','Working','Appt','BeBack','Cold'];
-const PIPELINE_STAGE_LABELS = { 'New':'New Lead', 'Working':'Working', 'Appt':'Appt Set', 'BeBack':'Be Back', 'Cold':'Cold' };
+const PIPELINE_STAGES = ['Turned','New','Working','Appt','BeBack','Cold'];
+const PIPELINE_STAGE_LABELS = { 'Turned':'Just Turned', 'New':'New Lead', 'Working':'Working', 'Appt':'Appt Set', 'BeBack':'Be Back', 'Cold':'Cold' };
 
 // Every column a lead can live in on the board, in the same left-to-right order as the
 // board itself. Drives the drawer's "Pipeline Status" button row — clicking one of these
 // is the click-based equivalent of dragging the card to that column.
 const PIPELINE_POSITION_OPTIONS = [
+  { key:'Turned',       label:'Just Turned' },
   { key:'New',          label:'New Lead' },
   { key:'Working',      label:'Working' },
   { key:'Appt',         label:'Appt Set' },
@@ -3695,6 +3697,7 @@ const BOARD_STAGE_COLS = ['Lot','Phone Call','FB Marketplace','Internet Lead','F
 const BOARD_CLOSED_COLS = ['Sold','Lost'];
 
 const PROCESS_COLS = [
+  { key:'Turned',  label:'Just Turned',         match: l => !isWaitingLead(l) && l.pipelineStage==='Turned' },
   { key:'New',     label:'New Lead',            match: l => !isWaitingLead(l) && (!l.pipelineStage || l.pipelineStage==='New') },
   { key:'Working', label:'Working',             match: l => !isWaitingLead(l) && l.pipelineStage==='Working' },
   { key:'Appt',    label:'Appt Set',            match: l => !isWaitingLead(l) && l.pipelineStage==='Appt' },
@@ -3706,6 +3709,7 @@ const PROCESS_COLS = [
 // Sold/Lost aren't here — those fall through to moveLeadTo() (inFocus), same as closed columns everywhere else.
 // SoldArchived is the exception: it's a closed-column split (see bucketLeadsForBoard), not a stage, so it's a plain field write.
 const PROCESS_COL_WRITE = {
+  'Turned':  { pipelineStage:'Turned', vehicleNotAvailable:'false' },
   'New':     { pipelineStage:'New', vehicleNotAvailable:'false' },
   'Working': { pipelineStage:'Working', vehicleNotAvailable:'false' },
   'Appt':    { pipelineStage:'Appt', vehicleNotAvailable:'false' },
@@ -4225,12 +4229,15 @@ async function submitManualLead(){
   const lastName  = document.getElementById('al-lastname').value.trim();
   const phone     = document.getElementById('al-phone').value.trim();
   const timeframe = document.getElementById('al-timeframe').value;
-  const pipelineStage = document.getElementById('al-pipeline').value;
   const notes     = document.getElementById('al-notes').value.trim();
   const vehicleInterest = document.getElementById('al-vehicle-interest').value.trim();
   const vehicleNotAvailable = document.getElementById('al-not-avail').checked ? 'true' : '';
   const turnedToFirst = (document.getElementById('al-rep-first').value||'').trim();
   const turnedTo = (document.getElementById('al-rep-last').value||'').trim();
+  let pipelineStage = document.getElementById('al-pipeline').value;
+  // Left on the default and a hand-off rep was entered -- this is a fresh turn, not a
+  // self-sourced New Lead, so it should land in the Just Turned column, not New.
+  if (pipelineStage === 'New' && (turnedToFirst || turnedTo)) pipelineStage = 'Turned';
 
   if(!firstName||!lastName||!phone){ document.getElementById('al-error').style.display='block'; return; }
   document.getElementById('al-error').style.display='none';
@@ -4345,6 +4352,7 @@ function showToast(msg){ const t=document.getElementById('toast'); t.textContent
 
 // ── NEW CARS ───────────────────────────────────────────────
 let newInventory = [];
+let selectedNewVins = new Set();
 
 const TOYOTA_EXT_COLORS = {
   '0040':'Black','0089':'Super White','0090':'Black','0202':'Magnetic Gray',
@@ -4373,6 +4381,9 @@ function showNewCarsView() {
 function hideNewCarsView() {
   document.getElementById('new-cars-view').style.display = 'none';
   document.querySelector('.toolbar').style.visibility = '';
+  selectedNewVins.clear();
+  const bar = document.getElementById('new-action-bar');
+  if (bar) bar.classList.remove('show');
 }
 
 async function loadNewInventory() {
@@ -4439,19 +4450,22 @@ function renderNewCarsView() {
     const isOnline  = (c.onlineStatus||'').toLowerCase()==='online' && !isStopped;
     const stBadge   = isStopped ? '<span class="badge badge-sold">Stop Sale</span>' : isOnline ? '<span class="badge badge-live">Online</span>' : '<span class="badge badge-notfound">Offline</span>';
     const fbBadge   = c.fbStatus==='posted' ? '<span class="badge badge-posted">Posted</span>' : '<span class="badge badge-unposted">—</span>';
-    const webBadge  = c.websiteUrl ? '<span class="badge badge-live" style="font-size:10px">Live</span>' : c.websiteStatus && c.websiteStatus!=='Live' ? `<span class="badge badge-notfound" style="font-size:10px">${c.websiteStatus}</span>` : '';
+    const webLink   = c.websiteUrl ? `<a href="${c.websiteUrl}" target="_blank" onclick="event.stopPropagation()" class="badge badge-live" style="font-size:10px;text-decoration:none" title="Check availability on DublinToyota.com">Live ↗</a>` : c.websiteStatus && c.websiteStatus!=='Live' ? `<span class="badge badge-notfound" style="font-size:10px">${c.websiteStatus}</span>` : '';
+    const downloadedBadge = c.photosDownloadedDate ? '<span class="badge badge-photos-pending" title="Photos downloaded — not yet posted">Downloaded</span>' : '';
     const price     = c.advertised ? '$'+Number(c.advertised).toLocaleString() : '—';
     const dis       = Number(c.dis)||0;
     const disColor  = dis>60?'var(--red)':dis>30?'var(--amber)':'var(--text3)';
     const isActive  = c.vin === lastOpenedNewVin;
+    const chk       = selectedNewVins.has(c.vin) ? 'checked' : '';
     return `<tr onclick="openNewCarDrawer('${c.vin}')" class="${isActive?'row-active':''}">
+      <td onclick="event.stopPropagation()"><input type="checkbox" ${chk} onchange="toggleNewSelect('${c.vin}',this)"></td>
       <td style="color:var(--text3)">${c.stock||'—'}</td>
       <td><div class="td-main">${c.year||''} ${c.modelName||'—'}</div><div class="td-vin">${c.vin}</div></td>
       <td>${decodeColor(c.extColor)}</td>
       <td style="font-weight:600">${price}</td>
       <td style="color:${disColor}">${dis||'—'}d</td>
-      <td>${stBadge} ${webBadge}</td>
-      <td>${fbBadge}</td>
+      <td>${stBadge} ${webLink}</td>
+      <td>${fbBadge}${downloadedBadge}</td>
     </tr>`;
   }).join('');
 
@@ -4483,10 +4497,20 @@ function renderNewCarsView() {
       </div>
       <div class="filter-tabs" style="padding:0 20px">${tabs}</div>
     </div>
+    <div class="action-bar" id="new-action-bar">
+      <span id="new-selected-count">0 selected</span>
+      <button class="btn" id="btn-download-new-photos" onclick="downloadNewPhotosZip()" style="color:var(--green);border-color:var(--green)">
+        <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        Download Photos
+      </button>
+      <button class="btn" onclick="bulkClearNewDownloaded()" title="Reset the Downloaded flag — use this when the actual photo files are gone (different computer, new day) so you can redownload a fresh batch">Clear Download Status</button>
+      <button class="btn" style="color:var(--red)" onclick="clearNewSelection()">Clear</button>
+    </div>
     <div style="padding:0 20px 20px">
       <div class="table-wrap">
         <table>
           <thead><tr>
+            <th style="width:32px"><input type="checkbox" id="chk-all-new" onchange="toggleNewAll(this)"></th>
             <th>Stock #</th>
             <th onclick="setNewCarsSort('model')">Model / VIN</th>
             <th>Color</th>
@@ -4495,7 +4519,7 @@ function renderNewCarsView() {
             <th>Status</th>
             <th>Facebook</th>
           </tr></thead>
-          <tbody>${newCarsFiltered.length ? rows : '<tr><td colspan="7" style="text-align:center;padding:40px;color:var(--text3)">No vehicles match</td></tr>'}</tbody>
+          <tbody>${newCarsFiltered.length ? rows : '<tr><td colspan="8" style="text-align:center;padding:40px;color:var(--text3)">No vehicles match</td></tr>'}</tbody>
         </table>
       </div>
     </div>`;
@@ -4504,6 +4528,92 @@ function renderNewCarsView() {
 function setNewCarsFilter(f){ newCarsFilter=f; renderNewCarsView(); }
 function setNewCarsSearch(q){ newCarsSearch=q; renderNewCarsView(); }
 function setNewCarsSort(s){ newCarsSort=s; renderNewCarsView(); }
+
+// ── New Cars selection + photo download ─────────────────────
+function toggleNewSelect(vin,el){ if(el.checked)selectedNewVins.add(vin);else selectedNewVins.delete(vin); updateNewActionBar(); }
+function toggleNewAll(el){ newCarsFiltered.forEach(c=>{ if(el.checked)selectedNewVins.add(c.vin);else selectedNewVins.delete(c.vin); }); updateNewActionBar(); renderNewCarsView(); }
+function clearNewSelection(){ selectedNewVins.clear(); const all=document.getElementById('chk-all-new'); if(all) all.checked=false; updateNewActionBar(); renderNewCarsView(); }
+function updateNewActionBar(){
+  const bar=document.getElementById('new-action-bar');
+  selectedNewVins.size>0?(bar.classList.add('show'),document.getElementById('new-selected-count').textContent=selectedNewVins.size+' selected'):bar.classList.remove('show');
+}
+
+async function bulkClearNewDownloaded() {
+  const vins=[...selectedNewVins];
+  if(!vins.length) return;
+  vins.forEach(v=>{ const c=newInventory.find(x=>x.vin===v); if(c) c.photosDownloadedDate=''; });
+  clearNewSelection(); renderNewCarsView(); setSyncInfo('saving');
+  await Promise.all(vins.map(v=>apiPost('updateNewCar',{vin:v,field:'photosDownloadedDate',value:''})));
+  setSyncInfo('ok'); showToast(vins.length+' download status cleared');
+}
+
+async function downloadNewPhotosZip() {
+  const vins = [...selectedNewVins];
+  if (!vins.length) return;
+
+  const btn = document.getElementById('btn-download-new-photos');
+  const countEl = document.getElementById('new-selected-count');
+  btn.disabled = true;
+
+  const zip = new JSZip();
+  let fetched = 0, empty = 0, errors = 0;
+  const downloadedVins = [];
+
+  for (let i = 0; i < vins.length; i++) {
+    const vin = vins[i];
+    const car = newInventory.find(c => c.vin === vin);
+    const label = car
+      ? `${car.stock || vin.slice(-6)} - ${car.year} ${car.modelName}`
+      : vin;
+    const orderPrefix = String(i + 1).padStart(2, '0');
+    const zipLabel = `${orderPrefix} - ${label}`;
+
+    countEl.textContent = `Fetching ${i + 1} of ${vins.length}: ${label}…`;
+
+    let res = null;
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        res = await apiPost('getPhotosBase64', { vin, label: zipLabel });
+        if (!res.error) break;
+        if (attempt === 0) { countEl.textContent = `Retrying ${label}…`; await new Promise(r => setTimeout(r, 4000)); }
+      } catch(e) {
+        if (attempt === 0) { countEl.textContent = `Retrying ${label}…`; await new Promise(r => setTimeout(r, 4000)); }
+      }
+    }
+
+    if (!res || res.error) {
+      errors++;
+    } else if (res.photos && res.photos.length) {
+      const folder = zip.folder(zipLabel);
+      res.photos.forEach(p => folder.file(p.name, p.data, { base64: true }));
+      fetched++;
+      if (car) { car.photosDownloadedDate = new Date().toISOString(); downloadedVins.push(car.vin); }
+    } else {
+      empty++;
+    }
+  }
+
+  if (fetched > 0) {
+    countEl.textContent = 'Zipping…';
+    const blob = await zip.generateAsync({ type: 'blob' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `new-car-photos-${new Date().toISOString().slice(0,10)}.zip`;
+    document.body.appendChild(a); a.click(); a.remove();
+    URL.revokeObjectURL(url);
+  }
+
+  if (downloadedVins.length) {
+    setSyncInfo('saving');
+    await Promise.all(downloadedVins.map(v => apiPost('updateNewCar',{vin:v,field:'photosDownloadedDate',value:newInventory.find(c=>c.vin===v).photosDownloadedDate})));
+    setSyncInfo('ok');
+  }
+
+  clearNewSelection();
+  btn.disabled = false;
+  showToast(`Downloaded ${fetched} car${fetched!==1?'s':''}` + (empty?`, ${empty} had no photos`:'') + (errors?`, ${errors} failed`:''));
+}
 
 // ── NEW CAR DRAWER ─────────────────────────────────────────
 function openNewCarDrawer(vin) {

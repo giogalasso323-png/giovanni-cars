@@ -206,7 +206,7 @@ function createMcpServer() {
       },
       {
         name: 'get_leads',
-        description: 'Get customer leads from the CRM. Filter by tab: Lot, FB Marketplace, FB Ad, Focus, Lost, Sold. Each lead includes leadType (source bucket), inFocus (Active/Focus/Lost/Sold), pipelineStage (New/Working/Appt/BeBack/Cold — Sales Process board column), vehicleList, vehicleInterest, timeframe (free-text timing notes, not a duration), status (comms state), and sales rep info. notes is a JSON array of {ts, by, text} entries, not a plain string.',
+        description: 'Get customer leads from the CRM. Filter by tab: Lot, FB Marketplace, FB Ad, Focus, Lost, Sold. Each lead includes leadType (source bucket), inFocus (Active/Focus/Lost/Sold), pipelineStage (Turned/New/Working/Appt/BeBack/Cold — Sales Process board column; Turned means another rep just handed this customer off and it hasn\'t been worked yet), vehicleList, vehicleInterest, timeframe (free-text timing notes, not a duration), status (comms state), and sales rep info. notes is a JSON array of {ts, by, text} entries, not a plain string.',
         inputSchema: {
           type: 'object',
           properties: {
@@ -229,14 +229,16 @@ function createMcpServer() {
             timeframe: { type: 'string', description: 'Free-text timing notes — what\'s holding up the timing (co-signer, down payment, insurance, etc.), not a duration code' },
             leadType: { type: 'string', description: 'Source bucket: Lot, FB Marketplace, FB Ad (default: Lot)' },
             vehicleInterest: { type: 'string', description: 'Pure vehicle specs only — color, drivetrain, price range, model year, package/features. Buyer type, negotiation stance, cash/finance goes in notes instead, never here.' },
-            notes: { type: 'string', description: 'If set, must be a JSON array string of {ts, by, text} entries (e.g. [{"ts":"<ISO timestamp>","by":"Cowork","text":"..."}]) — never a bare string. Usually easier to leave blank on creation and add the first entry via a follow-up update_lead call.' }
+            notes: { type: 'string', description: 'If set, must be a JSON array string of {ts, by, text} entries (e.g. [{"ts":"<ISO timestamp>","by":"Cowork","text":"..."}]) — never a bare string. Usually easier to leave blank on creation and add the first entry via a follow-up update_lead call.' },
+            turnedToFirst: { type: 'string', description: 'First rep who originally had this customer, if this lead is a hand-off' },
+            turnedTo: { type: 'string', description: 'Rep the customer was just turned to (usually Giovanni). If set and pipelineStage is omitted, the lead lands in the Just Turned board column instead of New.' }
           },
           required: ['firstName', 'phone']
         }
       },
       {
         name: 'update_lead',
-        description: 'Update a field on an existing lead by row index. Common fields: firstName, lastName, phone, timeframe (free-text timing notes), status (comms: "", One Way, Two Way, Cold), pipelineStage (New/Working/Appt/BeBack/Cold), vehicleInterest (pure vehicle specs only), notes (JSON array string of {ts, by, text} — parse existing, push a new entry, stringify the whole array back, never overwrite with a bare string), followUpDate, turnedTo, turnedToFirst, leadRank, leadSoldDate, soldArchived, inFocus (Focus/Lost/Sold), vehicleNotAvailable.',
+        description: 'Update a field on an existing lead by row index. Common fields: firstName, lastName, phone, timeframe (free-text timing notes), status (comms: "", One Way, Two Way, Cold), pipelineStage (Turned/New/Working/Appt/BeBack/Cold), vehicleInterest (pure vehicle specs only), notes (JSON array string of {ts, by, text} — parse existing, push a new entry, stringify the whole array back, never overwrite with a bare string), followUpDate, turnedTo, turnedToFirst, leadRank, leadSoldDate, soldArchived, inFocus (Focus/Lost/Sold), vehicleNotAvailable.',
         inputSchema: {
           type: 'object',
           properties: {
