@@ -106,16 +106,45 @@ function submitLead(data) {
   if (!data.firstName && !data.lastName && !data.phone) {
     return { error: 'Missing lead data' };
   }
-  var sh = getLeadsSheet();
-  var row = LEADS_COLUMNS.map(function(col) {
-    if (col === 'timestamp') return new Date().toISOString();
-    if (col === 'source' && !data[col]) return 'manual';
-    if (col === 'pipelineStage' && !data[col]) return 'New';
-    if (col === 'leadId') return Utilities.getUuid();
-    return data[col] !== undefined ? data[col] : '';
-  });
-  sh.appendRow(row);
-  return { ok: true };
+  var lock = LockService.getScriptLock();
+  lock.waitLock(30000);
+  try {
+    var sh = getLeadsSheet();
+    // Guards against duplicate rows from a retried Cowork call or a fast double-click on
+    // Add Lead -- only blocks a same-phone submission within 2 minutes of the last one, so
+    // a customer genuinely returning later still gets a fresh lead instead of being merged.
+    var phone = String(data.phone || '').replace(/\D/g, '');
+    var last = sh.getLastRow();
+    if (phone && last >= 2) {
+      var phoneCol = LEADS_COLUMNS.indexOf('phone') + 1;
+      var tsCol    = LEADS_COLUMNS.indexOf('timestamp') + 1;
+      var idCol    = LEADS_COLUMNS.indexOf('leadId') + 1;
+      var phones = sh.getRange(2, phoneCol, last - 1, 1).getValues();
+      var stamps = sh.getRange(2, tsCol, last - 1, 1).getValues();
+      var ids    = sh.getRange(2, idCol, last - 1, 1).getValues();
+      for (var i = phones.length - 1; i >= 0; i--) {
+        var rowPhone = String(phones[i][0] || '').replace(/\D/g, '');
+        if (rowPhone.slice(-10) !== phone.slice(-10) || rowPhone.length < 7) continue;
+        var ts = stamps[i][0];
+        var tsMs = ts instanceof Date ? ts.getTime() : new Date(ts).getTime();
+        if (Date.now() - tsMs < 120000) {
+          return { ok: true, duplicate: true, rowIndex: ids[i][0] };
+        }
+        break;
+      }
+    }
+    var row = LEADS_COLUMNS.map(function(col) {
+      if (col === 'timestamp') return new Date().toISOString();
+      if (col === 'source' && !data[col]) return 'manual';
+      if (col === 'pipelineStage' && !data[col]) return 'New';
+      if (col === 'leadId') return Utilities.getUuid();
+      return data[col] !== undefined ? data[col] : '';
+    });
+    sh.appendRow(row);
+    return { ok: true };
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 // A lead's physical sheet row shifts whenever another row above it is deleted, so a rowIndex
@@ -644,7 +673,9 @@ function getPhotosBase64(vin, label) {
         headers: { 'User-Agent': 'Mozilla/5.0 Chrome/120' }
       });
       if (resp.getResponseCode() !== 200) break;
-      photos.push({ name: i + '.jpg', data: Utilities.base64Encode(resp.getContent()) });
+      // Zero-padded so plain alphabetical sort (Explorer, Finder, zip tools) doesn't scramble
+      // 1,10,11,2,3... back out of numeric order once the zip is extracted.
+      photos.push({ name: ('0' + i).slice(-2) + '.jpg', data: Utilities.base64Encode(resp.getContent()) });
     } catch(e) {
       failed++;
       if (failed >= 3) break;
@@ -733,7 +764,7 @@ function savePhotosToDrive(vin, stock, title) {
         headers: { 'User-Agent': 'Mozilla/5.0 Chrome/120' }
       });
       if (resp.getResponseCode() !== 200) break;
-      var blob = resp.getBlob().setName(i + '.jpg');
+      var blob = resp.getBlob().setName(('0' + i).slice(-2) + '.jpg');
       folder.createFile(blob);
       saved++;
     } catch(e) {

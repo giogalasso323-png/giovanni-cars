@@ -5,6 +5,7 @@ import { readFileSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import express from 'express';
+import { randomBytes, createHash } from 'crypto';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 try {
@@ -653,5 +654,113 @@ app.post('/mcp', async (req, res) => {
 });
 
 app.get('/health', (_req, res) => res.json({ ok: true }));
+
+// ── Minimal OAuth 2.1 shim ───────────────────────────────────────────────
+// claude.ai's custom-connector flow assumes every remote MCP server requires OAuth and has
+// no "no auth required" option in its admin UI (github.com/anthropics/claude-ai-mcp #402) --
+// it hits /authorize on connect and 404s otherwise. This server's actual security model
+// hasn't changed (the long Railway URL is still the only real gate, same as before /mcp
+// ever checked AUTH_TOKEN); this just completes the handshake claude.ai insists on, with no
+// login screen, so it stops treating an unauthenticated server as broken.
+const oauthCodes = new Map();   // code -> { codeChallenge, codeChallengeMethod, expiresAt }
+const oauthTokens = new Set();  // issued access/refresh tokens, so /oauth/token can't be fed junk
+
+function randomToken() { return randomBytes(32).toString('base64url'); }
+function originOf(req) {
+  const proto = req.headers['x-forwarded-proto'] || req.protocol;
+  return `${proto}://${req.headers.host}`;
+}
+
+app.get('/.well-known/oauth-protected-resource', (req, res) => {
+  const origin = originOf(req);
+  res.json({ resource: `${origin}/mcp`, authorization_servers: [origin] });
+});
+
+app.get('/.well-known/oauth-authorization-server', (req, res) => {
+  const origin = originOf(req);
+  res.json({
+    issuer: origin,
+    authorization_endpoint: `${origin}/authorize`,
+    token_endpoint: `${origin}/oauth/token`,
+    registration_endpoint: `${origin}/oauth/register`,
+    response_types_supported: ['code'],
+    grant_types_supported: ['authorization_code', 'refresh_token'],
+    code_challenge_methods_supported: ['S256', 'plain'],
+    token_endpoint_auth_methods_supported: ['none']
+  });
+});
+
+// Dynamic Client Registration (RFC 7591) -- single-user tool, so every registration gets
+// the same open client_id back rather than tracking real per-client records.
+app.post('/oauth/register', (req, res) => {
+  res.status(201).json({
+    client_id: 'dublin-toyota-mcp',
+    client_name: (req.body && req.body.client_name) || 'Claude',
+    redirect_uris: (req.body && req.body.redirect_uris) || [],
+    token_endpoint_auth_method: 'none',
+    grant_types: ['authorization_code', 'refresh_token'],
+    response_types: ['code']
+  });
+});
+
+// No login screen -- this is Giovanni's own single-user tool, so any request reaching this
+// server is already him. Issues a code immediately and redirects straight back.
+app.get('/authorize', (req, res) => {
+  const { redirect_uri, state, code_challenge, code_challenge_method } = req.query;
+  if (!redirect_uri) { res.status(400).send('Missing redirect_uri'); return; }
+  const code = randomToken();
+  oauthCodes.set(code, {
+    codeChallenge: code_challenge || '',
+    codeChallengeMethod: code_challenge_method || 'plain',
+    expiresAt: Date.now() + 5 * 60 * 1000
+  });
+  const url = new URL(redirect_uri);
+  url.searchParams.set('code', code);
+  if (state) url.searchParams.set('state', state);
+  res.redirect(url.toString());
+});
+
+app.post('/oauth/token', express.urlencoded({ extended: true }), (req, res) => {
+  const body = { ...req.query, ...req.body };
+  const grantType = body.grant_type;
+
+  if (grantType === 'authorization_code') {
+    const entry = oauthCodes.get(body.code);
+    if (!entry || entry.expiresAt < Date.now()) {
+      res.status(400).json({ error: 'invalid_grant' });
+      return;
+    }
+    oauthCodes.delete(body.code);
+    if (entry.codeChallenge) {
+      const verifier = body.code_verifier || '';
+      const computed = entry.codeChallengeMethod === 'S256'
+        ? createHash('sha256').update(verifier).digest('base64url')
+        : verifier;
+      if (computed !== entry.codeChallenge) {
+        res.status(400).json({ error: 'invalid_grant', error_description: 'PKCE verification failed' });
+        return;
+      }
+    }
+    const accessToken = randomToken();
+    const refreshToken = randomToken();
+    oauthTokens.add(accessToken);
+    oauthTokens.add(refreshToken);
+    res.json({ access_token: accessToken, token_type: 'Bearer', expires_in: 3600, refresh_token: refreshToken });
+    return;
+  }
+
+  if (grantType === 'refresh_token') {
+    if (!oauthTokens.has(body.refresh_token)) {
+      res.status(400).json({ error: 'invalid_grant' });
+      return;
+    }
+    const accessToken = randomToken();
+    oauthTokens.add(accessToken);
+    res.json({ access_token: accessToken, token_type: 'Bearer', expires_in: 3600, refresh_token: body.refresh_token });
+    return;
+  }
+
+  res.status(400).json({ error: 'unsupported_grant_type' });
+});
 
 app.listen(PORT, () => console.log(`Dublin Toyota MCP server running on port ${PORT}`));

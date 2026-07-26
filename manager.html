@@ -759,7 +759,7 @@
     <div id="al-error" style="font-size:12px;color:var(--red);margin-bottom:8px;display:none">Please fill in First Name, Last Name, and Phone.</div>
     <div class="modal-footer">
       <button class="btn" onclick="closeAddLeadModal()">Cancel</button>
-      <button class="btn btn-primary" onclick="submitManualLead()">Add Lead</button>
+      <button class="btn btn-primary" id="al-submit-btn" onclick="submitManualLead()">Add Lead</button>
     </div>
   </div>
 </div>
@@ -971,8 +971,13 @@ const fbBadge = c => c.fbStatus==='posted' ? '<span class="badge badge-posted">P
 const fbBadge2 = c => c.fbStatus==='sold' ? '<span class="badge badge-sold">SOLD — remove listing</span>' : (c.fbStatus2==='posted' ? '<span class="badge badge-posted">FB Posted 2</span>' : '<span class="badge badge-unposted">FB Posted 1</span>');
 // True for the in-progress state between a bulk photo download and actually listing it on
 // Marketplace — backs the "Downloaded" badge, the dedicated filter tab, and bulk-clear.
-const isPendingDownload = c => !!(c.photosDownloadedDate && c.fbStatus!=='posted');
-const photosPendingBadge = c => isPendingDownload(c) ? '<span class="badge badge-photos-pending" title="Photos downloaded — not yet posted">Downloaded</span>' : '';
+// Photos are downloaded once and can back either FB account's listing, so "pending" is
+// relative to whichever account's tab is being viewed (isFb2), not always the primary one.
+const isPendingDownload = (c, isFb2) => {
+  const postedThisAcct = isFb2 ? c.fbStatus2==='posted' : c.fbStatus==='posted';
+  return !!(c.photosDownloadedDate && !postedThisAcct);
+};
+const photosPendingBadge = (c, isFb2) => isPendingDownload(c, isFb2) ? '<span class="badge badge-photos-pending" title="Photos downloaded — not yet posted">Downloaded</span>' : '';
 const daysClass = d => d>60?'hot':d>30?'warm':'';
 
 // ── CSV ────────────────────────────────────────────────────
@@ -1203,7 +1208,7 @@ function renderTable() {
       <td style="${priceStyle}">${priceDisplay}</td>
       <td>${fmtMiles(c.mileage)}</td>
       <td>${statusBadge(c, isPosted2Tab)}</td>
-      <td>${isPosted2Tab?fbBadge2(c):fbBadge(c)}${photosPendingBadge(c)}</td>
+      <td>${isPosted2Tab?fbBadge2(c):fbBadge(c)}${photosPendingBadge(c, isPosted2Tab)}</td>
       <td><span class="days-badge ${daysClass(d)}">${d}d</span></td>
       ${isPostedTab?`<td><span class="days-badge ${daysClass(daysPosted)}">${daysPosted}d posted</span></td>`:''}
       ${grossTableCell(c)}
@@ -1220,7 +1225,7 @@ function renderCards() {
   g.innerHTML=filtered.map(c=>{
     const d=daysOnLot(c), p=c.websitePrice||c.price;
     return `<div class="card" onclick="openDrawer('${c.vin}')">
-      <div class="card-header"><div><div class="card-title">${getTitle(c)}</div><div class="card-vin">${c.vin}</div></div>${isPosted2Tab?fbBadge2(c):fbBadge(c)}${photosPendingBadge(c)}</div>
+      <div class="card-header"><div><div class="card-title">${getTitle(c)}</div><div class="card-vin">${c.vin}</div></div>${isPosted2Tab?fbBadge2(c):fbBadge(c)}${photosPendingBadge(c, isPosted2Tab)}</div>
       ${statusBadge(c, isPosted2Tab)}
       ${p?`<div class="card-price">${fmtPrice(p)}</div>`:''}
       <div class="card-meta">${c.mileage?`<span>${fmtMiles(c.mileage)}</span>`:''}${c.color?`<span>${c.color}</span>`:''}${c.stock?`<span>#${c.stock}</span>`:''}</div>
@@ -1405,9 +1410,13 @@ async function downloadPhotosZip() {
   for (let i = 0; i < vins.length; i++) {
     const vin = vins[i];
     const car = inventory.find(c => c.vin === vin);
+    // Zero-padded selection-order prefix so the extracted folders sort in the order they
+    // were selected — Explorer/Finder otherwise re-sort subfolders alphabetically by name,
+    // undoing whatever order the zip itself was assembled in.
+    const orderPrefix = String(i + 1).padStart(2, '0');
     const label = car
-      ? `${car.stock || vin.slice(-6)} - ${car.year} ${car.make} ${car.model}${car.trim ? ' ' + car.trim : ''}`
-      : vin;
+      ? `${orderPrefix} - ${car.stock || vin.slice(-6)} - ${car.year} ${car.make} ${car.model}${car.trim ? ' ' + car.trim : ''}`
+      : `${orderPrefix} - ${vin}`;
 
     countEl.textContent = `Fetching ${i + 1} of ${vins.length}: ${label}…`;
 
@@ -4135,6 +4144,7 @@ let alPrefTrims = new Set();
 let alPrefExtColors = new Set();
 
 function openAddLeadModal(preselectedVin){
+  const submitBtn = document.getElementById('al-submit-btn'); if (submitBtn) submitBtn.disabled = false;
   alSelectedVin=''; alSelectedVehicle=''; alSelectedCar=null;
   ['al-firstname','al-lastname','al-phone','al-notes','al-vehicle-interest','al-rep-first','al-rep-last'].forEach(id=>{
     const el=document.getElementById(id); if(el) el.value='';
@@ -4225,6 +4235,10 @@ async function submitManualLead(){
   if(!firstName||!lastName||!phone){ document.getElementById('al-error').style.display='block'; return; }
   document.getElementById('al-error').style.display='none';
 
+  const submitBtn = document.getElementById('al-submit-btn');
+  if (submitBtn.disabled) return; // already submitting -- ignore a fast double-click
+  submitBtn.disabled = true;
+
   const vListArr = alSelectedCar
     ? [{ vin: alSelectedCar.vin, stock: alSelectedCar.stock || '', title: getTitle(alSelectedCar) }]
     : [];
@@ -4241,8 +4255,9 @@ async function submitManualLead(){
   };
 
   try {
-    await apiPost('submitLead', leadPayload);
+    const res = await apiPost('submitLead', leadPayload);
     closeAddLeadModal();
+    if (res && res.duplicate) { showToast('Already added — matched an existing lead with this phone number'); return; }
     showToast('Lead added');
     await loadLeads();
     // Run matching on the new lead and show result in drawer if matches found
@@ -4255,6 +4270,7 @@ async function submitManualLead(){
       }
     }
   } catch(e){ showToast('Failed to add lead: '+e.message); }
+  finally { submitBtn.disabled = false; }
 }
 
 // ── Lead Drawer Helpers ───────────────────────────────────────
