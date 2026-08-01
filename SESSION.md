@@ -6,12 +6,13 @@
 
 ## Current Work
 
-### Leads/New Cars session (2026-07-31) — mostly shipped, two loose ends
-Everything below is deployed (manager.html + mcp-server auto-deploy via git push; apps-script.js changes were pasted to clipboard for Giovanni to redeploy manually — **not confirmed done yet, worth checking first thing next session**).
+### Zombie lead fix — fully shipped (2026-08-01)
+All zombie lead fixes are now deployed end-to-end:
+- Apps Script redeployed 2026-08-01 (confirmed by Giovanni) — now uses stable `leadId` UUIDs to find rows instead of raw row numbers that shift on delete.
+- manager.html: `updateLeadStatus` now reloads on save failure; `migrateLeadPipelineFields` is now properly async/awaited instead of fire-and-forget.
 
-**Loose ends:**
-1. **Confirm the Apps Script redeploy actually happened.** Multiple rounds of apps-script.js changes piled up this session (dedup, photo zero-padding, New Cars header-map fix, Turned default) before Giovanni asked for the file — last action was copying the full current file to his clipboard via `clip.exe`. If leads still behave oddly (duplicates not blocked, New Cars photos/Turned-default not working), check this first.
-2. **Offered, no answer yet:** add a `scrape_new_inventory` MCP tool so the automated morning scrape routine covers New Cars too (currently only used inventory is scraped automatically — New Cars web links/availability only update when someone manually clicks "Refresh Web Data" in the app). Pick this back up if Giovanni wants it.
+**Remaining open item:**
+- **Offered, no answer yet:** add a `scrape_new_inventory` MCP tool so the automated morning scrape routine covers New Cars too (currently only used inventory is scraped automatically — New Cars web links/availability only update when someone manually clicks "Refresh Web Data" in the app). Pick this back up if Giovanni wants it.
 
 ### Discord Bot — SCOPED, NOT BUILT YET
 Next build: Discord bot on always-on home PC that relays messages to Claude Code.
