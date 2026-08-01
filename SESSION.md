@@ -6,6 +6,13 @@
 
 ## Current Work
 
+### Leads/New Cars session (2026-07-31) — mostly shipped, two loose ends
+Everything below is deployed (manager.html + mcp-server auto-deploy via git push; apps-script.js changes were pasted to clipboard for Giovanni to redeploy manually — **not confirmed done yet, worth checking first thing next session**).
+
+**Loose ends:**
+1. **Confirm the Apps Script redeploy actually happened.** Multiple rounds of apps-script.js changes piled up this session (dedup, photo zero-padding, New Cars header-map fix, Turned default) before Giovanni asked for the file — last action was copying the full current file to his clipboard via `clip.exe`. If leads still behave oddly (duplicates not blocked, New Cars photos/Turned-default not working), check this first.
+2. **Offered, no answer yet:** add a `scrape_new_inventory` MCP tool so the automated morning scrape routine covers New Cars too (currently only used inventory is scraped automatically — New Cars web links/availability only update when someone manually clicks "Refresh Web Data" in the app). Pick this back up if Giovanni wants it.
+
 ### Discord Bot — SCOPED, NOT BUILT YET
 Next build: Discord bot on always-on home PC that relays messages to Claude Code.
 - Different Discord channels = different agent contexts (#cowork, #briefing, #alerts, #inventory)
@@ -63,6 +70,32 @@ Deployed via Railway's official template (`railway.com/deploy/hermes-agent-nousr
 **Decision point for next time:** try the OpenRouter route, wait for upstream fixes to bugs #1/#3 and retry direct Anthropic, or shelve Hermes entirely. Not decided — Giovanni paused here after hitting three real bugs in one sitting, reasonably frustrated with the state of the software tonight.
 
 **Cross-machine note:** Giovanni works from this desktop and a separate work laptop, each with its own independent git clone AND its own independent Claude Code memory — memory does not sync between machines, only this file (and code) does via git. `git pull` before starting work on either machine; update this file before ending a session that had real changes.
+
+---
+
+## Recently Completed (2026-07-20 to 07-31)
+
+**Zombie leads — actual root cause found and fixed (2026-07-31):**
+- The real bug: Apps Script always answers HTTP 200 even on a logical failure (e.g. "Lead not found"), so the frontend's `fetch()` never rejected for that case, and most call sites never checked the response body for an `error` field. Deleting a lead, and dragging a card to a new board column, both updated the screen (or removed the card) *before* the write finished, with several paths having zero error handling — so a failed write looked identical to a successful one until a real reload pulled the untouched row back.
+- Fixed centrally in `apiFetch` (throws on any response with `.error`, one fix instead of patching every call site) + added recovery (toast + reload from server) to the two board-move paths and the Focus toggle that had no error handling.
+- This superseded an earlier (2026-07-20) fix that switched lead identity from raw sheet row number to a persistent `leadId` — real bug in its own right (row numbers shift on delete, corrupting concurrent operations), but not the one actually causing the reported symptom.
+- Added duplicate-lead protection as a secondary hardening: `submitLead` rejects a same-phone resubmission within 2 minutes (catches retried Cowork calls / double-clicks), Add Lead modal disables its submit button while in flight. Confirmed via live data pull (fetched the Leads sheet directly) that zero actual duplicate rows exist — so this wasn't the cause of what Giovanni saw, but closes off a real gap regardless.
+
+**New "Turned" pipeline column:**
+- Leads created with `turnedTo`/`turnedToFirst` set and no explicit pipeline stage now land in a dedicated "Turned" board column (New Lead → Working → Turned → Appt → Be Back → Waiting → Cold) instead of "New Lead", and stay there until manually moved. Covered in the Add Lead modal, the backend default, and Cowork's `add_lead` MCP tool.
+
+**New Cars tab — photo download + web link parity with used inventory:**
+- Bulk-select checkboxes + Download Photos action bar, same zero-padded/order-prefixed zip approach as used inventory (see below), backed by a new `photosDownloadedDate` field.
+- Fixed a real pre-existing bug found along the way: the New Inventory sheet wrote fields by hardcoded array position but read them back by header-text lookup, so any newly-added field would write successfully but silently never read back. Added the same header auto-repair `getNewInventory`/used-Inventory already had.
+- The "Live" status badge in the New Cars table is now a clickable link straight to the DublinToyota.com listing (was previously a dead-end label — had to open the drawer to get the link). Requires "Refresh Web Data" to have been run at least once per car; the FB description does not (builds entirely from CSV-imported fields).
+- New Cars are NOT covered by the automated morning scrape — only `scrape_inventory` (used cars) is exposed as an MCP tool. See Current Work above.
+
+**FB Posted 2 tab + bulk photo download fixes:**
+- The amber "Downloaded" badge was checking the primary account's posted status even on the FB Posted 2 tab, so it never lit up there — now account-aware.
+- Bulk photo ZIP download: photo filenames are now zero-padded (`01.jpg` not `1.jpg`) and each car's folder gets a `01 -`, `02 -`... selection-order prefix. The actual fetch/assembly order was always correct — the scrambling was Explorer/Finder re-sorting alphabetically on extraction, which mangles unpadded numbers (`1, 10, 11, 2, 3...`).
+
+**Railway/claude.ai OAuth reconnect fix:**
+- claude.ai's custom-connector flow started assuming every remote MCP server requires OAuth with no "no auth" opt-out in its UI (confirmed via multiple open `anthropics/claude-ai-mcp` GitHub issues, e.g. #402) — was 404ing on `/authorize` against our server, which was built with no auth (long URL = the security model). Added a minimal OAuth 2.1 shim (discovery metadata, dynamic client registration, auto-approve `/authorize`, `/oauth/token`) so the handshake completes; doesn't change `/mcp`'s actual (still unauthenticated) behavior.
 
 ---
 
