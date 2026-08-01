@@ -3169,7 +3169,7 @@ const LEGACY_STATUS_SPLIT = {
   'Sold':                   { status:'',        pipelineStage:'Working' },
   'Lost':                   { status:'',        pipelineStage:'Working' }
 };
-function migrateLeadPipelineFields(lead){
+async function migrateLeadPipelineFields(lead){
   // Backend hasn't been redeployed with the pipelineStage column yet — the key won't even
   // be present on the object (as opposed to present-but-empty). Skip entirely rather than
   // guessing from `status`, which may already be in its short (post-split) form from an
@@ -3179,8 +3179,12 @@ function migrateLeadPipelineFields(lead){
   const split = LEGACY_STATUS_SPLIT[lead.status||''] || { status:'', pipelineStage:'New' };
   lead.status = split.status;
   lead.pipelineStage = split.pipelineStage;
-  apiPost('updateLead', { rowIndex: lead.rowIndex, field: 'status', value: split.status });
-  apiPost('updateLead', { rowIndex: lead.rowIndex, field: 'pipelineStage', value: split.pipelineStage });
+  try {
+    await Promise.all([
+      apiPost('updateLead', { rowIndex: lead.rowIndex, field: 'status', value: split.status }),
+      apiPost('updateLead', { rowIndex: lead.rowIndex, field: 'pipelineStage', value: split.pipelineStage })
+    ]);
+  } catch(e) { console.warn('Migration write failed for lead', lead.rowIndex, e.message); }
 }
 
 // Notes log — `notes` used to be one free-edit blob; now it's a JSON array of
@@ -3529,9 +3533,9 @@ async function loadLeads(){
     leadsData.forEach(l => {
       try { l.vehicleList = l.vehicleList ? JSON.parse(l.vehicleList) : []; }
       catch(e) { l.vehicleList = []; }
-      migrateLeadPipelineFields(l);
       migrateLeadNotes(l);
     });
+    await Promise.all(leadsData.map(l => migrateLeadPipelineFields(l)));
     document.getElementById('cnt-leads').textContent = leadsData.length;
     // Run matching on all open leads
     runMatchingForAllLeads();
@@ -4119,7 +4123,7 @@ async function updateLeadStatus(rowIndex, sel){
   if(lead) lead.status=status;
   updateLeadsSubtitle();
   try { await apiPost('updateLead',{rowIndex,field:'status',value:status}); showToast('Status updated'); }
-  catch(e){ showToast('Save failed: '+e.message); }
+  catch(e){ showToast('Save failed: '+e.message+' — reloading'); await loadLeads(); }
 }
 
 // ── Delete Lead ───────────────────────────────────────────────
