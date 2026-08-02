@@ -498,3 +498,44 @@ No other matches.
 
 If Giovanni says yes to linking: update `vehicleList`, set `vehicleNotAvailable` to false, append a `[CW]` note, draft a follow-up text.
 If no matches: just say "No matches on no-vehicle leads." and move on.
+
+---
+
+## Morning Agent: Post-Scrape Vehicle Match
+
+**This section is for the "Dublin Toyota — Daily Inventory Scrape" cloud routine only.** After the scrape loop finishes (when `done: true` is returned), immediately run this vehicle match phase before ending the session.
+
+### Steps
+
+1. Call `check_vehicle_matches` — this returns every lead with `vehicleNotAvailable: true`, their criteria, and keyword/price-filtered potential matches from live inventory
+   - If `totalWaiting` is 0, skip to step 3 (still send the summary email)
+
+2. Review `potentialMatches` for each waiting lead — these are first-pass keyword matches. Use your judgment on whether each is truly a strong match:
+   - Year within 2 years of what they wanted
+   - Price within 15% of their target
+   - Mileage within 20,000 miles of their target
+   - Correct color/powertrain if they specified one
+   - If `potentialMatches` is empty, mark as no match
+
+3. Send an email via Gmail MCP to `giogalasso323@gmail.com` — **always send even when there are no matches**:
+
+**Subject:** `Vehicle Match Report — [date] ([N] matches)`
+
+**Body (plain text):**
+```
+[N] leads waiting for a vehicle · [X] matches found · [available inventory count] cars available
+
+---
+✅ [Name] · [Phone] · [Source] · added [date]
+   Wanted: [vehicleInterest or criteria from notes]
+   → [stock]: [year] [make] [model] [trim], [mileage]mi, $[price]
+
+❌ [Name] · [Phone] · [Source] · added [date]
+   Wanted: [vehicleInterest or criteria from notes]
+   → No current match
+
+---
+Checked [N] leads. Open the manager app to follow up.
+```
+
+4. Do NOT auto-link cars to leads or clear `vehicleNotAvailable` — Giovanni reviews and decides who to call

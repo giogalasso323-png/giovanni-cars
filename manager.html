@@ -583,6 +583,19 @@
   </div>
 </div>
 
+<!-- VEHICLE MATCH MODAL -->
+<div class="modal-overlay" id="vehicle-match-modal" onclick="if(event.target===this)closeVehicleMatchModal()">
+  <div class="modal" style="width:560px">
+    <h2>Vehicle Match Check</h2>
+    <div id="vmatch-summary" style="font-size:13px;color:var(--text2);margin-bottom:12px"></div>
+    <div id="vmatch-results" style="max-height:400px;overflow-y:auto;border:1px solid var(--border);border-radius:var(--radius);padding:0 12px;background:var(--bg3)"></div>
+    <div id="vmatch-checked" style="font-size:11px;color:var(--text3);margin-top:8px"></div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeVehicleMatchModal()">Close</button>
+    </div>
+  </div>
+</div>
+
 <!-- COST IMPORT MODAL -->
 <div class="modal-overlay" id="cost-import-modal" onclick="if(event.target===this)closeCostImportModal()">
   <div class="modal" style="width:560px;max-height:90vh;display:flex;flex-direction:column">
@@ -1548,6 +1561,80 @@ async function doImport(){
       showMatchBanner(matchedCount);
     }
   }
+}
+
+// ── VEHICLE MATCH ──────────────────────────────────────────
+function openVehicleMatchModal() {
+  const MODELS = ['tundra','tacoma','camry','rav4','highlander','4runner','sienna','corolla','venza','sequoia','prius','crown','gr86','bz4x'];
+
+  function parseTargetPrice(text) {
+    const m = text.match(/\$\s*(\d+)(?:[,](\d{3}))?([kK])?/);
+    if (!m) return null;
+    const base = parseInt(m[1]);
+    if (m[3]) return base * 1000;
+    if (m[2]) return base * 1000 + parseInt(m[2]);
+    if (base < 200) return base * 1000;
+    return base;
+  }
+
+  const waitingLeads = leadsData.filter(isWaitingLead);
+  const availCars = inventory.filter(c => c.fbStatus !== 'sold' && !(c.websiteStatus||'').toLowerCase().includes('sold') && !(c.websiteStatus||'').toLowerCase().includes('delist'));
+
+  function matchLead(lead) {
+    const interest = (lead.vehicleInterest || '').toLowerCase();
+    let notesText = '';
+    try {
+      const notes = Array.isArray(lead.notes) ? lead.notes : JSON.parse(lead.notes || '[]');
+      notesText = notes.map(n => n.text || '').join(' ').toLowerCase();
+    } catch {}
+    const searchText = interest + ' ' + notesText;
+    const keyword = MODELS.find(m => searchText.includes(m));
+    if (!keyword) return [];
+    const targetPrice = parseTargetPrice(searchText);
+    return availCars.filter(car => {
+      const title = `${car.year||''} ${car.make||''} ${car.model||''} ${car.trim||''}`.toLowerCase();
+      if (!title.includes(keyword)) return false;
+      if (targetPrice && car.price) {
+        if (Math.abs(car.price - targetPrice) / targetPrice > 0.20) return false;
+      }
+      return true;
+    });
+  }
+
+  const results = waitingLeads.map(lead => ({ lead, matches: matchLead(lead) }));
+  const totalMatches = results.filter(r => r.matches.length > 0).length;
+  const checkedAt = new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+
+  document.getElementById('vmatch-summary').textContent = waitingLeads.length === 0
+    ? 'No leads waiting for a vehicle'
+    : `${waitingLeads.length} lead${waitingLeads.length !== 1 ? 's' : ''} waiting · ${totalMatches} match${totalMatches !== 1 ? 'es' : ''} found`;
+
+  if (!waitingLeads.length) {
+    document.getElementById('vmatch-results').innerHTML = '<div style="color:var(--text3);text-align:center;padding:20px">No leads are currently waiting for a vehicle.</div>';
+  } else {
+    document.getElementById('vmatch-results').innerHTML = results.map(r => {
+      const l = r.lead;
+      const name = [capName(l.firstName), capName(l.lastName)].filter(Boolean).join(' ') || '—';
+      const phone = fmtPhone(l.phone) || '—';
+      const interest = l.vehicleInterest || (latestNoteText(l) ? 'See notes' : '—');
+      const added = l.timestamp ? new Date(l.timestamp).toLocaleDateString('en-US', { month: 'numeric', day: 'numeric' }) : '';
+      const matchHtml = r.matches.length
+        ? r.matches.map(c => `<div style="margin-top:4px;color:var(--green)">&#10003; ${c.stock||c.vin} — ${c.year} ${c.make} ${c.model}${c.trim?' '+c.trim:''}, ${Number(c.mileage||0).toLocaleString()}mi, $${Number(c.price||0).toLocaleString()}</div>`).join('')
+        : '<div style="margin-top:4px;color:var(--text3)">No match yet</div>';
+      return `<div style="padding:10px 0;border-bottom:1px solid var(--border);${r.matches.length ? '' : 'opacity:0.55'}">
+        <div style="font-weight:600">${name} · <span style="font-weight:400">${phone}</span>${added ? ' · <span style="color:var(--text3);font-size:11px">added '+added+'</span>' : ''}</div>
+        <div style="font-size:12px;color:var(--text2);margin-top:2px">Wanted: ${interest}</div>
+        ${matchHtml}
+      </div>`;
+    }).join('');
+  }
+
+  document.getElementById('vmatch-checked').textContent = 'Checked at ' + checkedAt + ' — reload the page first to use latest inventory';
+  document.getElementById('vehicle-match-modal').classList.add('open');
+}
+
+function closeVehicleMatchModal() {
+  document.getElementById('vehicle-match-modal').classList.remove('open');
 }
 
 // ── SCRAPE ─────────────────────────────────────────────────
@@ -3827,10 +3914,13 @@ function renderLeadsBoard(){
 
 function renderBoardColumn(bucket){
   const cards = bucket.leads.map(l => renderBoardCard(l, bucket.draggable, bucket.key)).join('');
+  const matchBtn = bucket.key === 'Waiting'
+    ? `<button class="btn" style="margin-left:auto;font-size:11px;padding:3px 10px;height:auto;line-height:1.4" onclick="openVehicleMatchModal()">Check Matches</button>`
+    : '';
   return `<div class="board-column"
       ondragover="${bucket.draggable?`boardColDragOver(event)`:''}"
       ondrop="${bucket.draggable?`boardColDrop(event,'${bucket.key}')`:''}">
-    <div class="board-column-header"><span>${bucket.label}</span><span class="board-column-count">${bucket.leads.length}</span></div>
+    <div class="board-column-header" style="gap:6px"><span>${bucket.label}</span><span class="board-column-count">${bucket.leads.length}</span>${matchBtn}</div>
     <div class="board-column-body">${cards || '<div class="board-column-empty">—</div>'}</div>
   </div>`;
 }

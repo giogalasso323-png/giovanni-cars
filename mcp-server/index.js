@@ -288,6 +288,11 @@ function createMcpServer() {
         }
       },
       {
+        name: 'check_vehicle_matches',
+        description: 'Check if any waiting customers (vehicleNotAvailable: true) can be matched to current available inventory. Returns each waiting lead with their vehicle criteria and any keyword+price-filtered potential matches from live inventory. Run this after a scrape or import completes to find customers who can now be served. The morning scrape agent uses this to build the daily vehicle match email.',
+        inputSchema: { type: 'object', properties: {} }
+      },
+      {
         name: 'import_cost_data',
         description: 'Import cost/appraisal data from a parsed DMS XLS export. Updates appraisedValue and certCost on existing inventory cars matched by VIN or stock number.',
         inputSchema: {
@@ -611,6 +616,75 @@ function createMcpServer() {
           if (!args.cars || !args.cars.length) { result = { error: 'No cars provided' }; break; }
           result = await callScript('importNewCars', { cars: args.cars, replace: args.replace !== false });
           break;
+
+        case 'check_vehicle_matches': {
+          const allLeads = await getLeadsList();
+          const waitingLeads = allLeads.filter(l => l.vehicleNotAvailable === true || l.vehicleNotAvailable === 'true');
+
+          const invData = await callScript('getAll');
+          const availCars = (invData.cars || []).filter(c => !isSoldOrGone(c));
+
+          const TOYOTA_MODELS = ['tundra','tacoma','camry','rav4','highlander','4runner','sienna','corolla','venza','sequoia','prius','crown','gr86','bz4x'];
+
+          function parseTargetPrice(text) {
+            const m = text.match(/\$\s*(\d+)(?:[,](\d{3}))?([kK])?/);
+            if (!m) return null;
+            const base = parseInt(m[1]);
+            if (m[3]) return base * 1000;
+            if (m[2]) return base * 1000 + parseInt(m[2]);
+            if (base < 200) return base * 1000;
+            return base;
+          }
+
+          const matched = waitingLeads.map(lead => {
+            const interest = (lead.vehicleInterest || '').toLowerCase();
+            let notesText = '';
+            try {
+              const notes = typeof lead.notes === 'string' ? JSON.parse(lead.notes || '[]') : (lead.notes || []);
+              notesText = notes.map(n => n.text || '').join(' ').toLowerCase();
+            } catch {}
+            const searchText = interest + ' ' + notesText;
+            const keyword = TOYOTA_MODELS.find(m => searchText.includes(m));
+            const targetPrice = parseTargetPrice(searchText);
+
+            let recentNotes = [];
+            try {
+              const notes = typeof lead.notes === 'string' ? JSON.parse(lead.notes || '[]') : (lead.notes || []);
+              recentNotes = notes.slice(-3).map(n => ({ ts: n.ts, text: n.text }));
+            } catch {}
+
+            const potentialMatches = keyword ? availCars.filter(car => {
+              const title = `${car.year||''} ${car.make||''} ${car.model||''} ${car.trim||''}`.toLowerCase();
+              if (!title.includes(keyword)) return false;
+              if (targetPrice && car.price) {
+                if (Math.abs(car.price - targetPrice) / targetPrice > 0.20) return false;
+              }
+              return true;
+            }).map(c => ({ stock: c.stock, vin: c.vin, year: c.year, make: c.make, model: c.model, trim: c.trim, mileage: c.mileage, price: c.price, color: c.color })) : [];
+
+            return {
+              leadId: lead.leadId,
+              rowIndex: lead.rowIndex,
+              name: [lead.firstName, lead.lastName].filter(Boolean).join(' '),
+              phone: lead.phone,
+              leadType: lead.leadType,
+              vehicleInterest: lead.vehicleInterest,
+              recentNotes,
+              addedDate: lead.timestamp,
+              potentialMatches,
+              hasMatch: potentialMatches.length > 0
+            };
+          });
+
+          result = {
+            waitingLeads: matched,
+            totalWaiting: matched.length,
+            matchCount: matched.filter(m => m.hasMatch).length,
+            availableInventory: availCars.length,
+            checkedAt: new Date().toISOString()
+          };
+          break;
+        }
 
         default:
           result = { error: 'Unknown tool: ' + name };
