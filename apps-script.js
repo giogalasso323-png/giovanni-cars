@@ -102,19 +102,22 @@ function getLeadsSheet() {
   return sh;
 }
 
-// Same auto-repair pattern as getHeaderMap() for inventory: reads the actual header row,
-// appends any LEADS_COLUMNS entries that are missing (e.g. leadId added after initial sheet
-// creation), and returns a name→0-indexed-column map for robust field lookups.
+// Ensures the Leads sheet header row matches LEADS_COLUMNS and returns a name→0-indexed
+// position map. Data has always been written to LEADS_COLUMNS positions by this codebase
+// (hardcoded indexOf calls), so the map is always built from those canonical positions —
+// NOT from wherever headers happen to sit in the sheet. If any header is missing or
+// misplaced (e.g. from a prior repair that appended at the wrong column), the full
+// LEADS_COLUMNS header row is rewritten at positions 1..LEADS_COLUMNS.length to match.
 function getLeadsHeaderMap(sh) {
-  var lastCol = Math.max(sh.getLastColumn(), 1);
+  var numCols = LEADS_COLUMNS.length;
+  var lastCol = Math.max(sh.getLastColumn(), numCols);
   var headers = sh.getRange(1, 1, 1, lastCol).getValues()[0];
-  var missing = LEADS_COLUMNS.filter(function(c) { return headers.indexOf(c) < 0; });
-  if (missing.length) {
-    sh.getRange(1, lastCol + 1, 1, missing.length).setValues([missing]);
-    missing.forEach(function(h) { headers.push(h); });
+  var needsRepair = LEADS_COLUMNS.some(function(col, i) { return headers[i] !== col; });
+  if (needsRepair) {
+    sh.getRange(1, 1, 1, numCols).setValues([LEADS_COLUMNS]);
   }
   var map = {};
-  headers.forEach(function(h, i) { if (h) map[String(h)] = i; });
+  LEADS_COLUMNS.forEach(function(col, i) { map[col] = i; });
   return map;
 }
 
