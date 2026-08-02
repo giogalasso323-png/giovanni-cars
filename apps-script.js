@@ -136,7 +136,7 @@ function submitLead(data) {
     var row = LEADS_COLUMNS.map(function(col) {
       if (col === 'timestamp') return new Date().toISOString();
       if (col === 'source' && !data[col]) return 'manual';
-      if (col === 'pipelineStage' && !data[col]) return (data.turnedTo || data.turnedToFirst) ? 'Turned' : 'New';
+      if (col === 'pipelineStage' && !data[col]) return data.turnedTo ? 'Turned' : 'New';
       if (col === 'leadId') return Utilities.getUuid();
       return data[col] !== undefined ? data[col] : '';
     });

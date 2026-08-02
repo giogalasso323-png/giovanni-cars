@@ -4250,9 +4250,9 @@ async function submitManualLead(){
   const turnedToFirst = (document.getElementById('al-rep-first').value||'').trim();
   const turnedTo = (document.getElementById('al-rep-last').value||'').trim();
   let pipelineStage = document.getElementById('al-pipeline').value;
-  // Left on the default and a hand-off rep was entered -- this is a fresh turn, not a
-  // self-sourced New Lead, so it should land in the Turned column, not New.
-  if (pipelineStage === 'New' && (turnedToFirst || turnedTo)) pipelineStage = 'Turned';
+  // Only promote to Turned if turnedTo is set — that's the rep who RECEIVED the hand-off.
+  // turnedToFirst alone (recording first contact) does not make it a turn.
+  if (pipelineStage === 'New' && turnedTo) pipelineStage = 'Turned';
 
   if(!firstName||!lastName||!phone){ document.getElementById('al-error').style.display='block'; return; }
   document.getElementById('al-error').style.display='none';
