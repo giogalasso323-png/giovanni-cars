@@ -288,6 +288,17 @@ function createMcpServer() {
         }
       },
       {
+        name: 'scrape_new_inventory',
+        description: 'Sync new car listings with dublintoyota.com — checks websiteUrl, websiteStatus, and websitePrice for each online or stop-sale new car and saves results to the sheet. Call repeatedly with offset to page through all cars (limit 4 per call — each call does a full sitemap fetch). Returns { scraped, errors, errorMessages, total, done, nextOffset }. done:true means all cars covered.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            limit:  { type: 'number', description: 'Cars per call (default 4, do not increase)' },
+            offset: { type: 'number', description: 'Start index (default 0). Increment by limit each call.' }
+          }
+        }
+      },
+      {
         name: 'check_vehicle_matches',
         description: 'Check if any waiting customers (vehicleNotAvailable: true) can be matched to current available inventory. Returns each waiting lead with their vehicle criteria and any keyword+price-filtered potential matches from live inventory. Run this after a scrape or import completes to find customers who can now be served. The morning scrape agent uses this to build the daily vehicle match email.',
         inputSchema: { type: 'object', properties: {} }
@@ -616,6 +627,46 @@ function createMcpServer() {
           if (!args.cars || !args.cars.length) { result = { error: 'No cars provided' }; break; }
           result = await callScript('importNewCars', { cars: args.cars, replace: args.replace !== false });
           break;
+
+        case 'scrape_new_inventory': {
+          const limit  = args.limit  || 4;
+          const offset = args.offset || 0;
+
+          const newData = await callScript('getNewInventory');
+          const allNew  = newData.cars || [];
+
+          // Mirror the frontend filter: only online or stop-sale cars need scraping
+          const toScrape = allNew.filter(c => {
+            const isStopped = (c.campaign || '').toLowerCase().includes('safety');
+            const isOnline  = (c.onlineStatus || '').toLowerCase() === 'online';
+            return isOnline || isStopped;
+          });
+
+          if (!toScrape.length) { result = { scraped: 0, total: 0, done: true, message: 'No online vehicles' }; break; }
+
+          const chunk = toScrape.slice(offset, offset + limit);
+          let scraped = 0, errors = 0;
+          const errorMessages = [];
+
+          try {
+            const res = await callScript('scrapeNewVehicles', { vins: chunk.map(c => c.vin) });
+            if (res.error) throw new Error(res.error);
+            const now = new Date().toISOString();
+            scraped = (res.results || []).length;
+            if (scraped) {
+              await callScript('saveNewScrapeResults', { results: res.results, lastChecked: now });
+            }
+          } catch (e) { errors++; errorMessages.push(e.message); }
+
+          result = {
+            scraped, errors, errorMessages,
+            total: toScrape.length,
+            offset, limit,
+            done: (offset + limit) >= toScrape.length,
+            nextOffset: (offset + limit) >= toScrape.length ? null : offset + limit
+          };
+          break;
+        }
 
         case 'check_vehicle_matches': {
           const allLeads = await getLeadsList();

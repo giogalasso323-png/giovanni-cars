@@ -503,7 +503,15 @@ If no matches: just say "No matches on no-vehicle leads." and move on.
 
 ## Morning Agent: Post-Scrape Vehicle Match
 
-**This section is for the "Dublin Toyota — Daily Inventory Scrape" cloud routine only.** After the scrape loop finishes (when `done: true` is returned), immediately run this vehicle match phase before ending the session.
+**This section is for the "Dublin Toyota — Daily Inventory Scrape" cloud routine only.** After the used car scrape loop finishes, run the new car scrape, then the vehicle match phase.
+
+### Part 1B — New Car Scrape (run after used car scrape completes)
+
+Call `scrape_new_inventory` repeatedly with offset 0, 4, 8… (limit 4 per call) until `done: true`. This syncs the websiteUrl, websiteStatus, and websitePrice for all online and stop-sale new cars. Include the totals in your final summary.
+
+---
+
+**After both scrapes complete**, run this vehicle match phase before ending the session.
 
 ### Steps
 

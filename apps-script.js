@@ -64,7 +64,8 @@ function handleRequest(e) {
       case 'getNewInventory':    result = getNewInventory();                               break;
       case 'importNewCars':      result = importNewCars(body.cars, body.replace);         break;
       case 'updateNewCar':       result = updateNewCar(body.vin, body.field, body.value); break;
-      case 'scrapeNewVehicles':  result = scrapeNewVehicles(body.vins);                   break;
+      case 'scrapeNewVehicles':     result = scrapeNewVehicles(body.vins);                              break;
+      case 'saveNewScrapeResults':  result = saveNewScrapeResults(body.results, body.lastChecked);     break;
       case 'importCostData': result = importCostData(body.records);               break;
       case 'getSettings':    result = getSettings();                               break;
       case 'saveSetting':    result = saveSetting(body.key, body.value);          break;
@@ -902,6 +903,39 @@ function parseNewVehiclePage(html, vehicleUrl) {
     websiteUrl:    vehicleUrl,
     websitePrice:  price
   };
+}
+
+// Batch-saves scrape results for multiple new cars in one sheet pass.
+// Reads the VIN column once, then writes websiteUrl/websiteStatus/websitePrice/lastChecked
+// for each car in the results array. Much faster than calling updateNewCar() 4× per car.
+function saveNewScrapeResults(results, lastChecked) {
+  if (!results || !results.length) return { saved: 0 };
+  var ss = getSpreadsheet();
+  var sh = ss.getSheetByName(NEW_INV_SHEET);
+  if (!sh) return { error: 'Sheet not found' };
+  var last = sh.getLastRow();
+  if (last < 2) return { saved: 0 };
+  var colMap = getNewInvHeaderMap(sh);
+  var vinCol     = colMap['vin'];
+  var urlCol     = colMap['websiteUrl'];
+  var statusCol  = colMap['websiteStatus'];
+  var priceCol   = colMap['websitePrice'];
+  var checkedCol = colMap['lastChecked'];
+  if (vinCol === undefined) return { error: 'No VIN column' };
+  var vins = sh.getRange(2, vinCol + 1, last - 1, 1).getValues();
+  var vinToRow = {};
+  vins.forEach(function(row, i) { vinToRow[String(row[0]).toUpperCase()] = i + 2; });
+  var saved = 0;
+  results.forEach(function(r) {
+    var rowNum = vinToRow[String(r.vin || '').toUpperCase()];
+    if (!rowNum) return;
+    if (urlCol     !== undefined) sh.getRange(rowNum, urlCol     + 1).setValue(r.websiteUrl    || '');
+    if (statusCol  !== undefined) sh.getRange(rowNum, statusCol  + 1).setValue(r.websiteStatus || '');
+    if (priceCol   !== undefined) sh.getRange(rowNum, priceCol   + 1).setValue(r.websitePrice  || 0);
+    if (checkedCol !== undefined) sh.getRange(rowNum, checkedCol + 1).setValue(lastChecked      || '');
+    saved++;
+  });
+  return { saved: saved };
 }
 
 // Same auto-repair as getHeaderMap() for the main Inventory sheet -- appends any

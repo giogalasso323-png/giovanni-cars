@@ -4843,6 +4843,11 @@ function renderNewCarDrawer(c, isLeadContext) {
       <button class="mini-copy-btn" onclick="copyText('${c.accessories.replace(/'/g,"\\'")}',this)" style="flex-shrink:0;margin-top:2px">Copy</button>
     </div></div>`;
 
+  // Notes (from dealer daily import — deposits, holds, internal remarks)
+  h += `<div class="field-group"><div class="field-label">Notes</div>
+    <textarea rows="3" style="width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:8px 10px;border-radius:var(--radius);font-family:'Inter',sans-serif;font-size:13px;outline:none;resize:vertical;line-height:1.5" placeholder="No notes — import from Dealer Daily to populate" onblur="saveNewCarNote(this.value)">${String(c.notes||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</textarea>
+  </div>`;
+
   // Website link (if scraped)
   if (c.websiteUrl || c.websiteStatus) {
     h += `<div style="display:flex;gap:10px;flex-wrap:wrap;margin:0 0 16px 0">`;
