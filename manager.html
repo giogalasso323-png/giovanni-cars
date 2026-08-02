@@ -4456,6 +4456,18 @@ async function selectVehicleForLead(vin){
 function showToast(msg){ const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2800); }
 
 // ── NEW CARS ───────────────────────────────────────────────
+function catBadgeHtml(cat, large) {
+  const c = (cat||'').toUpperCase().trim();
+  const sz = large ? 'font-size:13px;font-weight:700' : 'font-size:11px;font-weight:700';
+  if (c === 'G') return `<span style="display:inline-flex;align-items:center;justify-content:center;width:${large?'24px':'20px'};height:${large?'24px':'20px'};border-radius:50%;background:#2563eb;color:#fff;${sz};flex-shrink:0" title="Ground — at dealership">G</span>`;
+  if (c === 'F') return `<span style="display:inline-flex;align-items:center;justify-content:center;padding:${large?'3px 8px':'2px 6px'};border-radius:4px;background:#6b7280;color:#fff;${sz}" title="In transit — being shipped">F</span>`;
+  if (c === 'A') return `<span style="display:inline-flex;align-items:center;justify-content:center;padding:${large?'3px 8px':'2px 6px'};border-radius:4px;background:#16a34a;color:#fff;${sz}" title="Allocated by Toyota">A</span>`;
+  return '';
+}
+function fmtArrival(val) {
+  if (!val) return '';
+  try { return new Date(val).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}); } catch(e) { return ''; }
+}
 let newInventory = [];
 let selectedNewVins = new Set();
 
@@ -4562,13 +4574,15 @@ function renderNewCarsView() {
     const disColor  = dis>60?'var(--red)':dis>30?'var(--amber)':'var(--text3)';
     const isActive  = c.vin === lastOpenedNewVin;
     const chk       = selectedNewVins.has(c.vin) ? 'checked' : '';
+    const catBadge  = catBadgeHtml(c.category);
+    const arrival   = fmtArrival(c.estArrival);
     return `<tr onclick="openNewCarDrawer('${c.vin}')" class="${isActive?'row-active':''}">
       <td onclick="event.stopPropagation()"><input type="checkbox" ${chk} onchange="toggleNewSelect('${c.vin}',this)"></td>
       <td style="color:var(--text3)">${c.stock||'—'}</td>
-      <td><div class="td-main">${c.year||''} ${c.modelName||'—'}</div><div class="td-vin">${c.vin}</div></td>
+      <td><div class="td-main" style="display:flex;align-items:center;gap:6px">${catBadge}<span>${c.year||''} ${c.modelName||'—'}</span></div><div class="td-vin">${c.vin}</div></td>
       <td>${decodeColor(c.extColor)}</td>
       <td style="font-weight:600">${price}</td>
-      <td style="color:${disColor}">${dis||'—'}d</td>
+      <td style="color:${disColor}">${dis||'—'}d${arrival?`<div style="font-size:10px;color:var(--text3);margin-top:1px">${arrival}</div>`:''}</td>
       <td>${stBadge} ${webLink}</td>
       <td>${fbBadge}${downloadedBadge}</td>
     </tr>`;
@@ -4804,8 +4818,9 @@ function renderNewCarDrawer(c, isLeadContext) {
   h += `<div class="section-title">Vehicle Details</div>`;
   h += `<div class="field-row">
     <div class="field-group"><div class="field-label">Year</div><div class="field-value">${c.year||'—'}</div></div>
-    <div class="field-group"><div class="field-label">Category</div><div class="field-value">${c.category||'—'}</div></div>
+    <div class="field-group"><div class="field-label">Category</div><div class="field-value" style="display:flex;align-items:center;gap:8px">${catBadgeHtml(c.category,true)}<span style="color:var(--text2);font-size:12px">${c.category==='G'?'Ground — at dealership':c.category==='F'?'In transit':c.category==='A'?'Allocated by Toyota':c.category||'—'}</span></div></div>
   </div>`;
+  if (c.estArrival) h += `<div class="field-group"><div class="field-label">Est. Arrival</div><div class="field-value">${fmtArrival(c.estArrival)||c.estArrival}</div></div>`;
   h += `<div class="field-group"><div class="field-label">Model</div>
     <div style="display:flex;align-items:center;gap:8px">
       <div class="field-value" style="flex:1">${c.modelName||'—'}</div>

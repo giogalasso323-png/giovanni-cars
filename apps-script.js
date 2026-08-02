@@ -12,7 +12,7 @@ const NEW_INV_COLUMNS = [
   'vin','year','modelName','modelCode','stock','category',
   'extColor','intColor','accessories','dis','totalSrp','advertised',
   'onlineStatus','promotable','campaign','presold','reserved',
-  'comments','rdr','addedDate','notes',
+  'comments','rdr','estArrival','addedDate','notes',
   'fbStatus','fbDescription','fbPostedPrice','fbPostedDate','currentFbPrice',
   'websiteUrl','websiteStatus','websitePrice','lastChecked','photosDownloadedDate'
 ];

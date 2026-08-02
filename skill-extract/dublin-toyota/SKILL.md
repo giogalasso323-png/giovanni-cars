@@ -473,9 +473,10 @@ When Giovanni drops any of these files, run the appropriate import then automati
 
 **New car CSV:**
 1. Parse with Python
-2. Call `import_new_cars` with the parsed rows
-3. Report: "X new cars imported"
-4. → Run no-vehicle lead check (match against new inventory too)
+2. Map columns to field names — key mappings: `Cat.` → `category`, `Model Name` → `modelName`, `Stock No.` → `stock`, `Model` → `modelCode`, `Ext.` → `extColor`, `Int.` → `intColor`, `Yr.` → `year`, `Total SRP` → `totalSrp`, `Online` → `onlineStatus`, `Cmpgn.` → `campaign`, `Presold` → `presold`, `Res.` → `reserved`, `Est. Arrival` → `estArrival`
+3. Call `import_new_cars` with the parsed rows
+4. Report: "X new cars imported"
+5. → Run no-vehicle lead check (match against new inventory too)
 
 ### Post-Import: Automatic No-Vehicle Lead Check
 
