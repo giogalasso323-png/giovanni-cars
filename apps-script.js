@@ -102,6 +102,22 @@ function getLeadsSheet() {
   return sh;
 }
 
+// Same auto-repair pattern as getHeaderMap() for inventory: reads the actual header row,
+// appends any LEADS_COLUMNS entries that are missing (e.g. leadId added after initial sheet
+// creation), and returns a name→0-indexed-column map for robust field lookups.
+function getLeadsHeaderMap(sh) {
+  var lastCol = Math.max(sh.getLastColumn(), 1);
+  var headers = sh.getRange(1, 1, 1, lastCol).getValues()[0];
+  var missing = LEADS_COLUMNS.filter(function(c) { return headers.indexOf(c) < 0; });
+  if (missing.length) {
+    sh.getRange(1, lastCol + 1, 1, missing.length).setValues([missing]);
+    missing.forEach(function(h) { headers.push(h); });
+  }
+  var map = {};
+  headers.forEach(function(h, i) { if (h) map[String(h)] = i; });
+  return map;
+}
+
 function submitLead(data) {
   if (!data.firstName && !data.lastName && !data.phone) {
     return { error: 'Missing lead data' };
@@ -151,11 +167,13 @@ function submitLead(data) {
 // cached by the client before a concurrent delete/move can point at the wrong row by the time
 // a follow-up write lands. leadId is a stable per-lead value that never changes, so writes and
 // deletes always re-resolve the current row from it instead of trusting a stale row number.
-function findLeadRow(sh, leadId) {
+// map is the result of getLeadsHeaderMap() — pass it in to avoid a redundant header read.
+function findLeadRow(sh, map, leadId) {
   var last = sh.getLastRow();
   if (last < 2) return -1;
-  var idCol = LEADS_COLUMNS.indexOf('leadId') + 1;
-  var ids = sh.getRange(2, idCol, last - 1, 1).getValues();
+  var idColIdx = map['leadId'];
+  if (idColIdx === undefined) return -1;
+  var ids = sh.getRange(2, idColIdx + 1, last - 1, 1).getValues();
   for (var i = 0; i < ids.length; i++) {
     if (String(ids[i][0]) === String(leadId)) return i + 2;
   }
@@ -167,8 +185,9 @@ function deleteLead(rowIndex) {
   var lock = LockService.getScriptLock();
   lock.waitLock(30000);
   try {
-    var sh = getLeadsSheet();
-    var row = findLeadRow(sh, rowIndex);
+    var sh  = getLeadsSheet();
+    var map = getLeadsHeaderMap(sh);
+    var row = findLeadRow(sh, map, rowIndex);
     if (row < 0) return { error: 'Lead not found' };
     sh.deleteRow(row);
     return { ok: true };
@@ -214,25 +233,31 @@ function saveSetting(key, value) {
 }
 
 function getLeads() {
-  var sh   = getLeadsSheet();
+  var sh  = getLeadsSheet();
+  var map = getLeadsHeaderMap(sh); // auto-repairs any missing columns (e.g. leadId)
   var last = sh.getLastRow();
   if (last < 2) return { leads: [] };
-  var numCols = LEADS_COLUMNS.length;
-  var idCol = LEADS_COLUMNS.indexOf('leadId');
-  var range = sh.getRange(2, 1, last - 1, numCols);
-  var data = range.getValues();
+  var numCols = sh.getLastColumn();
+  var idColIdx = map['leadId'];
+  var data = sh.getRange(2, 1, last - 1, numCols).getValues();
   var idChanged = false;
-  var leads = data.map(function(row, i) {
-    if (!row[idCol]) { row[idCol] = Utilities.getUuid(); idChanged = true; }
-    var obj = { rowIndex: row[idCol] };
-    LEADS_COLUMNS.forEach(function(col, j) {
-      var val = row[j];
+  var leads = data.map(function(row) {
+    if (idColIdx !== undefined && !row[idColIdx]) {
+      row[idColIdx] = Utilities.getUuid();
+      idChanged = true;
+    }
+    var obj = { rowIndex: idColIdx !== undefined ? String(row[idColIdx]) : '' };
+    LEADS_COLUMNS.forEach(function(col) {
+      var idx = map[col];
+      var val = idx !== undefined ? row[idx] : '';
       if (val instanceof Date) val = val.toISOString();
       obj[col] = (val === null || val === undefined) ? '' : val;
     });
     return obj;
   }).filter(function(l) { return l.firstName || l.lastName || l.phone; });
-  if (idChanged) range.setValues(data); // backfill leadId for pre-existing rows
+  if (idChanged && idColIdx !== undefined) {
+    sh.getRange(2, 1, data.length, numCols).setValues(data);
+  }
   return { leads: leads };
 }
 
@@ -261,13 +286,14 @@ function updateLead(rowIndex, field, value) {
   lock.waitLock(30000);
   try {
     var sh  = getLeadsSheet();
-    var row = findLeadRow(sh, rowIndex);
+    var map = getLeadsHeaderMap(sh);
+    var row = findLeadRow(sh, map, rowIndex);
     if (row < 0) return { error: 'Lead not found' };
-    var col = LEADS_COLUMNS.indexOf(field);
-    if (col < 0) return { error: 'Unknown field: ' + field };
+    var col = map[field];
+    if (col === undefined) return { error: 'Unknown field: ' + field };
     sh.getRange(row, col + 1).setValue(value);
-    var lastEditedCol = LEADS_COLUMNS.indexOf('lastEdited');
-    if (lastEditedCol >= 0 && field !== 'lastEdited') {
+    var lastEditedCol = map['lastEdited'];
+    if (lastEditedCol !== undefined && field !== 'lastEdited') {
       sh.getRange(row, lastEditedCol + 1).setValue(new Date().toISOString());
     }
     return { ok: true };
