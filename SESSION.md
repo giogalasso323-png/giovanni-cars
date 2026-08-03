@@ -35,9 +35,7 @@
 - `estArrival` field added to NEW_INV_COLUMNS in apps-script.js; shows under DIS in list and as dedicated field in drawer
 - SKILL.md: explicit CSV column→field mappings added for new car import (Cat.→category, Est. Arrival→estArrival, etc.)
 
-**Pending — requires Giovanni action:**
-- Redeploy Apps Script (estArrival + saveNewScrapeResults are new — clipboard ready)
-- Re-import new car CSV to populate estArrival and category badges in existing rows
+**All fully deployed — Apps Script redeployed and new car CSV reimported 2026-08-02.**
 
 ### Discord Bot — SCOPED, NOT BUILT YET
 Next build: Discord bot on always-on home PC that relays messages to Claude Code.
