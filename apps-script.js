@@ -33,7 +33,7 @@ const LEADS_COLUMNS = [
   'timeframe','source','status','notes','followUpDate','vehicleList',
   'leadType','inFocus','turnedTo','vehicleNotAvailable','vehicleInterest','turnedToFirst',
   'addedBy','calEventId','lastEdited','leadRank','leadSoldDate','soldArchived','pipelineStage','boardOrder',
-  'leadId'
+  'leadId','inventoryType'
 ];
 
 function doGet(e)     { return handleRequest(e); }
