@@ -6,13 +6,38 @@
 
 ## Current Work
 
-### Zombie lead fix — fully shipped (2026-08-01)
-All zombie lead fixes are now deployed end-to-end:
-- Apps Script redeployed 2026-08-01 (confirmed by Giovanni) — now uses stable `leadId` UUIDs to find rows instead of raw row numbers that shift on delete.
-- manager.html: `updateLeadStatus` now reloads on save failure; `migrateLeadPipelineFields` is now properly async/awaited instead of fire-and-forget.
+### Shipped 2026-08-02
 
-**Remaining open item:**
-- **Offered, no answer yet:** add a `scrape_new_inventory` MCP tool so the automated morning scrape routine covers New Cars too (currently only used inventory is scraped automatically — New Cars web links/availability only update when someone manually clicks "Refresh Web Data" in the app). Pick this back up if Giovanni wants it.
+**Vehicle match system:**
+- `check_vehicle_matches` MCP tool in mcp-server/index.js — returns all `vehicleNotAvailable: true` leads with keyword/price-filtered potential inventory matches
+- "Check Matches" button in Waiting board column → client-side modal using in-memory leadsData + inventory
+- SKILL.md: morning agent instructions to run vehicle match after scrape and output a daily report
+
+**New car daily scrape:**
+- `scrape_new_inventory` MCP tool in mcp-server/index.js — same offset/limit paging as used car scrape, limit 4 per call, filters online + stop-sale cars only
+- `saveNewScrapeResults()` in apps-script.js — batch saves websiteUrl/websiteStatus/websitePrice/lastChecked for a chunk in one sheet pass (replaces 4 individual updateNewCar calls per car)
+- SKILL.md updated: morning agent runs Part 1B (new car scrape) after used car scrape, before vehicle match phase
+- Giovanni updated the "Dublin Toyota — Daily Inventory Scrape" agent in Claude.ai to include Part 1B
+
+**Notes in new car drawer:**
+- `notes` field (from Dealer Daily imports — deposits, holds, remarks) now shows as editable textarea in new car drawer
+- `saveNewCarNote()` already existed; just wired up the UI
+
+**Zombie leads via calendar sync — FIXED:**
+- Root cause: Calendar Lead Sync Pass 3 was recreating deleted leads from orphaned calendar events (~30 min after deletion)
+- Fix: Giovanni replaced the calendar sync agent prompt in Claude.ai — Pass 3 (Calendar→New Lead) removed entirely
+- Sync now only runs Pass 1 (CRM→Calendar) and Pass 2 (Calendar reschedules→CRM)
+- Leads now only enter the system through Cowork conversations or the manager app
+
+**New inventory category badges + Est. Arrival:**
+- G/F/A category field now displays as styled badges: G = blue circle, F = grey box, A = green box
+- Badges show next to model name in list view; full label shown in drawer ("Ground — at dealership", "In transit", "Allocated by Toyota")
+- `estArrival` field added to NEW_INV_COLUMNS in apps-script.js; shows under DIS in list and as dedicated field in drawer
+- SKILL.md: explicit CSV column→field mappings added for new car import (Cat.→category, Est. Arrival→estArrival, etc.)
+
+**Pending — requires Giovanni action:**
+- Redeploy Apps Script (estArrival + saveNewScrapeResults are new — clipboard ready)
+- Re-import new car CSV to populate estArrival and category badges in existing rows
 
 ### Discord Bot — SCOPED, NOT BUILT YET
 Next build: Discord bot on always-on home PC that relays messages to Claude Code.
