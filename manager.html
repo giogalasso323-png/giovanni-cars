@@ -3967,6 +3967,7 @@ function renderBoardCard(lead, draggable, colKey){
       <span style="cursor:pointer" title="Set customer grade" onclick="event.stopPropagation();openQuickRank(event,'${lead.rowIndex}')">${rankBadgeHtml(rank)}</span>
       <span class="board-src-badge">${src}</span>
       ${pipelineStatusBadgeHtml(lead)}
+      ${invTypeBadgeHtml(lead.inventoryType)}
     </div>
     <div class="board-card-row"><span class="board-card-name">${fName||'—'}</span>${copyBtn(lead.firstName,'first name')}</div>
     <div class="board-card-row"><span class="board-card-name">${lName||'—'}</span>${copyBtn(lead.lastName,'last name')}</div>
@@ -3995,6 +3996,14 @@ function rankBadgeHtml(rank){
     `<span style="color:${rankCharColor(p3,false)}">${p3||'–'}</span>`+
     (suffix?`<span style="color:var(--text3)">${suffix}</span>`:'')+
     `</span>`;
+}
+function invTypeBadgeHtml(type) {
+  const t = (type || '').trim();
+  const pill = (label, bg) => `<span style="display:inline-flex;align-items:center;padding:2px 5px;border-radius:3px;font-size:10px;font-weight:700;font-family:'Inter',sans-serif;background:${bg};color:#fff;letter-spacing:0.3px">${label}</span>`;
+  if (t === 'Used') return pill('U', '#d97706');
+  if (t === 'New')  return pill('N', '#5299ff');
+  if (t === 'Both') return pill('U', '#d97706') + ' ' + pill('N', '#5299ff');
+  return '';
 }
 // Quick rank popover — set customer grade straight from any board card, no drawer needed.
 function openQuickRank(e, rowIndex){
