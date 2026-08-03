@@ -853,7 +853,7 @@ let currentLeadRowIndex = null;
 let currentSubDrawerVin = null;
 // New cars state
 let currentNewVin = null, lastOpenedNewVin = null;
-let newCarsFilter = 'all', newCarsSearch = '', newCarsSort = 'model';
+let newCarsFilter = 'all', newCarsSearch = '', newCarsSort = 'model', newCarsCategory = 'all';
 let newCarsFiltered = [];
 
 // ── SETUP ──────────────────────────────────────────────────
@@ -2022,7 +2022,10 @@ function buildLeadSectionHtml(lead, car){
     <!-- In Focus? -->
     <div style="margin-bottom:12px">
       <div class="field-label" style="margin-bottom:6px">In Focus?</div>
-      <button class="lead-type-tab${isLeadInFocus(lead)?' active':''}" style="${isLeadInFocus(lead)?'background:var(--purple);color:#fff;border-color:var(--purple);opacity:1':''}" onclick="toggleLeadFocus('${lead.rowIndex}')">${isLeadInFocus(lead)?'✓ In Focus':'Not in Focus'}</button>
+      <div style="display:flex;gap:6px">
+        <button onclick="setLeadFocus('${lead.rowIndex}',true)" style="flex:1;padding:7px 12px;border-radius:var(--radius);font-family:'Inter',sans-serif;font-size:12px;font-weight:600;cursor:pointer;border:1px solid;transition:all 0.15s;${isLeadInFocus(lead)?'background:var(--purple);color:#fff;border-color:var(--purple)':'background:var(--bg3);color:var(--text2);border-color:var(--border)'}">✓ In Focus</button>
+        <button onclick="setLeadFocus('${lead.rowIndex}',false)" style="flex:1;padding:7px 12px;border-radius:var(--radius);font-family:'Inter',sans-serif;font-size:12px;font-weight:600;cursor:pointer;border:1px solid;transition:all 0.15s;${!isLeadInFocus(lead)?'background:var(--red-bg);color:var(--red);border-color:var(--red)':'background:var(--bg3);color:var(--text2);border-color:var(--border)'}">Not in Focus</button>
+      </div>
     </div>
 
     <!-- Pipeline Status — one button per board column, same as dragging a card there -->
@@ -2171,8 +2174,9 @@ function buildVehicleListHtml(lead) {
     try {
     const car = inventory.find(c => c.vin === v.vin)
              || inventory.find(c => c.stock && v.stock && c.stock.toUpperCase() === v.stock.toUpperCase());
+    const newCar = !car ? (newInventory.find(c => c.vin === v.vin) || null) : null;
     const g = car ? calcGrossData(car, 0, 0) : null;
-    const title = car ? getTitle(car) : (v.title || v.stock || v.vin || '?');
+    const title = car ? getTitle(car) : newCar ? `${newCar.year||''} ${newCar.modelName||''}`.trim() : (v.title || v.stock || v.vin || '?');
     const stock = v.stock || (car ? car.stock : '') || '';
     const price = car ? fmtPrice(car.websitePrice||car.price) : '—';
     const miles = car ? fmtMiles(car.mileage) : '—';
@@ -2317,12 +2321,11 @@ async function saveInventoryType(rowIndex, value) {
   } catch(e) { showToast('Failed to save: ' + e.message); }
 }
 
-// In Focus is now a pure on/off toggle, independent of Sold/Lost/pipeline position —
-// replaces the old "Active" button that unconditionally reset both leadType and inFocus.
-async function toggleLeadFocus(rowIndex){
+// In Focus — explicit set (true = Focus, false = not in focus)
+async function setLeadFocus(rowIndex, focused){
   const lead = leadsData.find(l => l.rowIndex === rowIndex);
   if (!lead) return;
-  const newVal = isLeadInFocus(lead) ? '' : 'Focus';
+  const newVal = focused ? 'Focus' : '';
   lead.inFocus = newVal;
   try {
     await apiPost('updateLead', { rowIndex, field: 'inFocus', value: newVal });
@@ -2332,6 +2335,11 @@ async function toggleLeadFocus(rowIndex){
   if (currentLeadRowIndex === rowIndex) {
     document.getElementById('drawer-body').innerHTML = buildLeadSectionHtml(lead, null);
   }
+}
+async function toggleLeadFocus(rowIndex){
+  const lead = leadsData.find(l => l.rowIndex === rowIndex);
+  if (!lead) return;
+  await setLeadFocus(rowIndex, !isLeadInFocus(lead));
 }
 // Pipeline Status button click — same effect as dragging the card to that board column.
 async function setLeadPipelinePosition(rowIndex, colKey){
@@ -2357,6 +2365,31 @@ function renderLvaResults(q) {
   const lead = currentLeadRowIndex !== null ? leadsData.find(l => l.rowIndex === currentLeadRowIndex) : null;
   const existingVins = lead && Array.isArray(lead.vehicleList) ? new Set(lead.vehicleList.map(v => v.vin)) : new Set();
 
+  const newCarsHtml = newInventory.filter(c => {
+    if (!q) return true;
+    return [c.year, c.modelName, c.vin, c.stock, decodeColor(c.extColor)].join(' ').toLowerCase().includes(q);
+  }).slice(0, 20).map(c => {
+    const already = existingVins.has(c.vin);
+    const price = c.advertised ? '$'+Number(c.advertised).toLocaleString() : '—';
+    return `<div onclick="${already ? '' : `addNewCarToLead('${c.vin}')`}"
+      style="padding:11px 14px;border-bottom:1px solid var(--border);cursor:${already?'default':'pointer'};opacity:${already?0.5:1}"
+      onmouseover="if(!${already})this.style.background='var(--bg3)'" onmouseout="this.style.background=''">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
+        <div style="min-width:0">
+          <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:2px">
+            <span style="font-size:11px;font-weight:700;padding:1px 6px;border-radius:3px;background:rgba(37,99,235,0.15);color:#60a5fa">NEW</span>
+            ${catBadgeHtml(c.category)}
+            <span style="font-size:13px;font-weight:600;color:var(--text)">${c.year||''} ${c.modelName||'—'}</span>
+          </div>
+          <div style="font-size:11px;color:var(--text3);font-family:'DM Mono',monospace">${c.vin}${c.stock?' · #'+c.stock:''} · ${price}</div>
+        </div>
+        <div style="font-size:12px;font-weight:600;white-space:nowrap;flex-shrink:0;padding-top:2px">
+          ${already ? '<span style="color:var(--green)">✓ Added</span>' : ''}
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+
   const cars = inventory.filter(c => {
     if (!lvaShowAll) {
       // Live only: must have websiteStatus==='Live' and not sold
@@ -2367,12 +2400,7 @@ function renderLvaResults(q) {
     return [c.year, c.make, c.model, c.trim, c.color, c.stock].join(' ').toLowerCase().includes(q);
   }).slice(0, 50);
 
-  if (!cars.length) {
-    results.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text3)">No vehicles match</div>';
-    return;
-  }
-
-  results.innerHTML = cars.map(c => {
+  const usedHtml = cars.map(c => {
     const g = calcGrossData(c, 0, 0);
     const commStr = g ? `${fmtG(g.bottomComm)}–${fmtG(g.topComm)}` : '';
     const already = existingVins.has(c.vin);
@@ -2399,6 +2427,14 @@ function renderLvaResults(q) {
       </div>
     </div>`;
   }).join('');
+
+  if (!usedHtml && !newCarsHtml) {
+    results.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text3)">No vehicles match</div>';
+    return;
+  }
+  const newSep = newCarsHtml ? `<div style="padding:6px 14px;font-size:11px;font-weight:700;color:var(--text3);background:var(--bg2);text-transform:uppercase;letter-spacing:0.5px">New Inventory</div>` : '';
+  const usedSep = usedHtml ? `<div style="padding:6px 14px;font-size:11px;font-weight:700;color:var(--text3);background:var(--bg2);text-transform:uppercase;letter-spacing:0.5px">Used Inventory</div>` : '';
+  results.innerHTML = newSep + newCarsHtml + usedSep + usedHtml;
 }
 
 async function addVehicleToLead(vin) {
@@ -2415,6 +2451,27 @@ async function addVehicleToLead(vin) {
   try {
     await apiPost('updateLead', { rowIndex: currentLeadRowIndex, field: 'vehicleList', value: JSON.stringify(vList) });
     showToast('Vehicle added');
+    const vSection = document.getElementById('lead-vehicles-section');
+    if (vSection) vSection.innerHTML = buildVehicleListHtml(lead);
+    renderLvaResults(document.getElementById('lva-search').value);
+  } catch(e) { showToast('Failed to save'); }
+}
+
+async function addNewCarToLead(vin) {
+  if (currentLeadRowIndex === null) return;
+  const lead = leadsData.find(l => l.rowIndex === currentLeadRowIndex);
+  const car = newInventory.find(c => c.vin === vin);
+  if (!lead || !car) return;
+
+  const vList = Array.isArray(lead.vehicleList) ? [...lead.vehicleList] : [];
+  if (vList.some(v => v.vin === vin)) { showToast('Already added'); return; }
+  const title = `${car.year||''} ${car.modelName||''}`.trim();
+  vList.push({ vin: car.vin, stock: car.stock || '', title });
+  lead.vehicleList = vList;
+
+  try {
+    await apiPost('updateLead', { rowIndex: currentLeadRowIndex, field: 'vehicleList', value: JSON.stringify(vList) });
+    showToast('New car added');
     const vSection = document.getElementById('lead-vehicles-section');
     if (vSection) vSection.innerHTML = buildVehicleListHtml(lead);
     renderLvaResults(document.getElementById('lva-search').value);
@@ -3962,7 +4019,7 @@ function pipelineStatusBadgeHtml(lead){
   if (isLeadInFocus(lead)) return `<span class="board-focus-badge">Focus</span>`;
   if (ip === 'Lost') return `<span class="board-pipestatus-lost">Lost</span>`;
   if (ip === 'Sold') return `<span class="board-pipestatus-sold">Sold</span>`;
-  return `<span class="board-pipestatus-active">Active</span>`;
+  return `<span class="board-pipestatus-lost" style="background:var(--red-bg);color:var(--red)">Not Focus</span>`;
 }
 
 function renderBoardCard(lead, draggable, colKey){
@@ -3980,6 +4037,7 @@ function renderBoardCard(lead, draggable, colKey){
 
   const copyBtn = (text, title) => text ? `<button class="mini-copy-btn board-copy-btn" title="Copy ${title}" onclick="event.stopPropagation();copyText('${String(text).replace(/'/g,"\\'")}',this)">⧉</button>` : '';
   const escText = s => String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  const notFocused = !isLeadInFocus(lead) && lead.inFocus !== 'Lost' && lead.inFocus !== 'Sold';
 
   return `<div class="board-card"
       ${draggable?'draggable="true"':''}
@@ -3988,7 +4046,8 @@ function renderBoardCard(lead, draggable, colKey){
       ondragover="${draggable?`boardCardDragOver(event)`:''}"
       ondragleave="${draggable?`boardCardDragLeave(event)`:''}"
       ondrop="${draggable?`boardCardDrop(event,'${colKey}','${lead.rowIndex}')`:''}"
-      onclick="openDrawerFromLead('${lead.rowIndex}')">
+      onclick="openDrawerFromLead('${lead.rowIndex}')"
+      style="${notFocused?'border-left:3px solid var(--red)':''}">
     <div class="board-card-top">
       <span style="cursor:pointer" title="Set customer grade" onclick="event.stopPropagation();openQuickRank(event,'${lead.rowIndex}')">${rankBadgeHtml(rank)}</span>
       <span class="board-src-badge">${src}</span>
@@ -4460,28 +4519,45 @@ function closeVehicleSearch(){ document.getElementById('vehicle-search-modal').c
 function renderVehicleSearchResults(q){
   const results=document.getElementById('vs-results');
   q=q.toLowerCase().trim();
-  const cars=inventory.filter(c=>{
+  const usedCars=inventory.filter(c=>{
     if((c.websiteStatus||'').toLowerCase().includes('sold')||c.soldDate) return false;
     if(!q) return true;
     return [c.year,c.make,c.model,c.trim,c.color,c.stock].join(' ').toLowerCase().includes(q);
-  }).slice(0,40);
-  if(!cars.length){ results.innerHTML='<div style="padding:20px;text-align:center;color:var(--text3)">No vehicles match</div>'; return; }
-  results.innerHTML=cars.map(c=>`
-    <div onclick="selectVehicleForLead('${c.vin}')" style="padding:11px 14px;border-bottom:1px solid var(--border);cursor:pointer;transition:background 0.1s" onmouseover="this.style.background='var(--bg3)'" onmouseout="this.style.background=''">
+  }).slice(0,30);
+  const newCars=newInventory.filter(c=>{
+    if(!q) return true;
+    return [c.year,c.modelName,c.vin,c.stock,decodeColor(c.extColor)].join(' ').toLowerCase().includes(q);
+  }).slice(0,20);
+  if(!usedCars.length&&!newCars.length){ results.innerHTML='<div style="padding:20px;text-align:center;color:var(--text3)">No vehicles match</div>'; return; }
+  const usedHtml = usedCars.map(c=>`
+    <div onclick="selectVehicleForLead('${c.vin}',false)" style="padding:11px 14px;border-bottom:1px solid var(--border);cursor:pointer;transition:background 0.1s" onmouseover="this.style.background='var(--bg3)'" onmouseout="this.style.background=''">
       <div style="font-size:13px;font-weight:600;color:var(--text)">${getTitle(c)}</div>
       <div style="font-size:11px;color:var(--text3);font-family:'DM Mono',monospace;margin-top:2px">${c.vin}${c.stock?' · #'+c.stock:''}${c.websitePrice?' · '+fmtPrice(c.websitePrice):''}${c.mileage?' · '+fmtMiles(c.mileage):''}</div>
     </div>`).join('');
+  const newHtml = newCars.map(c=>`
+    <div onclick="selectVehicleForLead('${c.vin}',true)" style="padding:11px 14px;border-bottom:1px solid var(--border);cursor:pointer;transition:background 0.1s" onmouseover="this.style.background='var(--bg3)'" onmouseout="this.style.background=''">
+      <div style="display:flex;align-items:center;gap:8px">
+        <span style="font-size:11px;font-weight:700;padding:1px 6px;border-radius:3px;background:rgba(37,99,235,0.15);color:#60a5fa">NEW</span>
+        <span style="font-size:13px;font-weight:600;color:var(--text)">${c.year||''} ${c.modelName||'—'}</span>
+        ${catBadgeHtml(c.category)}
+      </div>
+      <div style="font-size:11px;color:var(--text3);font-family:'DM Mono',monospace;margin-top:2px">${c.vin}${c.stock?' · #'+c.stock:''}${c.advertised?' · $'+Number(c.advertised).toLocaleString():''}</div>
+    </div>`).join('');
+  const sep = newHtml ? `<div style="padding:6px 14px;font-size:11px;font-weight:700;color:var(--text3);background:var(--bg2);text-transform:uppercase;letter-spacing:0.5px">New Inventory</div>` : '';
+  results.innerHTML = (usedHtml||'') + sep + (newHtml||'');
 }
 
-async function selectVehicleForLead(vin){
+async function selectVehicleForLead(vin, isNew){
   if(currentLeadRowIndex===null) return;
-  const car=inventory.find(c=>c.vin===vin); if(!car) return;
+  const car = isNew ? newInventory.find(c=>c.vin===vin) : inventory.find(c=>c.vin===vin);
+  if(!car) return;
   closeVehicleSearch();
+  const title = isNew ? `${car.year||''} ${car.modelName||''}`.trim() : getTitle(car);
   const lead=leadsData.find(l=>l.rowIndex===currentLeadRowIndex);
-  if(lead){ lead.vin=vin; lead.vehicle=getTitle(car); }
+  if(lead){ lead.vin=vin; lead.vehicle=title; }
   try {
     await apiPost('updateLead',{rowIndex:currentLeadRowIndex,field:'vin',value:vin});
-    await apiPost('updateLead',{rowIndex:currentLeadRowIndex,field:'vehicle',value:getTitle(car)});
+    await apiPost('updateLead',{rowIndex:currentLeadRowIndex,field:'vehicle',value:title});
   } catch(e){ showToast('Failed to save vehicle change'); return; }
   if(lead) document.getElementById('drawer-body').innerHTML = buildLeadSectionHtml(lead, null);
   showToast('Vehicle updated');
@@ -4556,8 +4632,11 @@ function applyNewCarsFilters() {
   const q = newCarsSearch.toLowerCase();
   newCarsFiltered = newInventory.filter(c => {
     if (q) {
-      const hay = [c.modelName,c.vin,c.stock,decodeColor(c.extColor),c.intColor,c.year,c.category].join(' ').toLowerCase();
+      const hay = [c.modelName,c.vin,c.stock,decodeColor(c.extColor),c.intColor,c.year,c.category,c.notes].join(' ').toLowerCase();
       if (!hay.includes(q)) return false;
+    }
+    if (newCarsCategory !== 'all') {
+      if ((c.category||'').toUpperCase().trim() !== newCarsCategory) return false;
     }
     const isStopped = (c.campaign||'').toLowerCase().includes('safety');
     const isOnline = (c.onlineStatus||'').toLowerCase() === 'online' && !isStopped;
@@ -4611,14 +4690,18 @@ function renderNewCarsView() {
     const chk       = selectedNewVins.has(c.vin) ? 'checked' : '';
     const catBadge  = catBadgeHtml(c.category);
     const arrival   = fmtArrival(c.estArrival);
+    const noteTxt   = c.notes ? (c.notes.length > 40 ? c.notes.slice(0,40)+'…' : c.notes) : '—';
     return `<tr onclick="openNewCarDrawer('${c.vin}')" class="${isActive?'row-active':''}">
       <td onclick="event.stopPropagation()"><input type="checkbox" ${chk} onchange="toggleNewSelect('${c.vin}',this)"></td>
+      <td style="text-align:center">${catBadge}</td>
       <td style="color:var(--text3)">${c.stock||'—'}</td>
-      <td><div class="td-main" style="display:flex;align-items:center;gap:6px">${catBadge}<span>${c.year||''} ${c.modelName||'—'}</span></div><div class="td-vin">${c.vin}</div></td>
+      <td><div class="td-main">${c.year||''} ${c.modelName||'—'}</div><div class="td-vin">${c.vin}</div></td>
       <td>${decodeColor(c.extColor)}</td>
-      <td style="font-weight:600">${price}</td>
-      <td style="color:${disColor}">${dis||'—'}d${arrival?`<div style="font-size:10px;color:var(--text3);margin-top:1px">${arrival}</div>`:''}</td>
+      <td style="font-weight:600;cursor:pointer" onclick="event.stopPropagation();setNewCarsSort(newCarsSort==='price-asc'?'price-desc':'price-asc')">${price}</td>
+      <td style="color:${disColor}">${dis||'—'}d</td>
+      <td style="color:var(--text3);font-size:12px;white-space:nowrap">${arrival||'—'}</td>
       <td>${stBadge} ${webLink}</td>
+      <td style="font-size:12px;color:var(--text2);max-width:160px" title="${(c.notes||'').replace(/"/g,'&quot;')}">${noteTxt}</td>
       <td>${fbBadge}${downloadedBadge}</td>
     </tr>`;
   }).join('');
@@ -4642,11 +4725,17 @@ function renderNewCarsView() {
           <button class="btn btn-primary" onclick="openNewCarsImport()"><svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg> Import CSV</button>
         </div>
       </div>
-      <div style="display:flex;align-items:center;gap:10px;padding:8px 20px;border-top:1px solid var(--border)">
+      <div style="display:flex;align-items:center;gap:10px;padding:8px 20px;border-top:1px solid var(--border);flex-wrap:wrap">
         <div class="search-wrap" style="max-width:280px">
           <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" style="position:absolute;left:10px;top:50%;transform:translateY(-50%);opacity:0.4;pointer-events:none"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
           <input type="search" placeholder="Search model, VIN, color…" value="${newCarsSearch.replace(/"/g,'&quot;')}" oninput="setNewCarsSearch(this.value)" style="width:100%">
         </div>
+        <select onchange="setNewCarsCategory(this.value)" style="background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:8px 28px 8px 12px;border-radius:var(--radius);font-family:'Inter',sans-serif;font-size:13px;outline:none;cursor:pointer;appearance:none;background-image:url('data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%2710%27 height=%276%27 fill=%27none%27%3E%3Cpath d=%27M1 1l4 4 4-4%27 stroke=%27%239a9994%27 stroke-width=%271.5%27 stroke-linecap=%27round%27 stroke-linejoin=%27round%27/%3E%3C/svg%3E');background-repeat:no-repeat;background-position:right 10px center">
+          <option value="all" ${newCarsCategory==='all'?'selected':''}>G/F/A: All</option>
+          <option value="G" ${newCarsCategory==='G'?'selected':''}>G — Ground</option>
+          <option value="F" ${newCarsCategory==='F'?'selected':''}>F — In Transit</option>
+          <option value="A" ${newCarsCategory==='A'?'selected':''}>A — Allocated</option>
+        </select>
         ${sortSel}
       </div>
       <div class="filter-tabs" style="padding:0 20px">${tabs}</div>
@@ -4665,15 +4754,18 @@ function renderNewCarsView() {
         <table>
           <thead><tr>
             <th style="width:32px"><input type="checkbox" id="chk-all-new" onchange="toggleNewAll(this)"></th>
+            <th style="width:36px;text-align:center">Cat</th>
             <th>Stock #</th>
-            <th onclick="setNewCarsSort('model')">Model / VIN</th>
+            <th onclick="setNewCarsSort('model')" style="cursor:pointer">Model / VIN ↕</th>
             <th>Color</th>
-            <th onclick="setNewCarsSort('price-asc')">Price</th>
-            <th onclick="setNewCarsSort('dis')">DIS</th>
+            <th onclick="setNewCarsSort(newCarsSort==='price-asc'?'price-desc':'price-asc')" style="cursor:pointer">Price ${newCarsSort==='price-asc'?'↑':newCarsSort==='price-desc'?'↓':'↕'}</th>
+            <th onclick="setNewCarsSort(newCarsSort==='dis'?'dis-desc':'dis')" style="cursor:pointer">DIS ${newCarsSort==='dis'?'↑':newCarsSort==='dis-desc'?'↓':'↕'}</th>
+            <th>Est. Arrival</th>
             <th>Status</th>
+            <th>Notes</th>
             <th>Facebook</th>
           </tr></thead>
-          <tbody>${newCarsFiltered.length ? rows : '<tr><td colspan="8" style="text-align:center;padding:40px;color:var(--text3)">No vehicles match</td></tr>'}</tbody>
+          <tbody>${newCarsFiltered.length ? rows : '<tr><td colspan="11" style="text-align:center;padding:40px;color:var(--text3)">No vehicles match</td></tr>'}</tbody>
         </table>
       </div>
     </div>`;
@@ -4682,6 +4774,7 @@ function renderNewCarsView() {
 function setNewCarsFilter(f){ newCarsFilter=f; renderNewCarsView(); }
 function setNewCarsSearch(q){ newCarsSearch=q; renderNewCarsView(); }
 function setNewCarsSort(s){ newCarsSort=s; renderNewCarsView(); }
+function setNewCarsCategory(c){ newCarsCategory=c; renderNewCarsView(); }
 
 // ── New Cars selection + photo download ─────────────────────
 function toggleNewSelect(vin,el){ if(el.checked)selectedNewVins.add(vin);else selectedNewVins.delete(vin); updateNewActionBar(); }
