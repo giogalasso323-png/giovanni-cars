@@ -367,7 +367,8 @@
   </header>
 
   <div class="filter-tabs">
-    <button class="filter-tab active" data-filter="all">All <span class="tab-count" id="cnt-all">0</span></button>
+    <button class="filter-tab active" data-filter="leads">Leads <span class="tab-count" id="cnt-leads">0</span></button>
+    <button class="filter-tab" data-filter="all">All <span class="tab-count" id="cnt-all">0</span></button>
     <button class="filter-tab" data-filter="upcoming">Upcoming <span class="tab-count" id="cnt-upcoming">0</span></button>
     <button class="filter-tab" data-filter="live">Live <span class="tab-count" id="cnt-live">0</span></button>
     <button class="filter-tab" data-filter="posted">FB Posted <span class="tab-count" id="cnt-posted">0</span></button>
@@ -376,7 +377,6 @@
     <button class="filter-tab" data-filter="downloaded">Downloaded <span class="tab-count" id="cnt-downloaded">0</span></button>
     <button class="filter-tab" data-filter="sold">Sold <span class="tab-count" id="cnt-sold">0</span></button>
     <button class="filter-tab" data-filter="not-listed">Not Listed <span class="tab-count" id="cnt-not-listed">0</span></button>
-    <button class="filter-tab" data-filter="leads">Leads <span class="tab-count" id="cnt-leads">0</span></button>
     <button class="filter-tab" data-filter="new-cars">New Cars <span class="tab-count" id="cnt-new">0</span></button>
     <button class="filter-tab" data-filter="floor">Floor <span class="tab-count" id="cnt-floor">0</span></button>
   </div>
@@ -845,7 +845,7 @@ async function checkPassword() {
 // ── APP BOOT ───────────────────────────────────────────────
 const API_URL = 'https://script.google.com/macros/s/AKfycbzl1VFO7DbmSfMq_tQnZDxygvdC5rpYFgGyCzbHurLdSSAlBtiPgc73WHGiVSK_SM0T/exec';
 let inventory = [], filtered = [];
-let currentView = 'table', activeFilter = 'all', sortKey = 'date-desc';
+let currentView = 'table', activeFilter = 'leads', sortKey = 'date-desc';
 let upcomingPricedOnly = false, upcomingDays = 90;
 let selectedVins = new Set(), pendingCsvData = null, currentVin = null, lastOpenedVin = null;
 let pendingPhotos = [];
@@ -922,7 +922,11 @@ async function loadFromSheet() {
     const res = await apiGet('getAll');
     if (res.error) throw new Error(res.error);
     inventory = (res.cars||[]).map(c => ({ ...c, mileage: Number(c.mileage)||0, price: Number(c.price)||0, websitePrice: Number(c.websitePrice)||0, appraisedValue: Number(c.appraisedValue)||0, certCost: Number(c.certCost)||0 }));
-    render(); setSyncInfo('ok');
+    if (activeFilter === 'leads') showLeadsView();
+    else if (activeFilter === 'new-cars') showNewCarsView();
+    else if (activeFilter === 'floor') showFloorView();
+    else render();
+    setSyncInfo('ok');
   } catch(e) { setSyncInfo('error'); showToast('Sheet load error: ' + e.message); }
 }
 
@@ -3133,7 +3137,7 @@ function viewMatchedLeads() {
 
 let leadsFilter = 'all'; // 'all' | 'matched'
 let leadsTab = 'Lot'; // 'Lot' | 'FB Marketplace' | 'FB Ad' | 'Website' | 'Focus' | 'Lost' | 'Sold'
-let leadsViewMode = 'table'; // 'table' | 'board'
+let leadsViewMode = 'board'; // 'table' | 'board'
 let leadsGroupBy = 'process'; // 'process' | 'stage' | 'recency' | 'new' | 'turned' | 'quality'
 let leadsShowClosed = false; // show Sold/Lost (stage) or Unranked/Dead (quality) columns
 let leadsSearch = ''; // free-text filter by name or phone, active in both table and board views
